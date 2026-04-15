@@ -13,12 +13,16 @@ import AdCopyTab from "@/components/AdCopyTab";
 import StoryTab from "@/components/StoryTab";
 import BiddingTab from "@/components/BiddingTab";
 import DiscountTab from "@/components/DiscountTab";
+import ThumbDiffTab from "@/components/ThumbDiffTab";
+import UpsellTab from "@/components/UpsellTab";
 
 const TABS = [
   { id: "description", label: "📝 상품 설명문" },
-  { id: "keywords", label: "🔍 키워드 최적화" },
   { id: "seo", label: "📈 상품명 SEO" },
+  { id: "keywords", label: "🔍 세부 키워드" },
   { id: "story", label: "🛒 구매 전환율" },
+  { id: "thumbdiff", label: "🎨 썸네일 차별화" },
+  { id: "upsell", label: "📦 업셀링 전략" },
   { id: "adcopy", label: "📣 광고 전략" },
   { id: "bidding", label: "💡 키워드 입찰" },
   { id: "discount", label: "🎁 할인 & 가치" },
@@ -66,6 +70,8 @@ export default function Home() {
           {activeTab === "keywords" && <KeywordsTab />}
           {activeTab === "seo" && <SeoTab />}
           {activeTab === "story" && <StoryTab />}
+          {activeTab === "thumbdiff" && <ThumbDiffTab />}
+          {activeTab === "upsell" && <UpsellTab />}
           {activeTab === "adcopy" && <AdCopyTab />}
           {activeTab === "bidding" && <BiddingTab />}
           {activeTab === "discount" && <DiscountTab />}
