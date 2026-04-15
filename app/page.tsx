@@ -15,8 +15,10 @@ import BiddingTab from "@/components/BiddingTab";
 import DiscountTab from "@/components/DiscountTab";
 import ThumbDiffTab from "@/components/ThumbDiffTab";
 import UpsellTab from "@/components/UpsellTab";
+import TrendTab from "@/components/TrendTab";
 
 const TABS = [
+  { id: "trend", label: "📊 트렌드 리포트" },
   { id: "description", label: "📝 상품 설명문" },
   { id: "seo", label: "📈 상품명 SEO" },
   { id: "keywords", label: "🔍 세부 키워드" },
@@ -66,6 +68,7 @@ export default function Home() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-6">
+          {activeTab === "trend" && <TrendTab />}
           {activeTab === "description" && <DescriptionTab />}
           {activeTab === "keywords" && <KeywordsTab />}
           {activeTab === "seo" && <SeoTab />}
