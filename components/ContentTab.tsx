@@ -24,6 +24,34 @@ interface ContentResult {
   canva_guide: CanvaGuide;
 }
 
+interface ImageItem {
+  index: number; type: string; description: string;
+  angle: string; background: string; props: string;
+  text_overlay: string; why_better: string;
+}
+interface ImageSection {
+  order: number; name: string; purpose: string; images: ImageItem[];
+}
+interface FreeTool { tool: string; purpose: string; url_hint: string; }
+interface ImagePlanResult {
+  strategy: string; competitor_weakness: string;
+  sections: ImageSection[]; total_images: number;
+  shooting_tips: string[]; mobile_optimization: string[];
+  free_tools: FreeTool[];
+}
+
+const SECTION_COLORS: Record<number, { bg: string; border: string; badge: string; text: string }> = {
+  1: { bg: "#fff7ed", border: "#fed7aa", badge: "#ea580c", text: "#9a3412" },
+  2: { bg: "#fef2f2", border: "#fecaca", badge: "#dc2626", text: "#991b1b" },
+  3: { bg: "#eff6ff", border: "#bfdbfe", badge: "#2563eb", text: "#1e40af" },
+  4: { bg: "#f0fdf4", border: "#bbf7d0", badge: "#16a34a", text: "#166534" },
+  5: { bg: "#faf5ff", border: "#e9d5ff", badge: "#7c3aed", text: "#5b21b6" },
+  6: { bg: "#ecfeff", border: "#a5f3fc", badge: "#0891b2", text: "#164e63" },
+  7: { bg: "#fffbeb", border: "#fde68a", badge: "#d97706", text: "#92400e" },
+  8: { bg: "#f0fdf4", border: "#86efac", badge: "#15803d", text: "#14532d" },
+  9: { bg: "#fdf4ff", border: "#e9d5ff", badge: "#9333ea", text: "#6b21a8" },
+};
+
 export default function ContentTab() {
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
@@ -32,22 +60,26 @@ export default function ContentTab() {
   const [price, setPrice] = useState("");
   const [uniquePoint, setUniquePoint] = useState("");
   const [result, setResult] = useState<ContentResult | null>(null);
+  const [imagePlan, setImagePlan] = useState<ImagePlanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState("marketing");
   const [copied, setCopied] = useState<string | null>(null);
+  const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
 
   const handleSubmit = async () => {
     if (!productName) return;
     setLoading(true);
     setResult(null);
+    setImagePlan(null);
     try {
-      const res = await fetch("/api/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName, category, features, targetCustomer, price, uniquePoint }),
-      });
-      const data = await res.json();
-      if (data.result) { setResult(data.result); setActiveSection("marketing"); }
+      const payload = { productName, category, features, targetCustomer, price, uniquePoint };
+      const [contentRes, imageRes] = await Promise.all([
+        fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+        fetch("/api/imageplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+      ]);
+      const [contentData, imageData] = await Promise.all([contentRes.json(), imageRes.json()]);
+      if (contentData.result) { setResult(contentData.result); setActiveSection("marketing"); }
+      if (imageData.result) { setImagePlan(imageData.result); setOpenImageSections([1]); }
     } catch {
       alert("오류가 발생했습니다.");
     } finally {
@@ -59,6 +91,12 @@ export default function ContentTab() {
     navigator.clipboard.writeText(text);
     setCopied(key);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const toggleImageSection = (order: number) => {
+    setOpenImageSections(prev =>
+      prev.includes(order) ? prev.filter(n => n !== order) : [...prev, order]
+    );
   };
 
   const CopyBtn = ({ text, id }: { text: string; id: string }) => (
@@ -73,6 +111,7 @@ export default function ContentTab() {
     { id: "marketing", label: "📣 카피" },
     { id: "thumbnail", label: "🖼️ 썸네일" },
     { id: "detail", label: "📄 상세페이지" },
+    { id: "imageplan", label: "📸 이미지 기획" },
     { id: "blog", label: "📝 블로그" },
     { id: "instagram", label: "📱 인스타" },
     { id: "kakao", label: "💬 카카오" },
@@ -85,7 +124,7 @@ export default function ContentTab() {
         <h2 className="text-xl font-bold" style={{ color: "#1a1a2e" }}>🚀 All in One 콘텐츠</h2>
         <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: "#e74c3c" }}>NEW</span>
       </div>
-      <p className="text-gray-400 text-sm mb-6">상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지 한 번에 완성!</p>
+      <p className="text-gray-400 text-sm mb-6">상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지·이미지 기획 한 번에 완성!</p>
 
       <div className="space-y-4">
         <div>
@@ -133,13 +172,13 @@ export default function ContentTab() {
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              모든 콘텐츠 생성 중... (약 10~15초)
+              모든 콘텐츠 + 이미지 기획 생성 중... (약 15~20초)
             </span>
           ) : "🚀 모든 콘텐츠 한 번에 생성하기"}
         </button>
       </div>
 
-      {result && (
+      {(result || imagePlan) && (
         <div className="mt-6">
           {/* 섹션 탭 */}
           <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
@@ -155,7 +194,7 @@ export default function ContentTab() {
           </div>
 
           {/* 마케팅 카피 */}
-          {activeSection === "marketing" && result.marketing_copies && (
+          {activeSection === "marketing" && result?.marketing_copies && (
             <div className="space-y-3">
               <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>마케팅 카피 3종</p>
               {result.marketing_copies.map((c, i) => (
@@ -173,7 +212,7 @@ export default function ContentTab() {
           )}
 
           {/* 썸네일 */}
-          {activeSection === "thumbnail" && result.thumbnail_sets && (
+          {activeSection === "thumbnail" && result?.thumbnail_sets && (
             <div className="space-y-3">
               <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>썸네일 문구 세트 3종</p>
               {result.thumbnail_sets.map((t, i) => (
@@ -202,7 +241,7 @@ export default function ContentTab() {
           )}
 
           {/* 상세페이지 */}
-          {activeSection === "detail" && result.detail_page && (
+          {activeSection === "detail" && result?.detail_page && (
             <div className="space-y-3">
               <div className="flex justify-end">
                 <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제공감] ${result.detail_page.problem}\n\n[해결책] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급성] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
@@ -246,8 +285,149 @@ export default function ContentTab() {
             </div>
           )}
 
+          {/* 📸 이미지 기획 */}
+          {activeSection === "imageplan" && (
+            <div className="space-y-3">
+              {imagePlan ? (
+                <>
+                  {/* 전략 요약 */}
+                  <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
+                    <p className="text-xs text-white/70 mb-1">📸 상세페이지 이미지 전략</p>
+                    <p className="text-sm font-bold text-white">{imagePlan.strategy}</p>
+                    {imagePlan.total_images && (
+                      <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>
+                    )}
+                  </div>
+
+                  {/* 경쟁사 약점 */}
+                  {imagePlan.competitor_weakness && (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                      <p className="text-xs font-bold text-red-500 mb-1">⚠️ 경쟁사의 흔한 약점</p>
+                      <p className="text-xs text-red-400">{imagePlan.competitor_weakness}</p>
+                    </div>
+                  )}
+
+                  {/* 섹션별 이미지 */}
+                  {imagePlan.sections?.map((section) => {
+                    const colors = SECTION_COLORS[section.order] || SECTION_COLORS[1];
+                    const isOpen = openImageSections.includes(section.order);
+                    return (
+                      <div key={section.order} className="border rounded-xl overflow-hidden" style={{ borderColor: colors.border }}>
+                        <button onClick={() => toggleImageSection(section.order)}
+                          className="w-full flex items-center justify-between p-3 cursor-pointer text-left"
+                          style={{ background: colors.bg }}>
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0"
+                              style={{ background: colors.badge }}>{section.order}</span>
+                            <div>
+                              <p className="text-sm font-bold" style={{ color: colors.text }}>{section.name}</p>
+                              <p className="text-xs text-gray-400">{section.purpose}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-bold text-white"
+                              style={{ background: colors.badge }}>{section.images?.length || 0}장</span>
+                            <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div className="divide-y divide-gray-100">
+                            {section.images?.map((img) => (
+                              <div key={img.index} className="p-4 bg-white">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                    style={{ background: colors.bg, color: colors.badge }}>
+                                    #{img.index} {img.type}
+                                  </span>
+                                  <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}\n소품: ${img.props}`, `img-${section.order}-${img.index}`)}
+                                    className="text-xs text-gray-400 hover:text-indigo-500 cursor-pointer">복사</button>
+                                </div>
+                                <p className="text-sm text-gray-700 mb-2 leading-relaxed">{img.description}</p>
+                                <div className="grid grid-cols-3 gap-1.5 mb-2">
+                                  {[
+                                    { label: "각도", value: img.angle },
+                                    { label: "배경", value: img.background },
+                                    { label: "소품", value: img.props || "없음" },
+                                  ].map((item) => (
+                                    <div key={item.label} className="bg-gray-50 rounded-lg p-2">
+                                      <p className="text-xs text-gray-400">{item.label}</p>
+                                      <p className="text-xs font-semibold text-gray-600">{item.value}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                                {img.text_overlay && (
+                                  <div className="bg-indigo-50 rounded-lg px-3 py-2 mb-1.5">
+                                    <p className="text-xs text-indigo-400">텍스트</p>
+                                    <p className="text-xs font-bold text-indigo-700">"{img.text_overlay}"</p>
+                                  </div>
+                                )}
+                                {img.why_better && (
+                                  <div className="flex gap-1.5 items-start">
+                                    <span className="text-green-500 text-xs">✓</span>
+                                    <p className="text-xs text-green-600">{img.why_better}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* 촬영 팁 */}
+                  {imagePlan.shooting_tips?.length > 0 && (
+                    <div className="bg-amber-50 rounded-xl p-4">
+                      <p className="text-sm font-bold text-amber-700 mb-2">📷 실전 촬영 팁</p>
+                      {imagePlan.shooting_tips.map((tip, i) => (
+                        <div key={i} className="flex gap-2 items-start mb-1.5">
+                          <span className="w-5 h-5 rounded-full bg-amber-400 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                          <p className="text-xs text-amber-700">{tip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 모바일 최적화 */}
+                  {imagePlan.mobile_optimization?.length > 0 && (
+                    <div className="bg-blue-50 rounded-xl p-4">
+                      <p className="text-sm font-bold text-blue-700 mb-2">📱 모바일 최적화</p>
+                      {imagePlan.mobile_optimization.map((tip, i) => (
+                        <div key={i} className="flex gap-2 items-start mb-1">
+                          <span className="text-blue-400">•</span>
+                          <p className="text-xs text-blue-600">{tip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 무료 도구 */}
+                  {imagePlan.free_tools?.length > 0 && (
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-sm font-bold mb-2" style={{ color: "#1a1a2e" }}>🛠️ 추천 무료 도구</p>
+                      {imagePlan.free_tools.map((tool, i) => (
+                        <div key={i} className="bg-white rounded-lg p-3 mb-1.5 flex items-start justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-gray-700">{tool.tool}</p>
+                            <p className="text-xs text-gray-500">{tool.purpose}</p>
+                          </div>
+                          <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{tool.url_hint}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-2xl mb-2">📸</p>
+                  <p className="text-sm">이미지 기획 데이터를 불러오는 중입니다...</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 블로그 */}
-          {activeSection === "blog" && result.blog_post && (
+          {activeSection === "blog" && result?.blog_post && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>네이버 블로그 포스팅</p>
@@ -278,7 +458,7 @@ export default function ContentTab() {
           )}
 
           {/* 인스타 */}
-          {activeSection === "instagram" && result.instagram && (
+          {activeSection === "instagram" && result?.instagram && (
             <div className="space-y-3">
               <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -309,7 +489,7 @@ export default function ContentTab() {
           )}
 
           {/* 카카오 */}
-          {activeSection === "kakao" && result.kakao && (
+          {activeSection === "kakao" && result?.kakao && (
             <div className="space-y-3">
               <div className="bg-yellow-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -329,7 +509,7 @@ export default function ContentTab() {
           )}
 
           {/* Canva 가이드 */}
-          {activeSection === "canva" && result.canva_guide && (
+          {activeSection === "canva" && result?.canva_guide && (
             <div className="space-y-3">
               <div className="bg-blue-50 rounded-xl p-4">
                 <p className="text-xs font-bold text-blue-600 mb-1">🎨 Canva 썸네일 스타일 가이드</p>
