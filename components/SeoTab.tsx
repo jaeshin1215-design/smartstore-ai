@@ -9,7 +9,9 @@ interface OptimizedName {
 }
 
 interface SeoResult {
+  score?: { current: string; issues: string[] };
   optimized_names: OptimizedName[];
+  keyword_strategy?: { main_keyword: string; sub_keywords: string[]; recommendation: string };
   seo_tips: string[];
   avoid: string[];
 }
@@ -18,6 +20,11 @@ export default function SeoTab() {
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
   const [keywords, setKeywords] = useState("");
+  const [searchVolume, setSearchVolume] = useState("");
+  const [competitorCount, setCompetitorCount] = useState("");
+  const [clickRate, setClickRate] = useState("");
+  const [priceRange, setPriceRange] = useState("");
+  const [showItemscout, setShowItemscout] = useState(false);
   const [result, setResult] = useState<SeoResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
@@ -30,7 +37,7 @@ export default function SeoTab() {
       const res = await fetch("/api/seo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName, category, keywords }),
+        body: JSON.stringify({ productName, category, keywords, searchVolume, competitorCount, clickRate, priceRange }),
       });
       const data = await res.json();
       if (data.result) setResult(data.result);
@@ -90,6 +97,52 @@ export default function SeoTab() {
           />
         </div>
 
+        {/* 아이템스카우트 데이터 입력 */}
+        <div className="border border-dashed border-indigo-300 rounded-xl p-4">
+          <button
+            type="button"
+            onClick={() => setShowItemscout(!showItemscout)}
+            className="w-full flex items-center justify-between text-sm font-semibold cursor-pointer"
+            style={{ color: "#667eea" }}
+          >
+            <span>📊 아이템스카우트 데이터 입력 (선택 · 입력 시 정확도 대폭 향상)</span>
+            <span>{showItemscout ? "▲" : "▼"}</span>
+          </button>
+
+          {showItemscout && (
+            <div className="mt-4 space-y-3">
+              <p className="text-xs text-gray-400">itemscout.io 에서 키워드 검색 후 아래에 입력하세요</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-gray-500">월간 검색량</label>
+                  <input type="text" value={searchVolume} onChange={(e) => setSearchVolume(e.target.value)}
+                    placeholder="예) 12,400"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-gray-500">경쟁 상품 수</label>
+                  <input type="text" value={competitorCount} onChange={(e) => setCompetitorCount(e.target.value)}
+                    placeholder="예) 3,200개"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-gray-500">클릭 경쟁률</label>
+                  <input type="text" value={clickRate} onChange={(e) => setClickRate(e.target.value)}
+                    placeholder="예) 낮음 / 0.26"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-gray-500">상위 상품 가격대</label>
+                  <input type="text" value={priceRange} onChange={(e) => setPriceRange(e.target.value)}
+                    placeholder="예) 15,000~25,000원"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+                </div>
+              </div>
+              <p className="text-xs text-indigo-500">✅ 실제 데이터 입력 시 AI가 훨씬 정확한 키워드 전략을 제안해요!</p>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={handleSubmit}
           disabled={loading || !productName}
@@ -107,6 +160,44 @@ export default function SeoTab() {
 
       {result && (
         <div className="mt-6 space-y-4">
+          {/* 현재 상품명 SEO 점수 */}
+          {result.score && (
+            <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
+              <p className="text-xs text-white/70 mb-2">현재 상품명 SEO 점수</p>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl font-bold text-white">{result.score.current}점</span>
+                <span className="text-sm text-white/70">/ 100점</span>
+              </div>
+              {result.score.issues?.length > 0 && (
+                <div className="space-y-1">
+                  {result.score.issues.map((issue, i) => (
+                    <div key={i} className="flex gap-2"><span className="text-yellow-300 text-xs">⚠</span><p className="text-xs text-white/80">{issue}</p></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 키워드 전략 */}
+          {result.keyword_strategy && (
+            <div className="bg-indigo-50 rounded-xl p-4">
+              <p className="text-sm font-bold text-indigo-700 mb-3">🎯 키워드 전략</p>
+              <div className="mb-2">
+                <p className="text-xs text-indigo-500 mb-1">메인 키워드</p>
+                <span className="text-sm font-bold px-3 py-1 rounded-full text-white" style={{ background: "#667eea" }}>{result.keyword_strategy.main_keyword}</span>
+              </div>
+              <div className="mb-2">
+                <p className="text-xs text-indigo-500 mb-1">세부 키워드 (롱테일)</p>
+                <div className="flex flex-wrap gap-1">
+                  {result.keyword_strategy.sub_keywords?.map((kw, i) => (
+                    <span key={i} className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#e8f0fe", color: "#4361ee" }}>#{kw}</span>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-indigo-600 mt-2">{result.keyword_strategy.recommendation}</p>
+            </div>
+          )}
+
           {/* 최적화된 상품명 */}
           <div>
             <h3 className="font-bold text-sm mb-3" style={{ color: "#1a1a2e" }}>추천 상품명 3가지</h3>
