@@ -14,10 +14,16 @@ interface PricingResult {
 export default function PricingTab() {
   const [productName, setProductName] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
+  const [shippingCost, setShippingCost] = useState("3000");
+  const [competitorPrice, setCompetitorPrice] = useState("");
+  const [targetMargin, setTargetMargin] = useState("");
   const [category, setCategory] = useState("");
   const [features, setFeatures] = useState("");
   const [result, setResult] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const platformFee = purchasePrice ? Math.round(Number(purchasePrice) * 0.0585) : 0;
+  const totalCost = purchasePrice ? Number(purchasePrice) + Number(shippingCost || 3000) + platformFee : 0;
 
   const handleSubmit = async () => {
     if (!productName || !purchasePrice) return;
@@ -27,7 +33,7 @@ export default function PricingTab() {
       const res = await fetch("/api/pricing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName, purchasePrice, category, features }),
+        body: JSON.stringify({ productName, purchasePrice, shippingCost, competitorPrice, targetMargin, category, features }),
       });
       const data = await res.json();
       if (data.result) setResult(data.result);
@@ -73,6 +79,67 @@ export default function PricingTab() {
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">원</span>
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>배송비 (선택)</label>
+          <div className="relative">
+            <input
+              type="number"
+              value={shippingCost}
+              onChange={(e) => setShippingCost(e.target.value)}
+              placeholder="기본 3000"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors pr-10"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">원</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>경쟁사 최저가 (선택)</label>
+          <div className="relative">
+            <input
+              type="number"
+              value={competitorPrice}
+              onChange={(e) => setCompetitorPrice(e.target.value)}
+              placeholder="예) 15000 (네이버 쇼핑에서 확인)"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors pr-10"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">원</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>목표 마진율 (선택)</label>
+          <div className="relative">
+            <input
+              type="number"
+              value={targetMargin}
+              onChange={(e) => setTargetMargin(e.target.value)}
+              placeholder="예) 30"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors pr-10"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+          </div>
+        </div>
+
+        {/* 원가 계산 미리보기 */}
+        {purchasePrice && (
+          <div className="bg-blue-50 rounded-xl p-4 space-y-1.5">
+            <p className="text-xs font-bold text-blue-700 mb-2">📊 원가 계산 미리보기</p>
+            <div className="flex justify-between text-xs text-blue-600">
+              <span>매입가</span><span>{Number(purchasePrice).toLocaleString()}원</span>
+            </div>
+            <div className="flex justify-between text-xs text-blue-600">
+              <span>배송비</span><span>{Number(shippingCost || 3000).toLocaleString()}원</span>
+            </div>
+            <div className="flex justify-between text-xs text-blue-600">
+              <span>수수료 (5.85%)</span><span>{platformFee.toLocaleString()}원</span>
+            </div>
+            <div className="flex justify-between text-xs font-bold text-blue-800 border-t border-blue-200 pt-1.5 mt-1">
+              <span>총 원가 합계</span><span>{totalCost.toLocaleString()}원</span>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>카테고리 (선택)</label>
@@ -163,6 +230,16 @@ export default function PricingTab() {
               </div>
             </div>
           )}
+
+          {/* 네이버 쇼핑 확인 링크 */}
+          <a
+            href={`https://search.shopping.naver.com/search/all?query=${encodeURIComponent(productName)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            🔎 네이버 쇼핑에서 경쟁사 가격 직접 확인하기
+          </a>
         </div>
       )}
     </div>

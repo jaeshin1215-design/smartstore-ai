@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { productName, purchasePrice, category, features } = await req.json();
+  const { productName, purchasePrice, shippingCost, competitorPrice, targetMargin, category, features } = await req.json();
 
   if (!productName || !purchasePrice) {
     return NextResponse.json({ error: "상품명과 매입가를 입력해주세요." }, { status: 400 });
   }
+
+  const shipping = Number(shippingCost) || 3000;
+  const platformFee = Math.round(Number(purchasePrice) * 0.0585);
+  const totalCost = Number(purchasePrice) + shipping + platformFee;
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -23,6 +27,11 @@ export async function POST(req: NextRequest) {
 
 상품명: ${productName}
 매입가(원가): ${purchasePrice}원
+배송비: ${shipping}원
+스마트스토어 수수료(5.85%): ${platformFee}원
+총 원가 합계: ${totalCost}원
+경쟁사 최저가: ${competitorPrice ? competitorPrice + "원" : "미입력"}
+목표 마진율: ${targetMargin ? targetMargin + "%" : "미입력 (적정 마진 추천)"}
 카테고리: ${category || "미입력"}
 상품 특징: ${features || "미입력"}
 
@@ -37,11 +46,11 @@ export async function POST(req: NextRequest) {
 }
 
 분석 기준:
-- 스마트스토어 수수료 약 5.5% 반영
-- 배송비 평균 3,000원 반영
-- 네이버쇼핑 광고비 고려
-- 경쟁 상품 대비 적정 마진 확보
-- 최소 마진율 20% 이상 권장`,
+- 위에서 계산된 총 원가(${totalCost}원) 기준으로 가격 책정
+- 경쟁사 가격이 있으면 반드시 반영
+- 목표 마진율이 있으면 그에 맞게 계산
+- 최소 마진율 20% 이상 확보
+- 네이버쇼핑 광고비 고려`,
         },
       ],
     }),
