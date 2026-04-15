@@ -10,12 +10,18 @@ import ReviewTab from "@/components/ReviewTab";
 import PricingTab from "@/components/PricingTab";
 import SeoTab from "@/components/SeoTab";
 import AdCopyTab from "@/components/AdCopyTab";
+import StoryTab from "@/components/StoryTab";
+import BiddingTab from "@/components/BiddingTab";
+import DiscountTab from "@/components/DiscountTab";
 
 const TABS = [
   { id: "description", label: "📝 상품 설명문" },
   { id: "keywords", label: "🔍 키워드 최적화" },
   { id: "seo", label: "📈 상품명 SEO" },
+  { id: "story", label: "🛒 구매 전환율" },
   { id: "adcopy", label: "📣 광고 전략" },
+  { id: "bidding", label: "💡 키워드 입찰" },
+  { id: "discount", label: "🎁 할인 & 가치" },
   { id: "reply", label: "💬 문의 답변" },
   { id: "tags", label: "🏷️ 태그 생성" },
   { id: "thumbnail", label: "🖼️ 썸네일 문구" },
@@ -59,7 +65,10 @@ export default function Home() {
           {activeTab === "description" && <DescriptionTab />}
           {activeTab === "keywords" && <KeywordsTab />}
           {activeTab === "seo" && <SeoTab />}
+          {activeTab === "story" && <StoryTab />}
           {activeTab === "adcopy" && <AdCopyTab />}
+          {activeTab === "bidding" && <BiddingTab />}
+          {activeTab === "discount" && <DiscountTab />}
           {activeTab === "reply" && <ReplyTab />}
           {activeTab === "tags" && <TagsTab />}
           {activeTab === "thumbnail" && <ThumbnailTab />}
