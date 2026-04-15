@@ -18,9 +18,11 @@ import UpsellTab from "@/components/UpsellTab";
 import TrendTab from "@/components/TrendTab";
 import ImageEditTab from "@/components/ImageEditTab";
 import ContentTab from "@/components/ContentTab";
+import ImagePlanTab from "@/components/ImagePlanTab";
 
 const TABS = [
   { id: "content", label: "🚀 All in One 콘텐츠" },
+  { id: "imageplan", label: "📸 상세페이지 이미지 기획" },
   { id: "trend", label: "📊 트렌드 리포트" },
   { id: "description", label: "📝 상품 설명문" },
   { id: "seo", label: "📈 상품명 SEO" },
@@ -73,6 +75,7 @@ export default function Home() {
 
         <div className="bg-white rounded-2xl shadow-sm p-6">
           {activeTab === "content" && <ContentTab />}
+          {activeTab === "imageplan" && <ImagePlanTab />}
           {activeTab === "trend" && <TrendTab />}
           {activeTab === "description" && <DescriptionTab />}
           {activeTab === "keywords" && <KeywordsTab />}
