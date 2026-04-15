@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
           "background": "배경 색/소재/장소",
           "props": "함께 배치할 소품/연출 요소",
           "text_overlay": "이미지에 넣을 텍스트 문구 (없으면 빈 문자열)",
-          "why_better": "이 방식이 경쟁사보다 나은 이유"
+          "why_better": "이 방식이 경쟁사보다 나은 이유",
+          "ai_prompt": "AI 이미지 생성용 영문 프롬프트 - Midjourney/DALL-E 스타일로 구체적이고 상세하게. 예: professional product photography of organic aronia powder in white ceramic bowl, dark purple berries scattered around, white background, soft studio lighting, 8k resolution, high detail, commercial photography"
         }
       ]
     }

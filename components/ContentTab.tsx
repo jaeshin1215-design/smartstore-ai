@@ -27,7 +27,7 @@ interface ContentResult {
 interface ImageItem {
   index: number; type: string; description: string;
   angle: string; background: string; props: string;
-  text_overlay: string; why_better: string;
+  text_overlay: string; why_better: string; ai_prompt?: string;
 }
 interface ImageSection {
   order: number; name: string; purpose: string; images: ImageItem[];
@@ -65,6 +65,8 @@ export default function ContentTab() {
   const [activeSection, setActiveSection] = useState("marketing");
   const [copied, setCopied] = useState<string | null>(null);
   const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
+  const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
 
   const handleSubmit = async () => {
     if (!productName) return;
@@ -97,6 +99,22 @@ export default function ContentTab() {
     setOpenImageSections(prev =>
       prev.includes(order) ? prev.filter(n => n !== order) : [...prev, order]
     );
+  };
+
+  const generateImage = (key: string, prompt: string) => {
+    if (generatedImages[key] || loadingImages[key]) return;
+    setLoadingImages(prev => ({ ...prev, [key]: true }));
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true&model=flux&seed=${Math.floor(Math.random() * 9999)}`;
+    setGeneratedImages(prev => ({ ...prev, [key]: url }));
+  };
+
+  const downloadImage = async (url: string, filename: string) => {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
   };
 
   const CopyBtn = ({ text, id }: { text: string; id: string }) => (
@@ -332,43 +350,94 @@ export default function ContentTab() {
                         </button>
                         {isOpen && (
                           <div className="divide-y divide-gray-100">
-                            {section.images?.map((img) => (
-                              <div key={img.index} className="p-4 bg-white">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                                    style={{ background: colors.bg, color: colors.badge }}>
-                                    #{img.index} {img.type}
-                                  </span>
-                                  <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}\n소품: ${img.props}`, `img-${section.order}-${img.index}`)}
-                                    className="text-xs text-gray-400 hover:text-indigo-500 cursor-pointer">복사</button>
-                                </div>
-                                <p className="text-sm text-gray-700 mb-2 leading-relaxed">{img.description}</p>
-                                <div className="grid grid-cols-3 gap-1.5 mb-2">
-                                  {[
-                                    { label: "각도", value: img.angle },
-                                    { label: "배경", value: img.background },
-                                    { label: "소품", value: img.props || "없음" },
-                                  ].map((item) => (
-                                    <div key={item.label} className="bg-gray-50 rounded-lg p-2">
-                                      <p className="text-xs text-gray-400">{item.label}</p>
-                                      <p className="text-xs font-semibold text-gray-600">{item.value}</p>
+                            {section.images?.map((img) => {
+                              const imgKey = `${section.order}-${img.index}`;
+                              const imgUrl = generatedImages[imgKey];
+                              const isImgLoading = loadingImages[imgKey];
+                              return (
+                                <div key={img.index} className="p-4 bg-white">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                      style={{ background: colors.bg, color: colors.badge }}>
+                                      #{img.index} {img.type}
+                                    </span>
+                                    <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}\n소품: ${img.props}`, `img-${imgKey}`)}
+                                      className="text-xs text-gray-400 hover:text-indigo-500 cursor-pointer">복사</button>
+                                  </div>
+                                  <p className="text-sm text-gray-700 mb-2 leading-relaxed">{img.description}</p>
+                                  <div className="grid grid-cols-3 gap-1.5 mb-2">
+                                    {[
+                                      { label: "각도", value: img.angle },
+                                      { label: "배경", value: img.background },
+                                      { label: "소품", value: img.props || "없음" },
+                                    ].map((item) => (
+                                      <div key={item.label} className="bg-gray-50 rounded-lg p-2">
+                                        <p className="text-xs text-gray-400">{item.label}</p>
+                                        <p className="text-xs font-semibold text-gray-600">{item.value}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {img.text_overlay && (
+                                    <div className="bg-indigo-50 rounded-lg px-3 py-2 mb-2">
+                                      <p className="text-xs text-indigo-400">텍스트</p>
+                                      <p className="text-xs font-bold text-indigo-700">"{img.text_overlay}"</p>
                                     </div>
-                                  ))}
+                                  )}
+                                  {img.why_better && (
+                                    <div className="flex gap-1.5 items-start mb-3">
+                                      <span className="text-green-500 text-xs">✓</span>
+                                      <p className="text-xs text-green-600">{img.why_better}</p>
+                                    </div>
+                                  )}
+                                  {/* AI 이미지 생성 영역 */}
+                                  {img.ai_prompt && (
+                                    <div>
+                                      {!imgUrl ? (
+                                        <button
+                                          onClick={() => generateImage(imgKey, img.ai_prompt!)}
+                                          className="w-full py-2 rounded-xl text-xs font-bold cursor-pointer transition-all border-2 border-dashed border-indigo-300 text-indigo-500 hover:bg-indigo-50">
+                                          🎨 AI 이미지 생성 (무료)
+                                        </button>
+                                      ) : (
+                                        <div className="mt-1">
+                                          <div className="relative rounded-xl overflow-hidden bg-gray-100" style={{ minHeight: 200 }}>
+                                            {isImgLoading && (
+                                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+                                                <span className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
+                                                <p className="text-xs text-gray-400">이미지 생성 중... (10~30초)</p>
+                                              </div>
+                                            )}
+                                            <img
+                                              src={imgUrl}
+                                              alt={img.type}
+                                              className="w-full rounded-xl"
+                                              onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
+                                              onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
+                                            />
+                                          </div>
+                                          <div className="flex gap-2 mt-2">
+                                            <button
+                                              onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
+                                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white cursor-pointer"
+                                              style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
+                                              ⬇️ 다운로드
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setGeneratedImages(prev => { const n = { ...prev }; delete n[imgKey]; return n; });
+                                                setLoadingImages(prev => { const n = { ...prev }; delete n[imgKey]; return n; });
+                                              }}
+                                              className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
+                                              🔄 재생성
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                                {img.text_overlay && (
-                                  <div className="bg-indigo-50 rounded-lg px-3 py-2 mb-1.5">
-                                    <p className="text-xs text-indigo-400">텍스트</p>
-                                    <p className="text-xs font-bold text-indigo-700">"{img.text_overlay}"</p>
-                                  </div>
-                                )}
-                                {img.why_better && (
-                                  <div className="flex gap-1.5 items-start">
-                                    <span className="text-green-500 text-xs">✓</span>
-                                    <p className="text-xs text-green-600">{img.why_better}</p>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
