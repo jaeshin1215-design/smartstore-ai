@@ -16,6 +16,7 @@ import DiscountTab from "@/components/DiscountTab";
 import ThumbDiffTab from "@/components/ThumbDiffTab";
 import UpsellTab from "@/components/UpsellTab";
 import TrendTab from "@/components/TrendTab";
+import ImageEditTab from "@/components/ImageEditTab";
 
 const TABS = [
   { id: "trend", label: "📊 트렌드 리포트" },
@@ -31,6 +32,7 @@ const TABS = [
   { id: "reply", label: "💬 문의 답변" },
   { id: "tags", label: "🏷️ 태그 생성" },
   { id: "thumbnail", label: "🖼️ 썸네일 문구" },
+  { id: "imageedit", label: "✏️ 이미지 편집" },
   { id: "review", label: "⭐ 리뷰 답글" },
   { id: "pricing", label: "💰 가격 책정" },
 ];
@@ -82,6 +84,7 @@ export default function Home() {
           {activeTab === "tags" && <TagsTab />}
           {activeTab === "thumbnail" && <ThumbnailTab />}
           {activeTab === "review" && <ReviewTab />}
+          {activeTab === "imageedit" && <ImageEditTab />}
           {activeTab === "pricing" && <PricingTab />}
         </div>
 
