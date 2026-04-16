@@ -122,16 +122,20 @@ export default function ContentTab() {
     );
   };
 
-  const generateImage = (key: string, prompt: string) => {
-    if (generatedImages[key] || loadingImages[key]) return;
+  const generateImage = (key: string, prompt: string, regenSeed?: number) => {
+    if (!regenSeed && (generatedImages[key] || loadingImages[key])) return;
     setLoadingImages(prev => ({ ...prev, [key]: true }));
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true&model=turbo&seed=${Math.floor(Math.random() * 9999)}`;
+    // seed 없음 = Pollinations 캐시 활용 → 동일 프롬프트 재요청 시 즉시 반환
+    const seedPart = regenSeed ? `&seed=${regenSeed}` : "";
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=turbo${seedPart}`;
     setGeneratedImages(prev => ({ ...prev, [key]: url }));
   };
 
-  const regenImage = (key: string) => {
+  const regenImage = (key: string, prompt: string) => {
+    const newSeed = Math.floor(Math.random() * 99999) + 1;
     setGeneratedImages(prev => { const n = { ...prev }; delete n[key]; return n; });
     setLoadingImages(prev => { const n = { ...prev }; delete n[key]; return n; });
+    setTimeout(() => generateImage(key, prompt, newSeed), 50);
   };
 
   const downloadImage = async (url: string, filename: string) => {
@@ -397,39 +401,60 @@ export default function ContentTab() {
                                       <p className="text-xs text-green-600">{img.why_better}</p>
                                     </div>
                                   )}
-                                  {/* AI 이미지 생성 */}
-                                  {!imgUrl ? (
-                                    <button
-                                      onClick={() => generateImage(imgKey, prompt)}
-                                      className="w-full py-2 rounded-xl text-xs font-bold cursor-pointer border-2 border-dashed border-indigo-300 text-indigo-500 hover:bg-indigo-50">
-                                      🎨 AI 이미지 생성 (5~10초)
-                                    </button>
-                                  ) : (
-                                    <div>
-                                      <div className="relative rounded-xl overflow-hidden bg-gray-100" style={{ minHeight: 200 }}>
-                                        {isImgLoading && (
-                                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-                                            <span className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
-                                            <p className="text-xs text-gray-400">이미지 생성 중... (5~10초)</p>
-                                          </div>
-                                        )}
-                                        <img src={imgUrl} alt={img.type} className="w-full rounded-xl"
-                                          onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
-                                          onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))} />
-                                      </div>
-                                      <div className="flex gap-2 mt-2">
-                                        <button onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
-                                          className="flex-1 py-2 rounded-xl text-xs font-bold text-white cursor-pointer"
-                                          style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-                                          ⬇️ 다운로드
-                                        </button>
-                                        <button onClick={() => regenImage(imgKey)}
-                                          className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
-                                          🔄 재생성
-                                        </button>
-                                      </div>
+                                  {/* AI 프롬프트 + 이미지 생성 */}
+                                  <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <p className="text-xs font-bold text-indigo-600">🤖 AI 이미지 프롬프트</p>
+                                      <button onClick={() => copy(prompt, `prompt-${imgKey}`)}
+                                        className="text-xs px-2 py-0.5 rounded-lg font-bold cursor-pointer"
+                                        style={{ background: copied === `prompt-${imgKey}` ? "#e8f9f0" : "#e8f0fe", color: copied === `prompt-${imgKey}` ? "#2d9653" : "#4361ee" }}>
+                                        {copied === `prompt-${imgKey}` ? "✓ 복사됨" : "📋 복사"}
+                                      </button>
                                     </div>
-                                  )}
+                                    <p className="text-xs text-gray-500 leading-relaxed mb-2 font-mono break-all">{prompt}</p>
+                                    <div className="flex gap-1.5 flex-wrap mb-2">
+                                      <a href="https://app.leonardo.ai/ai-generations" target="_blank" rel="noopener noreferrer"
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        style={{ background: "#7c3aed" }}>Leonardo.ai</a>
+                                      <a href="https://firefly.adobe.com/generate/images" target="_blank" rel="noopener noreferrer"
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        style={{ background: "#e74c3c" }}>Adobe Firefly</a>
+                                      <a href="https://www.bing.com/images/create" target="_blank" rel="noopener noreferrer"
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        style={{ background: "#0078d4" }}>Bing AI</a>
+                                    </div>
+                                    {!imgUrl ? (
+                                      <button onClick={() => generateImage(imgKey, prompt)}
+                                        className="w-full py-1.5 rounded-lg text-xs font-semibold cursor-pointer border border-dashed border-indigo-300 text-indigo-400 hover:bg-indigo-100">
+                                        🎨 앱 내 자동 생성 시도 (처음엔 1~2분 소요)
+                                      </button>
+                                    ) : (
+                                      <div>
+                                        <div className="relative rounded-xl overflow-hidden bg-gray-100 mt-1" style={{ minHeight: 160 }}>
+                                          {isImgLoading && (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+                                              <span className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
+                                              <p className="text-xs text-gray-400">생성 중... (처음엔 1~2분 소요)</p>
+                                            </div>
+                                          )}
+                                          <img src={imgUrl} alt={img.type} className="w-full rounded-xl"
+                                            onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
+                                            onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))} />
+                                        </div>
+                                        <div className="flex gap-2 mt-2">
+                                          <button onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
+                                            className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
+                                            style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
+                                            ⬇️ 다운로드
+                                          </button>
+                                          <button onClick={() => regenImage(imgKey, prompt)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
+                                            🔄 재생성
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })}
