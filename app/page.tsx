@@ -1,49 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import DescriptionTab from "@/components/DescriptionTab";
-import KeywordsTab from "@/components/KeywordsTab";
-import ReplyTab from "@/components/ReplyTab";
-import TagsTab from "@/components/TagsTab";
-import ThumbnailTab from "@/components/ThumbnailTab";
-import ReviewTab from "@/components/ReviewTab";
-import PricingTab from "@/components/PricingTab";
+import ContentTab from "@/components/ContentTab";
+import TrendTab from "@/components/TrendTab";
 import SeoTab from "@/components/SeoTab";
-import AdCopyTab from "@/components/AdCopyTab";
 import StoryTab from "@/components/StoryTab";
-import BiddingTab from "@/components/BiddingTab";
-import DiscountTab from "@/components/DiscountTab";
 import ThumbDiffTab from "@/components/ThumbDiffTab";
 import UpsellTab from "@/components/UpsellTab";
-import TrendTab from "@/components/TrendTab";
+import AdCopyTab from "@/components/AdCopyTab";
+import BiddingTab from "@/components/BiddingTab";
+import DiscountTab from "@/components/DiscountTab";
+import CustomerTab from "@/components/CustomerTab";
+import TagsTab from "@/components/TagsTab";
 import ImageEditTab from "@/components/ImageEditTab";
-import ContentTab from "@/components/ContentTab";
-import ImagePlanTab from "@/components/ImagePlanTab";
+import PricingTab from "@/components/PricingTab";
 import FeedbackButton from "@/components/FeedbackButton";
 
 const TABS = [
-  { id: "content", label: "🚀 All in One 콘텐츠" },
-  { id: "imageplan", label: "📸 상세페이지 이미지 기획" },
-  { id: "trend", label: "📊 트렌드 리포트" },
-  { id: "description", label: "📝 상품 설명문" },
-  { id: "seo", label: "📈 상품명 SEO" },
-  { id: "keywords", label: "🔍 세부 키워드" },
-  { id: "story", label: "🛒 구매 전환율" },
-  { id: "thumbdiff", label: "🎨 썸네일 차별화" },
-  { id: "upsell", label: "📦 업셀링 전략" },
-  { id: "adcopy", label: "📣 광고 전략" },
-  { id: "bidding", label: "💡 키워드 입찰" },
+  { id: "content",  label: "🚀 All in One" },
+  { id: "trend",    label: "📊 트렌드 리포트" },
+  { id: "seo",      label: "📈 상품명 SEO" },
+  { id: "story",    label: "🛒 구매 전환율" },
+  { id: "thumbdiff",label: "🎨 썸네일 차별화" },
+  { id: "upsell",   label: "📦 업셀링 전략" },
+  { id: "adcopy",   label: "📣 광고 전략" },
+  { id: "bidding",  label: "💡 키워드 입찰" },
   { id: "discount", label: "🎁 할인 & 가치" },
-  { id: "reply", label: "💬 문의 답변" },
-  { id: "tags", label: "🏷️ 태그 생성" },
-  { id: "thumbnail", label: "🖼️ 썸네일 문구" },
-  { id: "imageedit", label: "✏️ 이미지 편집" },
-  { id: "review", label: "⭐ 리뷰 답글" },
-  { id: "pricing", label: "💰 가격 책정" },
+  { id: "customer", label: "💬 고객 소통" },
+  { id: "tags",     label: "🏷️ 태그 생성" },
+  { id: "imageedit",label: "✏️ 이미지 편집" },
+  { id: "pricing",  label: "💰 가격 책정" },
 ];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("description");
+  const [activeTab, setActiveTab] = useState("content");
 
   return (
     <div className="min-h-screen" style={{ background: "#f0f4ff" }}>
@@ -75,24 +65,19 @@ export default function Home() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-6">
-          {activeTab === "content" && <ContentTab />}
-          {activeTab === "imageplan" && <ImagePlanTab />}
-          {activeTab === "trend" && <TrendTab />}
-          {activeTab === "description" && <DescriptionTab />}
-          {activeTab === "keywords" && <KeywordsTab />}
-          {activeTab === "seo" && <SeoTab />}
-          {activeTab === "story" && <StoryTab />}
+          {activeTab === "content"   && <ContentTab />}
+          {activeTab === "trend"     && <TrendTab />}
+          {activeTab === "seo"       && <SeoTab />}
+          {activeTab === "story"     && <StoryTab />}
           {activeTab === "thumbdiff" && <ThumbDiffTab />}
-          {activeTab === "upsell" && <UpsellTab />}
-          {activeTab === "adcopy" && <AdCopyTab />}
-          {activeTab === "bidding" && <BiddingTab />}
-          {activeTab === "discount" && <DiscountTab />}
-          {activeTab === "reply" && <ReplyTab />}
-          {activeTab === "tags" && <TagsTab />}
-          {activeTab === "thumbnail" && <ThumbnailTab />}
-          {activeTab === "review" && <ReviewTab />}
+          {activeTab === "upsell"    && <UpsellTab />}
+          {activeTab === "adcopy"    && <AdCopyTab />}
+          {activeTab === "bidding"   && <BiddingTab />}
+          {activeTab === "discount"  && <DiscountTab />}
+          {activeTab === "customer"  && <CustomerTab />}
+          {activeTab === "tags"      && <TagsTab />}
           {activeTab === "imageedit" && <ImageEditTab />}
-          {activeTab === "pricing" && <PricingTab />}
+          {activeTab === "pricing"   && <PricingTab />}
         </div>
 
         <p className="text-center text-gray-400 text-xs mt-6">
