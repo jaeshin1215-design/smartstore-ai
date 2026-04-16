@@ -29,9 +29,7 @@ interface ImageItem {
   angle: string; background: string; props: string;
   text_overlay: string; why_better: string; ai_prompt?: string;
 }
-interface ImageSection {
-  order: number; name: string; purpose: string; images: ImageItem[];
-}
+interface ImageSection { order: number; name: string; purpose: string; images: ImageItem[]; }
 interface FreeTool { tool: string; purpose: string; url_hint: string; }
 interface ImagePlanResult {
   strategy: string; competitor_weakness: string;
@@ -51,6 +49,28 @@ const SECTION_COLORS: Record<number, { bg: string; border: string; badge: string
   8: { bg: "#f0fdf4", border: "#86efac", badge: "#15803d", text: "#14532d" },
   9: { bg: "#fdf4ff", border: "#e9d5ff", badge: "#9333ea", text: "#6b21a8" },
 };
+
+function buildPrompt(img: ImageItem, productName: string): string {
+  if (img.ai_prompt) return img.ai_prompt;
+  const typeMap: [string, string][] = [
+    ["라이프스타일", "lifestyle photography, natural light, real people"],
+    ["클로즈업", "macro close-up product photography, extreme detail"],
+    ["비교", "before and after comparison product photography"],
+    ["패키지", "product packaging photography, clean presentation"],
+    ["성분", "ingredient flat lay photography, overhead shot"],
+    ["정면", "professional front view product photography"],
+  ];
+  const typeHint = typeMap.find(([k]) => img.type.includes(k))?.[1] ?? "professional product photography";
+  const parts = [
+    typeHint,
+    `of ${productName}`,
+    img.angle,
+    `${img.background} background`,
+    img.props ? img.props : "",
+    "studio lighting, high quality, 8k, commercial photography",
+  ].filter(Boolean);
+  return parts.join(", ");
+}
 
 export default function ContentTab() {
   const [productName, setProductName] = useState("");
@@ -73,6 +93,7 @@ export default function ContentTab() {
     setLoading(true);
     setResult(null);
     setImagePlan(null);
+    setGeneratedImages({});
     try {
       const payload = { productName, category, features, targetCustomer, price, uniquePoint };
       const [contentRes, imageRes] = await Promise.all([
@@ -101,25 +122,16 @@ export default function ContentTab() {
     );
   };
 
-  const buildPrompt = (img: ImageItem, productName: string): string => {
-    if (img.ai_prompt) return img.ai_prompt;
-    const typeMap: Record<string, string> = {
-      "제품 정면샷": "professional product photography, front view",
-      "라이프스타일": "lifestyle photography, natural light",
-      "클로즈업": "macro close-up product photography",
-      "비교": "before and after comparison photography",
-      "패키지": "product packaging photography",
-      "성분": "ingredient flat lay photography",
-    };
-    const typeHint = Object.entries(typeMap).find(([k]) => img.type.includes(k))?.[1] || "product photography";
-    return `${typeHint} of ${productName}, ${img.angle}, ${img.background} background, ${img.props ? img.props + ", " : ""}studio lighting, high quality, 8k, commercial photography, clean composition`;
-  };
-
   const generateImage = (key: string, prompt: string) => {
     if (generatedImages[key] || loadingImages[key]) return;
     setLoadingImages(prev => ({ ...prev, [key]: true }));
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true&model=flux&seed=${Math.floor(Math.random() * 9999)}`;
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true&model=turbo&seed=${Math.floor(Math.random() * 9999)}`;
     setGeneratedImages(prev => ({ ...prev, [key]: url }));
+  };
+
+  const regenImage = (key: string) => {
+    setGeneratedImages(prev => { const n = { ...prev }; delete n[key]; return n; });
+    setLoadingImages(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
 
   const downloadImage = async (url: string, filename: string) => {
@@ -170,41 +182,40 @@ export default function ContentTab() {
             <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>카테고리</label>
             <input type="text" value={category} onChange={(e) => setCategory(e.target.value)}
               placeholder="예) 식품 > 건강식품"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
           </div>
           <div>
             <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>판매가</label>
             <input type="text" value={price} onChange={(e) => setPrice(e.target.value)}
               placeholder="예) 19,900원"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
           </div>
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>주요 특징</label>
           <input type="text" value={features} onChange={(e) => setFeatures(e.target.value)}
             placeholder="예) 유기농 인증, 국산 원료, 당일 발송, 무농약"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>타겟 고객</label>
           <input type="text" value={targetCustomer} onChange={(e) => setTargetCustomer(e.target.value)}
             placeholder="예) 건강 관리하는 30~50대 여성"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>경쟁사 대비 차별점</label>
           <input type="text" value={uniquePoint} onChange={(e) => setUniquePoint(e.target.value)}
             placeholder="예) 타사 대비 안토시아닌 함량 3배, 소분 포장"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
         </div>
-
         <button onClick={handleSubmit} disabled={loading || !productName}
           className="w-full py-4 rounded-xl font-bold text-white text-sm disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
           style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              모든 콘텐츠 + 이미지 기획 생성 중... (약 15~20초)
+              모든 콘텐츠 생성 중... (약 15~20초)
             </span>
           ) : "🚀 모든 콘텐츠 한 번에 생성하기"}
         </button>
@@ -212,7 +223,6 @@ export default function ContentTab() {
 
       {(result || imagePlan) && (
         <div className="mt-6">
-          {/* 섹션 탭 */}
           <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
             {sections.map((s) => (
               <button key={s.id} onClick={() => setActiveSection(s.id)}
@@ -276,70 +286,53 @@ export default function ContentTab() {
           {activeSection === "detail" && result?.detail_page && (
             <div className="space-y-3">
               <div className="flex justify-end">
-                <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제공감] ${result.detail_page.problem}\n\n[해결책] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급성] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
+                <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제] ${result.detail_page.problem}\n\n[해결] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
               </div>
               {[
-                { label: "⚡ 후킹 문구", value: result.detail_page.hook, bg: "linear-gradient(135deg, #667eea, #764ba2)", textColor: "white" },
-                { label: "😓 문제 공감", value: result.detail_page.problem, bg: "#fee2e2", textColor: "#b91c1c" },
-                { label: "✅ 해결책", value: result.detail_page.solution, bg: "#dbeafe", textColor: "#1d4ed8" },
-                { label: "🏆 신뢰 증거", value: result.detail_page.trust, bg: "#d1fae5", textColor: "#065f46" },
-                { label: "🔥 긴급성", value: result.detail_page.urgency, bg: "#ffedd5", textColor: "#c2410c" },
-                { label: "🛒 구매 유도", value: result.detail_page.cta, bg: "linear-gradient(135deg, #f093fb, #f5576c)", textColor: "white" },
+                { label: "⚡ 후킹 문구", value: result.detail_page.hook, bg: "linear-gradient(135deg, #667eea, #764ba2)", color: "white" },
+                { label: "😓 문제 공감", value: result.detail_page.problem, bg: "#fee2e2", color: "#b91c1c" },
+                { label: "✅ 해결책", value: result.detail_page.solution, bg: "#dbeafe", color: "#1d4ed8" },
+                { label: "🏆 신뢰 증거", value: result.detail_page.trust, bg: "#d1fae5", color: "#065f46" },
+                { label: "🔥 긴급성", value: result.detail_page.urgency, bg: "#ffedd5", color: "#c2410c" },
+                { label: "🛒 구매 유도", value: result.detail_page.cta, bg: "linear-gradient(135deg, #f093fb, #f5576c)", color: "white" },
               ].map((item, i) => (
                 <div key={i} className="rounded-xl p-4" style={{ background: item.bg }}>
-                  <p className="text-xs font-bold mb-1" style={{ color: item.textColor, opacity: 0.8 }}>{item.label}</p>
-                  <p className="text-sm font-semibold" style={{ color: item.textColor }}>{item.value}</p>
+                  <p className="text-xs font-bold mb-1" style={{ color: item.color, opacity: 0.8 }}>{item.label}</p>
+                  <p className="text-sm font-semibold" style={{ color: item.color }}>{item.value}</p>
                 </div>
               ))}
-              {result.detail_page.features?.length > 0 && (
-                <div>
-                  <p className="text-sm font-bold mb-2" style={{ color: "#1a1a2e" }}>📋 상세페이지 섹션</p>
-                  {result.detail_page.features.map((f, i) => (
-                    <div key={i} className="bg-gray-50 rounded-xl p-4 mb-2">
-                      <p className="font-bold text-sm mb-1" style={{ color: "#1a1a2e" }}>{f.title}</p>
-                      <p className="text-xs text-gray-600 mb-1">{f.desc}</p>
-                      <p className="text-xs text-indigo-500">📷 {f.image_guide}</p>
-                    </div>
-                  ))}
+              {result.detail_page.features?.map((f, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-4">
+                  <p className="font-bold text-sm mb-1" style={{ color: "#1a1a2e" }}>{f.title}</p>
+                  <p className="text-xs text-gray-600 mb-1">{f.desc}</p>
+                  <p className="text-xs text-indigo-500">📷 {f.image_guide}</p>
                 </div>
-              )}
-              {result.detail_page.faq?.length > 0 && (
-                <div>
-                  <p className="text-sm font-bold mb-2" style={{ color: "#1a1a2e" }}>❓ FAQ</p>
-                  {result.detail_page.faq.map((f, i) => (
-                    <div key={i} className="bg-gray-50 rounded-xl p-3 mb-2">
-                      <p className="text-sm font-bold mb-1" style={{ color: "#1a1a2e" }}>Q. {f.q}</p>
-                      <p className="text-xs text-gray-600">A. {f.a}</p>
-                    </div>
-                  ))}
+              ))}
+              {result.detail_page.faq?.map((f, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-sm font-bold mb-1" style={{ color: "#1a1a2e" }}>Q. {f.q}</p>
+                  <p className="text-xs text-gray-600">A. {f.a}</p>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
-          {/* 📸 이미지 기획 */}
+          {/* 이미지 기획 */}
           {activeSection === "imageplan" && (
             <div className="space-y-3">
               {imagePlan ? (
                 <>
-                  {/* 전략 요약 */}
                   <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-                    <p className="text-xs text-white/70 mb-1">📸 상세페이지 이미지 전략</p>
+                    <p className="text-xs text-white/70 mb-1">📸 이미지 전략</p>
                     <p className="text-sm font-bold text-white">{imagePlan.strategy}</p>
-                    {imagePlan.total_images && (
-                      <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>
-                    )}
+                    {imagePlan.total_images && <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>}
                   </div>
-
-                  {/* 경쟁사 약점 */}
                   {imagePlan.competitor_weakness && (
                     <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-                      <p className="text-xs font-bold text-red-500 mb-1">⚠️ 경쟁사의 흔한 약점</p>
+                      <p className="text-xs font-bold text-red-500 mb-1">⚠️ 경쟁사 약점</p>
                       <p className="text-xs text-red-400">{imagePlan.competitor_weakness}</p>
                     </div>
                   )}
-
-                  {/* 섹션별 이미지 */}
                   {imagePlan.sections?.map((section) => {
                     const colors = SECTION_COLORS[section.order] || SECTION_COLORS[1];
                     const isOpen = openImageSections.includes(section.order);
@@ -368,6 +361,7 @@ export default function ContentTab() {
                               const imgKey = `${section.order}-${img.index}`;
                               const imgUrl = generatedImages[imgKey];
                               const isImgLoading = loadingImages[imgKey];
+                              const prompt = buildPrompt(img, productName);
                               return (
                                 <div key={img.index} className="p-4 bg-white">
                                   <div className="flex items-center justify-between mb-2">
@@ -375,7 +369,7 @@ export default function ContentTab() {
                                       style={{ background: colors.bg, color: colors.badge }}>
                                       #{img.index} {img.type}
                                     </span>
-                                    <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}\n소품: ${img.props}`, `img-${imgKey}`)}
+                                    <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}`, `img-${imgKey}`)}
                                       className="text-xs text-gray-400 hover:text-indigo-500 cursor-pointer">복사</button>
                                   </div>
                                   <p className="text-sm text-gray-700 mb-2 leading-relaxed">{img.description}</p>
@@ -403,99 +397,54 @@ export default function ContentTab() {
                                       <p className="text-xs text-green-600">{img.why_better}</p>
                                     </div>
                                   )}
-                                  {/* AI 이미지 생성 영역 */}
-                                  {(
+                                  {/* AI 이미지 생성 */}
+                                  {!imgUrl ? (
+                                    <button
+                                      onClick={() => generateImage(imgKey, prompt)}
+                                      className="w-full py-2 rounded-xl text-xs font-bold cursor-pointer border-2 border-dashed border-indigo-300 text-indigo-500 hover:bg-indigo-50">
+                                      🎨 AI 이미지 생성 (5~10초)
+                                    </button>
+                                  ) : (
                                     <div>
-                                      {!imgUrl ? (
-                                        <button
-                                          onClick={() => generateImage(imgKey, buildPrompt(img, productName))}
-                                          className="w-full py-2 rounded-xl text-xs font-bold cursor-pointer transition-all border-2 border-dashed border-indigo-300 text-indigo-500 hover:bg-indigo-50">
-                                          🎨 AI 이미지 생성 (무료)
+                                      <div className="relative rounded-xl overflow-hidden bg-gray-100" style={{ minHeight: 200 }}>
+                                        {isImgLoading && (
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+                                            <span className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
+                                            <p className="text-xs text-gray-400">이미지 생성 중... (5~10초)</p>
+                                          </div>
+                                        )}
+                                        <img src={imgUrl} alt={img.type} className="w-full rounded-xl"
+                                          onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
+                                          onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))} />
+                                      </div>
+                                      <div className="flex gap-2 mt-2">
+                                        <button onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
+                                          className="flex-1 py-2 rounded-xl text-xs font-bold text-white cursor-pointer"
+                                          style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
+                                          ⬇️ 다운로드
                                         </button>
-                                      ) : (
-                                        <div className="mt-1">
-                                          <div className="relative rounded-xl overflow-hidden bg-gray-100" style={{ minHeight: 200 }}>
-                                            {isImgLoading && (
-                                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-                                                <span className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
-                                                <p className="text-xs text-gray-400">이미지 생성 중... (10~30초)</p>
-                                              </div>
-                                            )}
-                                            <img
-                                              src={imgUrl}
-                                              alt={img.type}
-                                              className="w-full rounded-xl"
-                                              onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
-                                              onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
-                                            />
-                                          </div>
-                                          <div className="flex gap-2 mt-2">
-                                            <button
-                                              onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
-                                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white cursor-pointer"
-                                              style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-                                              ⬇️ 다운로드
-                                            </button>
-                                            <button
-                                              onClick={() => {
-                                                setGeneratedImages(prev => { const n = { ...prev }; delete n[imgKey]; return n; });
-                                                setLoadingImages(prev => { const n = { ...prev }; delete n[imgKey]; return n; });
-                                              }}
-                                              className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
-                                              🔄 재생성
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
+                                        <button onClick={() => regenImage(imgKey)}
+                                          className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
+                                          🔄 재생성
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
                               );
                             })}
-
                           </div>
                         )}
                       </div>
                     );
                   })}
-
-                  {/* 촬영 팁 */}
                   {imagePlan.shooting_tips?.length > 0 && (
                     <div className="bg-amber-50 rounded-xl p-4">
-                      <p className="text-sm font-bold text-amber-700 mb-2">📷 실전 촬영 팁</p>
+                      <p className="text-sm font-bold text-amber-700 mb-2">📷 촬영 팁</p>
                       {imagePlan.shooting_tips.map((tip, i) => (
                         <div key={i} className="flex gap-2 items-start mb-1.5">
                           <span className="w-5 h-5 rounded-full bg-amber-400 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
                           <p className="text-xs text-amber-700">{tip}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 모바일 최적화 */}
-                  {imagePlan.mobile_optimization?.length > 0 && (
-                    <div className="bg-blue-50 rounded-xl p-4">
-                      <p className="text-sm font-bold text-blue-700 mb-2">📱 모바일 최적화</p>
-                      {imagePlan.mobile_optimization.map((tip, i) => (
-                        <div key={i} className="flex gap-2 items-start mb-1">
-                          <span className="text-blue-400">•</span>
-                          <p className="text-xs text-blue-600">{tip}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 무료 도구 */}
-                  {imagePlan.free_tools?.length > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-4">
-                      <p className="text-sm font-bold mb-2" style={{ color: "#1a1a2e" }}>🛠️ 추천 무료 도구</p>
-                      {imagePlan.free_tools.map((tool, i) => (
-                        <div key={i} className="bg-white rounded-lg p-3 mb-1.5 flex items-start justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-gray-700">{tool.tool}</p>
-                            <p className="text-xs text-gray-500">{tool.purpose}</p>
-                          </div>
-                          <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{tool.url_hint}</span>
                         </div>
                       ))}
                     </div>
@@ -521,18 +470,16 @@ export default function ContentTab() {
                 <p className="text-xs font-bold text-green-600 mb-1">📌 SEO 최적화 제목</p>
                 <p className="font-bold text-sm text-green-800">{result.blog_post.title}</p>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-2">도입부</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{result.blog_post.intro}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-2">본문</p>
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{result.blog_post.body}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-2">마무리</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{result.blog_post.outro}</p>
-              </div>
+              {[
+                { label: "도입부", value: result.blog_post.intro },
+                { label: "본문", value: result.blog_post.body },
+                { label: "마무리", value: result.blog_post.outro },
+              ].map((s) => (
+                <div key={s.label} className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs font-bold text-gray-500 mb-2">{s.label}</p>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{s.value}</p>
+                </div>
+              ))}
               <div className="flex flex-wrap gap-1">
                 {result.blog_post.tags?.map((tag, i) => (
                   <span key={i} className="text-xs px-2 py-1 rounded-full" style={{ background: "#f0f0ff", color: "#667eea" }}>#{tag}</span>
@@ -546,7 +493,7 @@ export default function ContentTab() {
             <div className="space-y-3">
               <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-white">📱 인스타그램 캡션</p>
+                  <p className="text-xs font-bold text-white">📱 캡션</p>
                   <CopyBtn text={result.instagram.caption} id="insta-cap" />
                 </div>
                 <p className="text-sm text-white leading-relaxed">{result.instagram.caption}</p>
@@ -577,14 +524,14 @@ export default function ContentTab() {
             <div className="space-y-3">
               <div className="bg-yellow-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-yellow-700">💬 카카오채널 포스팅</p>
+                  <p className="text-xs font-bold text-yellow-700">💬 채널 포스팅</p>
                   <CopyBtn text={result.kakao.channel_post} id="kakao-ch" />
                 </div>
                 <p className="text-sm text-yellow-800 leading-relaxed">{result.kakao.channel_post}</p>
               </div>
               <div className="bg-yellow-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-yellow-700">📤 친구 공유 메시지</p>
+                  <p className="text-xs font-bold text-yellow-700">📤 친구 공유</p>
                   <CopyBtn text={result.kakao.talk_message} id="kakao-talk" />
                 </div>
                 <p className="text-sm text-yellow-800 leading-relaxed">{result.kakao.talk_message}</p>
@@ -592,28 +539,23 @@ export default function ContentTab() {
             </div>
           )}
 
-          {/* Canva 가이드 */}
+          {/* Canva */}
           {activeSection === "canva" && result?.canva_guide && (
             <div className="space-y-3">
-              <div className="bg-blue-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-blue-600 mb-1">🎨 Canva 썸네일 스타일 가이드</p>
-                <p className="text-sm text-blue-800">{result.canva_guide.thumbnail_style}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-2">색상 조합</p>
-                <p className="text-sm text-gray-700">{result.canva_guide.color_scheme}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-2">폰트 추천</p>
-                <p className="text-sm text-gray-700">{result.canva_guide.font_suggestion}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-gray-500 mb-2">레이아웃 팁</p>
-                <p className="text-sm text-gray-700">{result.canva_guide.layout_tip}</p>
-              </div>
+              {[
+                { label: "🎨 썸네일 스타일", value: result.canva_guide.thumbnail_style, bg: "#eff6ff", color: "#1d4ed8" },
+                { label: "🎨 색상 조합", value: result.canva_guide.color_scheme, bg: "#f9fafb", color: "#374151" },
+                { label: "✍️ 폰트", value: result.canva_guide.font_suggestion, bg: "#f9fafb", color: "#374151" },
+                { label: "📐 레이아웃 팁", value: result.canva_guide.layout_tip, bg: "#f9fafb", color: "#374151" },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl p-4" style={{ background: item.bg }}>
+                  <p className="text-xs font-bold mb-1" style={{ color: item.color }}>{item.label}</p>
+                  <p className="text-sm" style={{ color: item.color }}>{item.value}</p>
+                </div>
+              ))}
               <a href="https://www.canva.com" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border-2 border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
-                🎨 Canva에서 썸네일 만들기 →
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border-2 border-blue-200 text-blue-600 hover:bg-blue-50">
+                🎨 Canva에서 만들기 →
               </a>
             </div>
           )}
