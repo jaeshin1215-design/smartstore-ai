@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface MarketingCopy { type: string; copy: string; sub: string; }
 interface ThumbnailSet { main: string; sub: string; badge: string; }
@@ -30,12 +30,10 @@ interface ImageItem {
   text_overlay: string; why_better: string; ai_prompt?: string;
 }
 interface ImageSection { order: number; name: string; purpose: string; images: ImageItem[]; }
-interface FreeTool { tool: string; purpose: string; url_hint: string; }
 interface ImagePlanResult {
   strategy: string; competitor_weakness: string;
   sections: ImageSection[]; total_images: number;
-  shooting_tips: string[]; mobile_optimization: string[];
-  free_tools: FreeTool[];
+  shooting_tips: string[];
 }
 
 const SECTION_COLORS: Record<number, { bg: string; border: string; badge: string; text: string }> = {
@@ -62,14 +60,24 @@ function buildPrompt(img: ImageItem, productName: string): string {
   ];
   const typeHint = typeMap.find(([k]) => img.type.includes(k))?.[1] ?? "professional product photography";
   const parts = [
-    typeHint,
-    `of ${productName}`,
-    img.angle,
-    `${img.background} background`,
-    img.props ? img.props : "",
+    typeHint, `of ${productName}`, img.angle,
+    `${img.background} background`, img.props || "",
     "studio lighting, high quality, 8k, commercial photography",
   ].filter(Boolean);
   return parts.join(", ");
+}
+
+function getRefKeywords(type: string, sectionName: string): string {
+  const t = type + sectionName;
+  if (t.includes("라이프스타일")) return "lifestyle,healthy,kitchen,food";
+  if (t.includes("클로즈업") || t.includes("성분")) return "food,ingredient,organic,closeup";
+  if (t.includes("패키지") || t.includes("포장")) return "packaging,product,minimal,box";
+  if (t.includes("비교")) return "health,wellness,beauty,natural";
+  if (t.includes("인증") || t.includes("신뢰")) return "organic,natural,green,trust";
+  if (t.includes("CTA") || t.includes("구매")) return "shopping,ecommerce,product,store";
+  if (t.includes("Hero") || t.includes("첫 화면")) return "product,photography,clean,studio";
+  if (t.includes("문제") || t.includes("공감")) return "stress,tired,health,wellness";
+  return "product,photography,studio,clean";
 }
 
 export default function ContentTab() {
@@ -85,49 +93,12 @@ export default function ContentTab() {
   const [activeSection, setActiveSection] = useState("marketing");
   const [copied, setCopied] = useState<string | null>(null);
   const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
-  const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
-  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
-  const [preloadProgress, setPreloadProgress] = useState(0);
-
-  // 이미지 기획 결과 도착 즉시 백그라운드에서 모든 이미지 사전 로드
-  useEffect(() => {
-    if (!imagePlan || !productName) return;
-    const allImages: { key: string; url: string }[] = [];
-    imagePlan.sections?.forEach((section) => {
-      section.images?.forEach((img) => {
-        const key = `${section.order}-${img.index}`;
-        const prompt = buildPrompt(img, productName);
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=turbo`;
-        allImages.push({ key, url });
-      });
-    });
-    if (allImages.length === 0) return;
-    setPreloadProgress(0);
-    let done = 0;
-    allImages.forEach(({ key, url }) => {
-      setGeneratedImages(prev => prev[key] ? prev : { ...prev, [key]: url });
-      setLoadingImages(prev => ({ ...prev, [key]: true }));
-      const img = new Image();
-      img.onload = () => {
-        done++;
-        setPreloadProgress(Math.round((done / allImages.length) * 100));
-        setLoadingImages(prev => ({ ...prev, [key]: false }));
-      };
-      img.onerror = () => {
-        done++;
-        setPreloadProgress(Math.round((done / allImages.length) * 100));
-        setLoadingImages(prev => ({ ...prev, [key]: false }));
-      };
-      img.src = url;
-    });
-  }, [imagePlan, productName]);
 
   const handleSubmit = async () => {
     if (!productName) return;
     setLoading(true);
     setResult(null);
     setImagePlan(null);
-    setGeneratedImages({});
     try {
       const payload = { productName, category, features, targetCustomer, price, uniquePoint };
       const [contentRes, imageRes] = await Promise.all([
@@ -156,31 +127,6 @@ export default function ContentTab() {
     );
   };
 
-  const generateImage = (key: string, prompt: string, regenSeed?: number) => {
-    if (!regenSeed && (generatedImages[key] || loadingImages[key])) return;
-    setLoadingImages(prev => ({ ...prev, [key]: true }));
-    // seed 없음 = Pollinations 캐시 활용 → 동일 프롬프트 재요청 시 즉시 반환
-    const seedPart = regenSeed ? `&seed=${regenSeed}` : "";
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=turbo${seedPart}`;
-    setGeneratedImages(prev => ({ ...prev, [key]: url }));
-  };
-
-  const regenImage = (key: string, prompt: string) => {
-    const newSeed = Math.floor(Math.random() * 99999) + 1;
-    setGeneratedImages(prev => { const n = { ...prev }; delete n[key]; return n; });
-    setLoadingImages(prev => { const n = { ...prev }; delete n[key]; return n; });
-    setTimeout(() => generateImage(key, prompt, newSeed), 50);
-  };
-
-  const downloadImage = async (url: string, filename: string) => {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-  };
-
   const CopyBtn = ({ text, id }: { text: string; id: string }) => (
     <button onClick={() => copy(text, id)}
       className="text-xs px-2 py-1 rounded-lg font-semibold cursor-pointer flex-shrink-0"
@@ -189,7 +135,7 @@ export default function ContentTab() {
     </button>
   );
 
-  const sections = [
+  const tabs = [
     { id: "marketing", label: "📣 카피" },
     { id: "thumbnail", label: "🖼️ 썸네일" },
     { id: "detail", label: "📄 상세페이지" },
@@ -262,7 +208,7 @@ export default function ContentTab() {
       {(result || imagePlan) && (
         <div className="mt-6">
           <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-            {sections.map((s) => (
+            {tabs.map((s) => (
               <button key={s.id} onClick={() => setActiveSection(s.id)}
                 className="whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all"
                 style={activeSection === s.id
@@ -363,30 +309,38 @@ export default function ContentTab() {
                   <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
                     <p className="text-xs text-white/70 mb-1">📸 이미지 전략</p>
                     <p className="text-sm font-bold text-white">{imagePlan.strategy}</p>
-                    {imagePlan.total_images && <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>}
-                    {preloadProgress < 100 && (
-                      <div className="mt-2">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs text-white/70">🎨 이미지 백그라운드 생성 중...</p>
-                          <p className="text-xs text-white font-bold">{preloadProgress}%</p>
-                        </div>
-                        <div className="w-full bg-white/20 rounded-full h-1.5">
-                          <div className="bg-white rounded-full h-1.5 transition-all duration-500"
-                            style={{ width: `${preloadProgress}%` }} />
-                        </div>
-                        <p className="text-xs text-white/60 mt-1">섹션을 열면 생성된 이미지를 바로 확인할 수 있어요</p>
-                      </div>
-                    )}
-                    {preloadProgress === 100 && (
-                      <p className="text-xs text-white/80 mt-2">✅ 모든 이미지 생성 완료! 각 섹션을 열어 확인하세요</p>
+                    {imagePlan.total_images && (
+                      <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>
                     )}
                   </div>
+
                   {imagePlan.competitor_weakness && (
-                    <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                       <p className="text-xs font-bold text-red-500 mb-1">⚠️ 경쟁사 약점</p>
                       <p className="text-xs text-red-400">{imagePlan.competitor_weakness}</p>
                     </div>
                   )}
+
+                  {/* AI 이미지 생성 안내 */}
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <p className="text-xs font-bold text-blue-600 mb-1">💡 AI 이미지 생성 방법</p>
+                    <p className="text-xs text-blue-500">각 섹션의 <strong>AI 프롬프트를 복사</strong>한 뒤, 아래 무료 도구에 붙여넣으면 고품질 이미지를 생성할 수 있어요.</p>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <a href="https://www.bing.com/images/create" target="_blank" rel="noopener noreferrer"
+                        className="text-xs px-2 py-1 rounded-lg font-bold text-white" style={{ background: "#0078d4" }}>
+                        Bing AI (무료·빠름)
+                      </a>
+                      <a href="https://app.leonardo.ai/ai-generations" target="_blank" rel="noopener noreferrer"
+                        className="text-xs px-2 py-1 rounded-lg font-bold text-white" style={{ background: "#7c3aed" }}>
+                        Leonardo.ai (무료)
+                      </a>
+                      <a href="https://firefly.adobe.com/generate/images" target="_blank" rel="noopener noreferrer"
+                        className="text-xs px-2 py-1 rounded-lg font-bold text-white" style={{ background: "#e74c3c" }}>
+                        Adobe Firefly (무료)
+                      </a>
+                    </div>
+                  </div>
+
                   {imagePlan.sections?.map((section) => {
                     const colors = SECTION_COLORS[section.order] || SECTION_COLORS[1];
                     const isOpen = openImageSections.includes(section.order);
@@ -409,24 +363,30 @@ export default function ContentTab() {
                             <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
                           </div>
                         </button>
+
                         {isOpen && (
                           <div className="divide-y divide-gray-100">
                             {section.images?.map((img) => {
-                              const imgKey = `${section.order}-${img.index}`;
-                              const imgUrl = generatedImages[imgKey];
-                              const isImgLoading = loadingImages[imgKey];
+                              const seed = section.order * 100 + img.index;
+                              const kw = getRefKeywords(img.type, section.name);
+                              const refImgUrl = `https://loremflickr.com/480/300/${kw}?lock=${seed}`;
                               const prompt = buildPrompt(img, productName);
+                              const promptKey = `prompt-${section.order}-${img.index}`;
+
                               return (
                                 <div key={img.index} className="p-4 bg-white">
+                                  {/* 이미지 타입 + 설명 */}
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                                       style={{ background: colors.bg, color: colors.badge }}>
                                       #{img.index} {img.type}
                                     </span>
-                                    <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}`, `img-${imgKey}`)}
+                                    <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}`, `img-${promptKey}`)}
                                       className="text-xs text-gray-400 hover:text-indigo-500 cursor-pointer">복사</button>
                                   </div>
                                   <p className="text-sm text-gray-700 mb-2 leading-relaxed">{img.description}</p>
+
+                                  {/* 촬영 정보 */}
                                   <div className="grid grid-cols-3 gap-1.5 mb-2">
                                     {[
                                       { label: "각도", value: img.angle },
@@ -439,71 +399,72 @@ export default function ContentTab() {
                                       </div>
                                     ))}
                                   </div>
+
                                   {img.text_overlay && (
                                     <div className="bg-indigo-50 rounded-lg px-3 py-2 mb-2">
-                                      <p className="text-xs text-indigo-400">텍스트</p>
+                                      <p className="text-xs text-indigo-400">텍스트 오버레이</p>
                                       <p className="text-xs font-bold text-indigo-700">"{img.text_overlay}"</p>
                                     </div>
                                   )}
+
                                   {img.why_better && (
                                     <div className="flex gap-1.5 items-start mb-3">
-                                      <span className="text-green-500 text-xs">✓</span>
+                                      <span className="text-green-500 text-xs mt-0.5">✓</span>
                                       <p className="text-xs text-green-600">{img.why_better}</p>
                                     </div>
                                   )}
-                                  {/* 자동 생성된 이미지 */}
-                                  {imgUrl ? (
-                                    <div className="mt-2">
-                                      <div className="relative rounded-xl overflow-hidden bg-gray-100" style={{ minHeight: 160 }}>
-                                        {isImgLoading && (
-                                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-                                            <span className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
-                                            <p className="text-xs text-gray-400">이미지 생성 중...</p>
-                                          </div>
-                                        )}
-                                        <img src={imgUrl} alt={img.type} className="w-full rounded-xl"
-                                          onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
-                                          onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))} />
-                                      </div>
-                                      <div className="flex gap-2 mt-2">
-                                        <button onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
-                                          className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
-                                          style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-                                          ⬇️ 다운로드
-                                        </button>
-                                        <button onClick={() => regenImage(imgKey, prompt)}
-                                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
-                                          🔄 재생성
-                                        </button>
-                                      </div>
+
+                                  {/* 분위기 참고 이미지 */}
+                                  <div className="mb-3">
+                                    <p className="text-xs text-gray-400 mb-1">📷 분위기 참고 이미지 (실제 촬영 참고용)</p>
+                                    <div className="rounded-xl overflow-hidden bg-gray-100" style={{ height: 160 }}>
+                                      <img
+                                        src={refImgUrl}
+                                        alt={img.type}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${seed}/480/300`;
+                                        }}
+                                      />
                                     </div>
-                                  ) : (
-                                    <div className="mt-2 py-3 bg-gray-50 rounded-xl text-center">
-                                      <span className="w-5 h-5 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin inline-block mb-1" />
-                                      <p className="text-xs text-gray-400">이미지 생성 중... 상단 진행률 확인</p>
+                                  </div>
+
+                                  {/* AI 프롬프트 + 생성 버튼 */}
+                                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <p className="text-xs font-bold text-indigo-600">🤖 AI 이미지 생성 프롬프트</p>
+                                      <button
+                                        onClick={() => copy(prompt, promptKey)}
+                                        className="text-xs px-2 py-0.5 rounded-lg font-bold cursor-pointer"
+                                        style={{
+                                          background: copied === promptKey ? "#e8f9f0" : "#e8f0fe",
+                                          color: copied === promptKey ? "#2d9653" : "#4361ee",
+                                        }}>
+                                        {copied === promptKey ? "✓ 복사됨!" : "📋 복사"}
+                                      </button>
                                     </div>
-                                  )}
-                                  {/* 프롬프트 복사 + 외부 도구 */}
-                                  <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 p-2">
+                                    <p className="text-xs text-gray-500 font-mono leading-relaxed mb-2 break-all">{prompt}</p>
                                     <div className="flex gap-1.5 flex-wrap">
                                       <button
-                                        onClick={() => { copy(prompt, `prompt-${imgKey}`); window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank"); }}
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        onClick={() => {
+                                          copy(prompt, promptKey);
+                                          window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank");
+                                        }}
+                                        className="text-xs px-2.5 py-1.5 rounded-lg font-bold text-white cursor-pointer"
                                         style={{ background: "#0078d4" }}>
-                                        🚀 Bing AI
+                                        🚀 Bing AI로 생성
                                       </button>
                                       <button
-                                        onClick={() => { copy(prompt, `prompt-${imgKey}`); window.open("https://app.leonardo.ai/ai-generations", "_blank"); }}
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        onClick={() => {
+                                          copy(prompt, promptKey);
+                                          window.open("https://app.leonardo.ai/ai-generations", "_blank");
+                                        }}
+                                        className="text-xs px-2.5 py-1.5 rounded-lg font-bold text-white cursor-pointer"
                                         style={{ background: "#7c3aed" }}>
                                         📋 Leonardo
                                       </button>
-                                      <button onClick={() => copy(prompt, `prompt-${imgKey}`)}
-                                        className="text-xs px-2 py-1 rounded-lg font-bold cursor-pointer"
-                                        style={{ background: copied === `prompt-${imgKey}` ? "#e8f9f0" : "#e8f0fe", color: copied === `prompt-${imgKey}` ? "#2d9653" : "#4361ee" }}>
-                                        {copied === `prompt-${imgKey}` ? "✓ 복사됨" : "📋 프롬프트 복사"}
-                                      </button>
                                     </div>
+                                    <p className="text-xs text-gray-400 mt-1.5">💡 복사 후 붙여넣기(Ctrl+V)하면 즉시 생성됩니다</p>
                                   </div>
                                 </div>
                               );
@@ -513,6 +474,7 @@ export default function ContentTab() {
                       </div>
                     );
                   })}
+
                   {imagePlan.shooting_tips?.length > 0 && (
                     <div className="bg-amber-50 rounded-xl p-4">
                       <p className="text-sm font-bold text-amber-700 mb-2">📷 촬영 팁</p>
@@ -528,7 +490,7 @@ export default function ContentTab() {
               ) : (
                 <div className="text-center py-8 text-gray-400">
                   <p className="text-2xl mb-2">📸</p>
-                  <p className="text-sm">이미지 기획 데이터를 불러오는 중입니다...</p>
+                  <p className="text-sm">콘텐츠를 먼저 생성해주세요</p>
                 </div>
               )}
             </div>

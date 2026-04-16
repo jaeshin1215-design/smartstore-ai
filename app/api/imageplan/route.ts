@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       model: "anthropic/claude-3-haiku",
+      max_tokens: 4000,
       messages: [
         {
           role: "user",
