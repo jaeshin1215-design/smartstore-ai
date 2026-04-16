@@ -101,6 +101,20 @@ export default function ContentTab() {
     );
   };
 
+  const buildPrompt = (img: ImageItem, productName: string): string => {
+    if (img.ai_prompt) return img.ai_prompt;
+    const typeMap: Record<string, string> = {
+      "제품 정면샷": "professional product photography, front view",
+      "라이프스타일": "lifestyle photography, natural light",
+      "클로즈업": "macro close-up product photography",
+      "비교": "before and after comparison photography",
+      "패키지": "product packaging photography",
+      "성분": "ingredient flat lay photography",
+    };
+    const typeHint = Object.entries(typeMap).find(([k]) => img.type.includes(k))?.[1] || "product photography";
+    return `${typeHint} of ${productName}, ${img.angle}, ${img.background} background, ${img.props ? img.props + ", " : ""}studio lighting, high quality, 8k, commercial photography, clean composition`;
+  };
+
   const generateImage = (key: string, prompt: string) => {
     if (generatedImages[key] || loadingImages[key]) return;
     setLoadingImages(prev => ({ ...prev, [key]: true }));
@@ -390,11 +404,11 @@ export default function ContentTab() {
                                     </div>
                                   )}
                                   {/* AI 이미지 생성 영역 */}
-                                  {img.ai_prompt && (
+                                  {(
                                     <div>
                                       {!imgUrl ? (
                                         <button
-                                          onClick={() => generateImage(imgKey, img.ai_prompt!)}
+                                          onClick={() => generateImage(imgKey, buildPrompt(img, productName))}
                                           className="w-full py-2 rounded-xl text-xs font-bold cursor-pointer transition-all border-2 border-dashed border-indigo-300 text-indigo-500 hover:bg-indigo-50">
                                           🎨 AI 이미지 생성 (무료)
                                         </button>
@@ -438,6 +452,7 @@ export default function ContentTab() {
                                 </div>
                               );
                             })}
+
                           </div>
                         )}
                       </div>
