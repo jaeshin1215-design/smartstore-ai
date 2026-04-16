@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface MarketingCopy { type: string; copy: string; sub: string; }
 interface ThumbnailSet { main: string; sub: string; badge: string; }
@@ -87,6 +87,40 @@ export default function ContentTab() {
   const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
+  const [preloadProgress, setPreloadProgress] = useState(0);
+
+  // 이미지 기획 결과 도착 즉시 백그라운드에서 모든 이미지 사전 로드
+  useEffect(() => {
+    if (!imagePlan || !productName) return;
+    const allImages: { key: string; url: string }[] = [];
+    imagePlan.sections?.forEach((section) => {
+      section.images?.forEach((img) => {
+        const key = `${section.order}-${img.index}`;
+        const prompt = buildPrompt(img, productName);
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=turbo`;
+        allImages.push({ key, url });
+      });
+    });
+    if (allImages.length === 0) return;
+    setPreloadProgress(0);
+    let done = 0;
+    allImages.forEach(({ key, url }) => {
+      setGeneratedImages(prev => prev[key] ? prev : { ...prev, [key]: url });
+      setLoadingImages(prev => ({ ...prev, [key]: true }));
+      const img = new Image();
+      img.onload = () => {
+        done++;
+        setPreloadProgress(Math.round((done / allImages.length) * 100));
+        setLoadingImages(prev => ({ ...prev, [key]: false }));
+      };
+      img.onerror = () => {
+        done++;
+        setPreloadProgress(Math.round((done / allImages.length) * 100));
+        setLoadingImages(prev => ({ ...prev, [key]: false }));
+      };
+      img.src = url;
+    });
+  }, [imagePlan, productName]);
 
   const handleSubmit = async () => {
     if (!productName) return;
@@ -330,6 +364,22 @@ export default function ContentTab() {
                     <p className="text-xs text-white/70 mb-1">📸 이미지 전략</p>
                     <p className="text-sm font-bold text-white">{imagePlan.strategy}</p>
                     {imagePlan.total_images && <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>}
+                    {preloadProgress < 100 && (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs text-white/70">🎨 이미지 백그라운드 생성 중...</p>
+                          <p className="text-xs text-white font-bold">{preloadProgress}%</p>
+                        </div>
+                        <div className="w-full bg-white/20 rounded-full h-1.5">
+                          <div className="bg-white rounded-full h-1.5 transition-all duration-500"
+                            style={{ width: `${preloadProgress}%` }} />
+                        </div>
+                        <p className="text-xs text-white/60 mt-1">섹션을 열면 생성된 이미지를 바로 확인할 수 있어요</p>
+                      </div>
+                    )}
+                    {preloadProgress === 100 && (
+                      <p className="text-xs text-white/80 mt-2">✅ 모든 이미지 생성 완료! 각 섹션을 열어 확인하세요</p>
+                    )}
                   </div>
                   {imagePlan.competitor_weakness && (
                     <div className="bg-red-50 border border-red-100 rounded-xl p-4">
@@ -401,73 +451,59 @@ export default function ContentTab() {
                                       <p className="text-xs text-green-600">{img.why_better}</p>
                                     </div>
                                   )}
-                                  {/* AI 프롬프트 + 이미지 생성 */}
-                                  <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <p className="text-xs font-bold text-indigo-600">🤖 AI 이미지 프롬프트</p>
-                                      <button
-                                        onClick={() => {
-                                          copy(prompt, `prompt-${imgKey}`);
-                                          window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank");
-                                        }}
-                                        className="text-xs px-2 py-0.5 rounded-lg font-bold cursor-pointer"
-                                        style={{ background: "#0078d4", color: "white" }}>
-                                        🚀 Bing AI로 바로 생성
-                                      </button>
-                                    </div>
-                                    <p className="text-xs text-gray-500 leading-relaxed mb-2 font-mono break-all">{prompt}</p>
-                                    <div className="flex gap-1.5 flex-wrap mb-2">
-                                      <button
-                                        onClick={() => {
-                                          copy(prompt, `prompt-${imgKey}`);
-                                          window.open("https://app.leonardo.ai/ai-generations", "_blank");
-                                        }}
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer flex items-center gap-1"
-                                        style={{ background: "#7c3aed" }}>
-                                        📋 복사 후 Leonardo.ai
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          copy(prompt, `prompt-${imgKey}`);
-                                          window.open("https://firefly.adobe.com/generate/images", "_blank");
-                                        }}
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer flex items-center gap-1"
-                                        style={{ background: "#e74c3c" }}>
-                                        📋 복사 후 Adobe Firefly
-                                      </button>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mb-2">💡 버튼 클릭 시 프롬프트가 자동 복사되고 해당 사이트가 열립니다. 사이트에서 붙여넣기(Ctrl+V)하세요.</p>
-                                    {!imgUrl ? (
-                                      <button onClick={() => generateImage(imgKey, prompt)}
-                                        className="w-full py-1.5 rounded-lg text-xs font-semibold cursor-pointer border border-dashed border-gray-300 text-gray-400 hover:bg-gray-100">
-                                        ⏳ 앱 내 생성 시도 (처음엔 1~2분 소요)
-                                      </button>
-                                    ) : (
-                                      <div>
-                                        <div className="relative rounded-xl overflow-hidden bg-gray-100 mt-1" style={{ minHeight: 160 }}>
-                                          {isImgLoading && (
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-                                              <span className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
-                                              <p className="text-xs text-gray-400">생성 중... (처음엔 1~2분 소요)</p>
-                                            </div>
-                                          )}
-                                          <img src={imgUrl} alt={img.type} className="w-full rounded-xl"
-                                            onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
-                                            onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))} />
-                                        </div>
-                                        <div className="flex gap-2 mt-2">
-                                          <button onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
-                                            className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
-                                            style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-                                            ⬇️ 다운로드
-                                          </button>
-                                          <button onClick={() => regenImage(imgKey, prompt)}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
-                                            🔄 재생성
-                                          </button>
-                                        </div>
+                                  {/* 자동 생성된 이미지 */}
+                                  {imgUrl ? (
+                                    <div className="mt-2">
+                                      <div className="relative rounded-xl overflow-hidden bg-gray-100" style={{ minHeight: 160 }}>
+                                        {isImgLoading && (
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+                                            <span className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
+                                            <p className="text-xs text-gray-400">이미지 생성 중...</p>
+                                          </div>
+                                        )}
+                                        <img src={imgUrl} alt={img.type} className="w-full rounded-xl"
+                                          onLoad={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))}
+                                          onError={() => setLoadingImages(prev => ({ ...prev, [imgKey]: false }))} />
                                       </div>
-                                    )}
+                                      <div className="flex gap-2 mt-2">
+                                        <button onClick={() => downloadImage(imgUrl, `${img.type}_${imgKey}.jpg`)}
+                                          className="flex-1 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer"
+                                          style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
+                                          ⬇️ 다운로드
+                                        </button>
+                                        <button onClick={() => regenImage(imgKey, prompt)}
+                                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 bg-gray-100 cursor-pointer hover:bg-gray-200">
+                                          🔄 재생성
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="mt-2 py-3 bg-gray-50 rounded-xl text-center">
+                                      <span className="w-5 h-5 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin inline-block mb-1" />
+                                      <p className="text-xs text-gray-400">이미지 생성 중... 상단 진행률 확인</p>
+                                    </div>
+                                  )}
+                                  {/* 프롬프트 복사 + 외부 도구 */}
+                                  <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 p-2">
+                                    <div className="flex gap-1.5 flex-wrap">
+                                      <button
+                                        onClick={() => { copy(prompt, `prompt-${imgKey}`); window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank"); }}
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        style={{ background: "#0078d4" }}>
+                                        🚀 Bing AI
+                                      </button>
+                                      <button
+                                        onClick={() => { copy(prompt, `prompt-${imgKey}`); window.open("https://app.leonardo.ai/ai-generations", "_blank"); }}
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
+                                        style={{ background: "#7c3aed" }}>
+                                        📋 Leonardo
+                                      </button>
+                                      <button onClick={() => copy(prompt, `prompt-${imgKey}`)}
+                                        className="text-xs px-2 py-1 rounded-lg font-bold cursor-pointer"
+                                        style={{ background: copied === `prompt-${imgKey}` ? "#e8f9f0" : "#e8f0fe", color: copied === `prompt-${imgKey}` ? "#2d9653" : "#4361ee" }}>
+                                        {copied === `prompt-${imgKey}` ? "✓ 복사됨" : "📋 프롬프트 복사"}
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               );
