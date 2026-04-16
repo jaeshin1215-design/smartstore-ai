@@ -405,28 +405,42 @@ export default function ContentTab() {
                                   <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3">
                                     <div className="flex items-center justify-between mb-1.5">
                                       <p className="text-xs font-bold text-indigo-600">🤖 AI 이미지 프롬프트</p>
-                                      <button onClick={() => copy(prompt, `prompt-${imgKey}`)}
+                                      <button
+                                        onClick={() => {
+                                          copy(prompt, `prompt-${imgKey}`);
+                                          window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank");
+                                        }}
                                         className="text-xs px-2 py-0.5 rounded-lg font-bold cursor-pointer"
-                                        style={{ background: copied === `prompt-${imgKey}` ? "#e8f9f0" : "#e8f0fe", color: copied === `prompt-${imgKey}` ? "#2d9653" : "#4361ee" }}>
-                                        {copied === `prompt-${imgKey}` ? "✓ 복사됨" : "📋 복사"}
+                                        style={{ background: "#0078d4", color: "white" }}>
+                                        🚀 Bing AI로 바로 생성
                                       </button>
                                     </div>
                                     <p className="text-xs text-gray-500 leading-relaxed mb-2 font-mono break-all">{prompt}</p>
                                     <div className="flex gap-1.5 flex-wrap mb-2">
-                                      <a href="https://app.leonardo.ai/ai-generations" target="_blank" rel="noopener noreferrer"
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
-                                        style={{ background: "#7c3aed" }}>Leonardo.ai</a>
-                                      <a href="https://firefly.adobe.com/generate/images" target="_blank" rel="noopener noreferrer"
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
-                                        style={{ background: "#e74c3c" }}>Adobe Firefly</a>
-                                      <a href="https://www.bing.com/images/create" target="_blank" rel="noopener noreferrer"
-                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer"
-                                        style={{ background: "#0078d4" }}>Bing AI</a>
+                                      <button
+                                        onClick={() => {
+                                          copy(prompt, `prompt-${imgKey}`);
+                                          window.open("https://app.leonardo.ai/ai-generations", "_blank");
+                                        }}
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer flex items-center gap-1"
+                                        style={{ background: "#7c3aed" }}>
+                                        📋 복사 후 Leonardo.ai
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          copy(prompt, `prompt-${imgKey}`);
+                                          window.open("https://firefly.adobe.com/generate/images", "_blank");
+                                        }}
+                                        className="text-xs px-2 py-1 rounded-lg font-bold text-white cursor-pointer flex items-center gap-1"
+                                        style={{ background: "#e74c3c" }}>
+                                        📋 복사 후 Adobe Firefly
+                                      </button>
                                     </div>
+                                    <p className="text-xs text-gray-400 mb-2">💡 버튼 클릭 시 프롬프트가 자동 복사되고 해당 사이트가 열립니다. 사이트에서 붙여넣기(Ctrl+V)하세요.</p>
                                     {!imgUrl ? (
                                       <button onClick={() => generateImage(imgKey, prompt)}
-                                        className="w-full py-1.5 rounded-lg text-xs font-semibold cursor-pointer border border-dashed border-indigo-300 text-indigo-400 hover:bg-indigo-100">
-                                        🎨 앱 내 자동 생성 시도 (처음엔 1~2분 소요)
+                                        className="w-full py-1.5 rounded-lg text-xs font-semibold cursor-pointer border border-dashed border-gray-300 text-gray-400 hover:bg-gray-100">
+                                        ⏳ 앱 내 생성 시도 (처음엔 1~2분 소요)
                                       </button>
                                     ) : (
                                       <div>
