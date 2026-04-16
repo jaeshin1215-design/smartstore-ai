@@ -19,6 +19,7 @@ import TrendTab from "@/components/TrendTab";
 import ImageEditTab from "@/components/ImageEditTab";
 import ContentTab from "@/components/ContentTab";
 import ImagePlanTab from "@/components/ImagePlanTab";
+import FeedbackButton from "@/components/FeedbackButton";
 
 const TABS = [
   { id: "content", label: "🚀 All in One 콘텐츠" },
@@ -98,6 +99,7 @@ export default function Home() {
           Powered by Claude AI · 스마트스토어 셀러를 위한 AI 도우미
         </p>
       </div>
+      <FeedbackButton />
     </div>
   );
 }
