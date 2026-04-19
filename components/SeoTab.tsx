@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
@@ -115,7 +115,7 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
         <div className="hidden lg:block space-y-2.5 mb-6">
           {[
             "네이버 검색 알고리즘 최적화",
-            "경쟁사 키워드 전략 분析",
+            "경쟁사 키워드 전략 분석",
             "상품명 3가지 버전 제공",
           ].map((f) => (
             <div key={f} className="flex items-center gap-2">
@@ -159,9 +159,9 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
       <div style={CARD} className="p-5">
         {/* Card header */}
         <div className="mb-5">
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>분析 입력</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>분석 입력</p>
           <h2 className="font-bold text-base" style={{ color: "#0f2a1e" }}>상품명 SEO 최적화</h2>
-          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>현재 상품명을 입력하면 AI가 분析합니다</p>
+          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>현재 상품명을 입력하면 AI가 분석합니다</p>
         </div>
 
         {/* Form */}

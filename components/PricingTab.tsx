@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
@@ -116,12 +116,12 @@ export default function PricingTab() {
         </h1>
         <p className="text-sm leading-relaxed mb-5" style={{ color: "#6b8c7a" }}>
           매입가를 입력하면 AI가<br className="hidden lg:block" />
-          최적 판매가와 마진 전략을 분析합니다.
+          최적 판매가와 마진 전략을 분석합니다.
         </p>
         <div className="hidden lg:block space-y-2.5 mb-6">
           {[
             "수수료·배송비 자동 계산",
-            "경쟁사 가격 비교 분析",
+            "경쟁사 가격 비교 분석",
             "마진율 최적화 전략 제공",
           ].map((f) => (
             <div key={f} className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export default function PricingTab() {
         {/* Margin result - desktop only */}
         {result && (
           <div className="hidden lg:block mt-4 rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9ca3af" }}>마진 분析</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9ca3af" }}>마진 분석</p>
             <MarginBar rate={result.margin_rate} />
             {result.price_breakdown && result.price_breakdown.margin_per_unit > 0 && (
               <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t" style={{ borderColor: "#e0ede9" }}>
@@ -181,9 +181,9 @@ export default function PricingTab() {
       <div style={CARD} className="p-5">
         {/* Card header */}
         <div className="mb-5">
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>가격 분析</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>가격 분석</p>
           <h2 className="font-bold text-base" style={{ color: "#0f2a1e" }}>최적 판매가 계산</h2>
-          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>매입가 입력 → AI가 마진 전략 분析</p>
+          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>매입가 입력 → AI가 마진 전략 분석</p>
         </div>
 
         {/* Form */}
@@ -272,7 +272,7 @@ export default function PricingTab() {
               ? <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />연결 중...
                 </span>
-              : "💰 최적 가격 분析하기"}
+              : "💰 최적 가격 분석하기"}
           </button>
         </div>
 

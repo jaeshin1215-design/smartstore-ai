@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 
@@ -166,13 +166,13 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
         {/* Description */}
         <p className="text-sm leading-relaxed mb-5" style={{ color: "#6b8c7a" }}>
           실시간 네이버 검색량 기반으로<br className="hidden lg:block" />
-          AI가 &quot;지금 팔리는 키워드&quot;를 분析합니다
+          AI가 &quot;지금 팔리는 키워드&quot;를 분석합니다
         </p>
         {/* Feature bullets - desktop only */}
         <div className="hidden lg:block space-y-2.5 mb-6">
           {[
             "실시간 네이버 검색량 데이터",
-            "AI 판매 가능성 자동 분析",
+            "AI 판매 가능성 자동 분석",
             "급상승 키워드 자동 추천",
           ].map((f) => (
             <div key={f} className="flex items-center gap-2">
@@ -208,7 +208,7 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
           {loadingAuto && (
             <div className="flex items-center gap-2 py-4" style={{ color: "#9ca3af" }}>
               <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00aa6c" }} />
-              <span className="text-sm">시즌 키워드 분析 중...</span>
+              <span className="text-sm">시즌 키워드 분석 중...</span>
             </div>
           )}
 
@@ -236,7 +236,7 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
                       hk.growth < 0 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"}`}>
                       {hk.growth > 0 ? "▲" : hk.growth < 0 ? "▼" : "–"}{Math.abs(hk.growth)}%
                     </span>
-                    <span className="text-[10px] font-semibold" style={{ color: "#00aa6c" }}>분析 →</span>
+                    <span className="text-[10px] font-semibold" style={{ color: "#00aa6c" }}>분석 →</span>
                   </div>
                 </button>
               ))}
@@ -254,7 +254,7 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
         {/* Card header */}
         <div className="mb-4">
           <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>직접 검색</p>
-          <h2 className="font-bold text-base" style={{ color: "#0f2a1e" }}>키워드 트렌드 분析</h2>
+          <h2 className="font-bold text-base" style={{ color: "#0f2a1e" }}>키워드 트렌드 분석</h2>
           <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>검색하고 싶은 키워드를 직접 입력하세요</p>
         </div>
 
