@@ -1,283 +1,419 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
-interface TrendKeyword {
-  keyword: string;
+interface TrendData { dates: string[]; ratios: number[] }
+interface Gender { male_pct: number; female_pct: number }
+interface Age { [key: string]: number }
+interface Related { keyword: string; avg: number; growth: number }
+interface AiAnalysis {
+  verdict: "good" | "bad" | "neutral";
+  action_command: string;
   reason: string;
-  competition: string;
-  opportunity: number;
-  action: string;
-}
-interface HotProduct {
-  product: string;
-  why_now: string;
-  target: string;
-  price_range: string;
-}
-interface SeasonStrategy {
-  this_month: string;
-  next_month: string;
-  avoid: string;
-}
-interface EventOpportunity {
-  event: string;
-  product_idea: string;
-  timing: string;
-  copy: string;
+  tips: string[];
 }
 interface TrendResult {
-  summary: string;
-  trend_keywords: TrendKeyword[];
-  hot_products: HotProduct[];
-  season_strategy: SeasonStrategy;
-  event_opportunities: EventOpportunity[];
-  competitor_alert: string;
-  action_checklist: string[];
+  keyword: string;
+  trend: TrendData;
+  gender: Gender;
+  age: Age;
+  related: Related[];
+  aiAnalysis: AiAnalysis;
 }
-interface TrendMeta {
-  date: string;
-  season: string;
-  events: string[];
+interface HotKeyword { keyword: string; avg: number; growth: number; comment: string }
+interface AutoResult { mode: "auto"; season: string; hotKeywords: HotKeyword[]; updatedAt: string }
+
+/* ── Styles ── */
+const CARD: React.CSSProperties = {
+  background: "#ffffff",
+  borderRadius: 12,
+  boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+  border: "1px solid #e0ede9",
+};
+
+function LineChart({ dates, ratios }: TrendData) {
+  if (!ratios.length) return null;
+  const W = 400, H = 90, PX = 8, PY = 8;
+  const max = Math.max(...ratios, 1);
+  const pts = ratios.map((r, i) => {
+    const x = PX + (i / Math.max(ratios.length - 1, 1)) * (W - PX * 2);
+    const y = PY + (1 - r / max) * (H - PY * 2);
+    return [x, y] as [number, number];
+  });
+  const poly = pts.map(([x, y]) => `${x},${y}`).join(" ");
+  const area = `${pts[0][0]},${H - PY} ${poly} ${pts[pts.length - 1][0]},${H - PY}`;
+  const peakIdx = ratios.indexOf(Math.max(...ratios));
+  const lastIdx = ratios.length - 1;
+  return (
+    <div className="w-full">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 90 }}>
+        <defs>
+          <linearGradient id="tg2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00aa6c" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#00aa6c" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75].map(v => (
+          <line key={v} x1={PX} x2={W - PX}
+            y1={PY + (1 - v) * (H - PY * 2)} y2={PY + (1 - v) * (H - PY * 2)}
+            stroke="#e0ede9" strokeWidth="1" />
+        ))}
+        <polygon points={area} fill="url(#tg2)" />
+        <polyline points={poly} fill="none" stroke="#00aa6c"
+          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={pts[peakIdx][0]} cy={pts[peakIdx][1]} r="4" fill="#007a4d" stroke="white" strokeWidth="2" />
+        <circle cx={pts[lastIdx][0]} cy={pts[lastIdx][1]} r="3.5" fill="#00aa6c" stroke="white" strokeWidth="2" />
+      </svg>
+      <div className="flex justify-between text-[10px] mt-1 px-1" style={{ color: "#9ca3af" }}>
+        {[0, Math.floor((ratios.length - 1) / 2), ratios.length - 1].map(i => (
+          <span key={i}>{dates[i]}</span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-const CATEGORIES = [
-  "식품 > 건강식품", "식품 > 간식/음료", "식품 > 신선식품",
-  "의류 > 여성패션", "의류 > 남성패션", "의류 > 아동복",
-  "뷰티 > 스킨케어", "뷰티 > 헤어케어", "뷰티 > 메이크업",
-  "생활 > 주방용품", "생활 > 인테리어", "생활 > 청소/세탁",
-  "디지털 > 이어폰/헤드폰", "디지털 > 스마트기기", "가전 > 생활가전",
-  "스포츠 > 운동용품", "스포츠 > 아웃도어", "유아 > 완구/교육",
-  "반려동물 > 사료/간식", "반려동물 > 용품"
-];
+function BarRow({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs w-12 flex-shrink-0" style={{ color: "#6b7280" }}>{label}</span>
+      <div className="flex-1 rounded-full h-1.5" style={{ background: "#e0ede9" }}>
+        <div className="h-1.5 rounded-full transition-all" style={{ width: `${value}%`, background: color }} />
+      </div>
+      <span className="text-xs font-bold w-8 text-right" style={{ color: "#0f2a1e" }}>{value}%</span>
+    </div>
+  );
+}
 
-export default function TrendTab() {
-  const [category, setCategory] = useState("");
-  const [subCategory, setSubCategory] = useState("");
-  const [keywords, setKeywords] = useState("");
-  const [manualData, setManualData] = useState("");
+function MetricCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <div className="rounded-xl p-3 text-center" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9ca3af" }}>{label}</p>
+      <p className="font-extrabold text-lg leading-none" style={{ color: color || "#0f2a1e" }}>{value}</p>
+      {sub && <p className="text-[10px] mt-1" style={{ color: "#9ca3af" }}>{sub}</p>}
+    </div>
+  );
+}
+
+export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: string) => void }) {
+  const [keyword, setKeyword] = useState("");
   const [result, setResult] = useState<TrendResult | null>(null);
-  const [meta, setMeta] = useState<TrendMeta | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [autoData, setAutoData] = useState<AutoResult | null>(null);
+  const [loadingAuto, setLoadingAuto] = useState(false);
+  const resultCardRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = async () => {
-    if (!category) return;
-    setLoading(true);
-    setResult(null);
-    setMeta(null);
+  useEffect(() => {
+    if (loading) {
+      resultCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [loading]);
+
+  const loadHotKeywords = async () => {
+    setLoadingAuto(true);
     try {
-      const res = await fetch("/api/trend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, subCategory, keywords, manualData }),
+      const res = await fetch("/api/naver-trend", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "auto" }),
       });
       const data = await res.json();
-      if (data.result) {
-        setResult(data.result);
-        setMeta(data.meta);
-      }
-    } catch {
-      alert("오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
+      if (!data.error) setAutoData(data);
+    } catch { /* silent */ }
+    finally { setLoadingAuto(false); }
   };
 
-  const opportunityColor = (score: number) =>
-    score >= 8 ? "#e74c3c" : score >= 6 ? "#f39c12" : "#2ecc71";
+  useEffect(() => { loadHotKeywords(); }, []);
 
-  const competitionBg = (c: string) =>
-    c === "높음" ? "#fee2e2" : c === "중간" ? "#fef3c7" : "#d1fae5";
+  const handleSearch = async (kw?: string) => {
+    const target = (kw ?? keyword).trim();
+    if (!target) return;
+    if (!kw) setKeyword(target);
+    setLoading(true); setResult(null); setError("");
+    try {
+      const res = await fetch("/api/naver-trend", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: target }),
+      });
+      const data = await res.json();
+      if (data.error) { setError(data.error); return; }
+      setResult(data);
+    } catch {
+      setError("오류가 발생했습니다. 다시 시도해주세요.");
+    } finally { setLoading(false); }
+  };
 
-  const competitionColor = (c: string) =>
-    c === "높음" ? "#e74c3c" : c === "중간" ? "#f39c12" : "#2ecc71";
+  const verdictCfg = {
+    good:    { bg: "#e8f5f0", border: "#00aa6c", icon: "🟢", label: "지금 팔기 좋음",   color: "#007a4d" },
+    bad:     { bg: "#fef2f2", border: "#ef4444", icon: "🔴", label: "지금 팔기 어려움",  color: "#dc2626" },
+    neutral: { bg: "#fffbeb", border: "#f59e0b", icon: "🟡", label: "중립 — 준비 단계", color: "#b45309" },
+  };
 
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-1" style={{ color: "#1a1a2e" }}>📊 트렌드 리포트</h2>
-      <p className="text-gray-400 text-sm mb-6">카테고리별 급상승 키워드와 신상품 트렌드를 실시간 분석해드려요</p>
+    <div className="lg:grid lg:gap-7" style={{ gridTemplateColumns: "1fr 420px" }}>
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>카테고리 <span className="text-red-400">*</span></label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors bg-white">
-            <option value="">카테고리 선택</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>세부 카테고리 / 관심 상품 (선택)</label>
-          <input type="text" value={subCategory} onChange={(e) => setSubCategory(e.target.value)}
-            placeholder="예) 저당 단백질 식품, 온풍기, 가습기"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>관심 키워드 (선택)</label>
-          <input type="text" value={keywords} onChange={(e) => setKeywords(e.target.value)}
-            placeholder="예) 유기농, 저칼로리, 무타공"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>
-            아이템스카우트 / 네이버 데이터랩 데이터 (선택)
-          </label>
-          <textarea value={manualData} onChange={(e) => setManualData(e.target.value)}
-            placeholder={"예) 아이템스카우트에서 확인한 내용:\n- '무타공 온풍기' 월간 검색량 8,200\n- '욕실 온풍기' 경쟁 상품 1,200개\n- 최근 30일 상승률 +42%"}
-            rows={4}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors resize-none" />
-          <p className="text-xs text-gray-400 mt-1">💡 데이터를 입력할수록 더 정확한 트렌드 분석이 가능해요</p>
-        </div>
-
-        <button onClick={handleSubmit} disabled={loading || !category}
-          className="w-full py-3 rounded-xl font-bold text-white text-sm disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              트렌드 분석 중...
-            </span>
-          ) : "📊 트렌드 리포트 생성하기"}
-        </button>
-      </div>
-
-      {result && meta && (
-        <div className="mt-6 space-y-4">
-          {/* 리포트 헤더 */}
-          <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-white/70">{meta.date} {meta.season} 시즌 트렌드 리포트</p>
-              <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">{category}</span>
+      {/* ── LEFT: Hero + Hot Keywords ── */}
+      <div className="mb-6 lg:mb-0">
+        {/* Section label */}
+        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#00aa6c" }}>
+          TREND ANALYZER
+        </p>
+        {/* Title */}
+        <h1 className="font-extrabold leading-tight mb-2"
+          style={{ fontSize: "clamp(26px,5vw,36px)", color: "#0f2a1e" }}>
+          지금 뭐가<br />팔려?
+        </h1>
+        {/* Description */}
+        <p className="text-sm leading-relaxed mb-5" style={{ color: "#6b8c7a" }}>
+          실시간 네이버 검색량 기반으로<br className="hidden lg:block" />
+          AI가 &quot;지금 팔리는 키워드&quot;를 분析합니다
+        </p>
+        {/* Feature bullets - desktop only */}
+        <div className="hidden lg:block space-y-2.5 mb-6">
+          {[
+            "실시간 네이버 검색량 데이터",
+            "AI 판매 가능성 자동 분析",
+            "급상승 키워드 자동 추천",
+          ].map((f) => (
+            <div key={f} className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                style={{ background: "#00aa6c" }}>✓</span>
+              <span className="text-sm" style={{ color: "#4b7a63" }}>{f}</span>
             </div>
-            <p className="text-sm font-bold text-white mb-2">{result.summary}</p>
-            {meta.events?.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {meta.events.map((e, i) => (
-                  <span key={i} className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">{e}</span>
-                ))}
-              </div>
-            )}
+          ))}
+        </div>
+
+        {/* Hot keywords */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#9ca3af" }}>🔥 오늘의 급상승 키워드</p>
+              {autoData && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: "#e8f5f0", color: "#00aa6c" }}>
+                  {autoData.season} 시즌
+                </span>
+              )}
+            </div>
+            <button onClick={loadHotKeywords} disabled={loadingAuto}
+              className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full cursor-pointer border transition-colors disabled:opacity-40"
+              style={{ background: "#f7faf9", color: "#00aa6c", borderColor: "#e0ede9" }}>
+              {loadingAuto
+                ? <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00aa6c" }} />
+                : "🔄"
+              } 새로고침
+            </button>
           </div>
 
-          {/* 급상승 키워드 */}
-          {result.trend_keywords?.length > 0 && (
-            <div>
-              <p className="text-sm font-bold mb-3" style={{ color: "#1a1a2e" }}>🔥 급상승 키워드</p>
-              <div className="space-y-3">
-                {result.trend_keywords.map((kw, i) => (
-                  <div key={i} className="bg-gray-50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm" style={{ color: "#1a1a2e" }}>#{kw.keyword}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                          style={{ background: competitionBg(kw.competition), color: competitionColor(kw.competition) }}>
-                          경쟁 {kw.competition}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-400">기회</span>
-                        <span className="text-sm font-bold" style={{ color: opportunityColor(kw.opportunity) }}>
-                          {kw.opportunity}/10
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-2">{kw.reason}</p>
-                    <div className="bg-indigo-50 rounded-lg px-3 py-2">
-                      <p className="text-xs text-indigo-700">👉 {kw.action}</p>
+          {loadingAuto && (
+            <div className="flex items-center gap-2 py-4" style={{ color: "#9ca3af" }}>
+              <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00aa6c" }} />
+              <span className="text-sm">시즌 키워드 분析 중...</span>
+            </div>
+          )}
+
+          {!loadingAuto && autoData && autoData.hotKeywords.length > 0 && (
+            <div className="space-y-2">
+              {autoData.hotKeywords.map((hk, i) => (
+                <button key={hk.keyword}
+                  onClick={() => { setKeyword(hk.keyword); handleSearch(hk.keyword); }}
+                  className="w-full text-left flex items-center justify-between rounded-xl px-4 py-3 transition-all border cursor-pointer"
+                  style={{ background: "#f7faf9", borderColor: "#e0ede9" }}>
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0"
+                      style={{ background: i === 0 ? "#ef4444" : i === 1 ? "#f59e0b" : "#00aa6c" }}>
+                      {i + 1}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: "#0f2a1e" }}>{hk.keyword}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>{hk.comment}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 주목할 상품 */}
-          {result.hot_products?.length > 0 && (
-            <div>
-              <p className="text-sm font-bold mb-3" style={{ color: "#1a1a2e" }}>🛍️ 지금 팔면 좋은 상품</p>
-              <div className="space-y-2">
-                {result.hot_products.map((p, i) => (
-                  <div key={i} className="bg-orange-50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-bold text-sm text-orange-800">{p.product}</p>
-                      <span className="text-xs text-orange-500">{p.price_range}</span>
-                    </div>
-                    <p className="text-xs text-orange-600 mb-1">🎯 타겟: {p.target}</p>
-                    <p className="text-xs text-orange-500">{p.why_now}</p>
+                  <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                    <span className="text-xs" style={{ color: "#9ca3af" }}>지수 {hk.avg}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      hk.growth > 0 ? "bg-green-100 text-green-700" :
+                      hk.growth < 0 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"}`}>
+                      {hk.growth > 0 ? "▲" : hk.growth < 0 ? "▼" : "–"}{Math.abs(hk.growth)}%
+                    </span>
+                    <span className="text-[10px] font-semibold" style={{ color: "#00aa6c" }}>분析 →</span>
                   </div>
-                ))}
-              </div>
+                </button>
+              ))}
             </div>
           )}
 
-          {/* 시즌 전략 */}
-          {result.season_strategy && (
-            <div className="bg-blue-50 rounded-xl p-4">
-              <p className="text-sm font-bold text-blue-700 mb-3">📅 시즌 전략</p>
-              <div className="space-y-2">
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-500 mb-1">이번 달 집중 전략</p>
-                  <p className="text-xs text-gray-600">{result.season_strategy.this_month}</p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs font-bold text-green-500 mb-1">다음 달 준비 전략</p>
-                  <p className="text-xs text-gray-600">{result.season_strategy.next_month}</p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-xs font-bold text-red-400 mb-1">⚠️ 이번 달 피해야 할 것</p>
-                  <p className="text-xs text-gray-600">{result.season_strategy.avoid}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 이벤트 기회 */}
-          {result.event_opportunities?.length > 0 && (
-            <div>
-              <p className="text-sm font-bold mb-3" style={{ color: "#1a1a2e" }}>🎉 이벤트 기회</p>
-              <div className="space-y-2">
-                {result.event_opportunities.map((ev, i) => (
-                  <div key={i} className="bg-purple-50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: "#764ba2" }}>{ev.event}</span>
-                      <span className="text-xs text-purple-500">{ev.timing}</span>
-                    </div>
-                    <p className="text-sm font-bold text-purple-800 mt-2 mb-1">{ev.product_idea}</p>
-                    <p className="text-xs text-purple-600 italic">"{ev.copy}"</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 경쟁사 주의 */}
-          {result.competitor_alert && (
-            <div className="bg-red-50 rounded-xl p-4">
-              <p className="text-sm font-bold text-red-600 mb-1">⚠️ 경쟁사 주의사항</p>
-              <p className="text-xs text-red-500">{result.competitor_alert}</p>
-            </div>
-          )}
-
-          {/* 액션 체크리스트 */}
-          {result.action_checklist?.length > 0 && (
-            <div className="bg-green-50 rounded-xl p-4">
-              <p className="text-sm font-bold text-green-700 mb-3">✅ 지금 당장 해야 할 것</p>
-              <div className="space-y-2">
-                {result.action_checklist.map((item, i) => (
-                  <div key={i} className="flex gap-2 items-start">
-                    <span className="w-5 h-5 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#2ecc71" }}>{i + 1}</span>
-                    <p className="text-xs text-green-700">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {!loadingAuto && !autoData && (
+            <p className="text-sm py-3" style={{ color: "#9ca3af" }}>키워드를 불러오지 못했습니다. 새로고침을 눌러주세요.</p>
           )}
         </div>
-      )}
+      </div>
+
+      {/* ── RIGHT: Search Card + Results ── */}
+      <div ref={resultCardRef} style={CARD} className="p-5">
+        {/* Card header */}
+        <div className="mb-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>직접 검색</p>
+          <h2 className="font-bold text-base" style={{ color: "#0f2a1e" }}>키워드 트렌드 분析</h2>
+          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>검색하고 싶은 키워드를 직접 입력하세요</p>
+        </div>
+
+        {/* Search input */}
+        <div className="flex gap-2 mb-4">
+          <input type="text" value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+            placeholder="예) 아로니아, 무선 이어폰, 여름 원피스"
+            className="flex-1 text-sm rounded-lg px-4 py-3 outline-none transition-all placeholder:text-gray-400"
+            style={{ background: "#f7faf9", border: "1px solid #e0ede9", color: "#0f2a1e" }} />
+          <button onClick={() => handleSearch()} disabled={loading || !keyword.trim()}
+            className="px-4 py-3 rounded-lg font-bold text-white text-sm disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed flex-shrink-0 transition-colors"
+            style={{ background: "#00aa6c", color: "white" }}>
+            {loading
+              ? <span className="flex items-center gap-1">
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />분석
+                </span>
+              : "🔍 분석"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg p-3 text-sm text-red-600 bg-red-50 border border-red-100 mb-4">{error}</div>
+        )}
+
+        {loading && (
+          <div className="py-8 flex flex-col items-center gap-3">
+            <span className="w-8 h-8 rounded-full animate-spin" style={{ borderWidth: 3, borderStyle: "solid", borderColor: "#e0ede9", borderTopColor: "#00aa6c" }} />
+            <p className="text-sm font-semibold" style={{ color: "#0f2a1e" }}>AI가 분석 중입니다...</p>
+            <p className="text-xs" style={{ color: "#9ca3af" }}>네이버 실시간 데이터 수집 중 (10~30초 소요)</p>
+          </div>
+        )}
+
+        {/* Results */}
+        {result && !loading && (
+          <div className="space-y-4">
+            {/* AI verdict */}
+            {result.aiAnalysis?.verdict && (() => {
+              const cfg = verdictCfg[result.aiAnalysis.verdict];
+              return (
+                <div className="rounded-xl p-4 border-l-4" style={{ background: cfg.bg, borderColor: cfg.border }}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-base">{cfg.icon}</span>
+                    <span className="font-bold text-sm" style={{ color: cfg.color }}>{cfg.label}</span>
+                  </div>
+                  <p className="text-sm font-bold mb-1.5" style={{ color: cfg.color }}>
+                    ⚡ {result.aiAnalysis.action_command}
+                  </p>
+                  <p className="text-xs text-slate-600 leading-relaxed">{result.aiAnalysis.reason}</p>
+                </div>
+              );
+            })()}
+
+            {/* 3 metrics */}
+            {result.trend.ratios.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                <MetricCard label="검색 피크" value={String(Math.max(...result.trend.ratios))} sub="최고지수" />
+                <MetricCard label="연관 키워드"
+                  value={String(result.related.length)}
+                  sub="상승 키워드" color="#00aa6c" />
+                <MetricCard label="AI 판정"
+                  value={result.aiAnalysis.verdict === "good" ? "🟢" : result.aiAnalysis.verdict === "bad" ? "🔴" : "🟡"}
+                  sub={result.aiAnalysis.verdict === "good" ? "판매 적합" : result.aiAnalysis.verdict === "bad" ? "위험" : "보통"} />
+              </div>
+            )}
+
+            {/* Trend chart */}
+            {result.trend.ratios.length > 0 && (
+              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#9ca3af" }}>
+                    최근 30일 트렌드
+                    <span className="ml-1 normal-case font-bold" style={{ color: "#00aa6c" }}>"{result.keyword}"</span>
+                  </p>
+                </div>
+                <LineChart dates={result.trend.dates} ratios={result.trend.ratios} />
+              </div>
+            )}
+
+            {/* Related keywords */}
+            {result.related.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9ca3af" }}>
+                  급상승 연관 키워드 TOP {result.related.length}
+                </p>
+                <div className="space-y-1.5">
+                  {result.related.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                      style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0"
+                          style={{ background: i === 0 ? "#ef4444" : i === 1 ? "#f59e0b" : "#00aa6c" }}>
+                          {i + 1}
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: "#0f2a1e" }}>{r.keyword}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs" style={{ color: "#9ca3af" }}>지수 {r.avg}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          r.growth > 0 ? "bg-green-100 text-green-700" :
+                          r.growth < 0 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"}`}>
+                          {r.growth > 0 ? "▲" : r.growth < 0 ? "▼" : "–"}{Math.abs(r.growth)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Gender / Age */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl p-3" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2.5" style={{ color: "#9ca3af" }}>성별 비율</p>
+                <div className="space-y-2">
+                  <BarRow label="남성" value={result.gender.male_pct} color="#00aa6c" />
+                  <BarRow label="여성" value={result.gender.female_pct} color="#f472b6" />
+                </div>
+              </div>
+              <div className="rounded-xl p-3" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2.5" style={{ color: "#9ca3af" }}>연령대</p>
+                <div className="space-y-2">
+                  {Object.entries(result.age).map(([label, val]) => (
+                    <BarRow key={label} label={label} value={val} color="#0f2a1e" />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Action plan */}
+            {result.aiAnalysis.tips?.length > 0 && (
+              <div className="rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#00aa6c" }}>
+                  실행 액션 플랜
+                </p>
+                <div className="space-y-2">
+                  {result.aiAnalysis.tips.map((tip, i) => (
+                    <div key={i} className="flex gap-2.5 items-start">
+                      <span className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                        style={{ background: "#00aa6c" }}>{i + 1}</span>
+                      <p className="text-sm" style={{ color: "#0f5c38" }}>{tip}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SEO navigate */}
+            {onSeoNavigate && (
+              <button onClick={() => onSeoNavigate(result.keyword)}
+                className="w-full py-3.5 rounded-xl font-bold text-white text-sm cursor-pointer transition-opacity hover:opacity-90"
+                style={{ background: "#0f2a1e" }}>
+                📈 이 키워드로 상품명 만들기
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
