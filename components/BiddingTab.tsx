@@ -28,12 +28,16 @@ const inputStyle: React.CSSProperties = { background: "#f7faf9", border: "1px so
 const labelCls = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
 const labelStyle: React.CSSProperties = { color: "#9ca3af" };
 
-function LoadingBox() {
+function SkeletonResult() {
   return (
-    <div className="mt-4 rounded-xl p-6 flex flex-col items-center gap-3" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-      <span className="w-8 h-8 rounded-full animate-spin" style={{ borderWidth: 3, borderStyle: "solid", borderColor: "#e0ede9", borderTopColor: "#00aa6c" }} />
-      <p className="text-sm font-semibold" style={{ color: "#0f2a1e" }}>AI가 분석 중입니다...</p>
-      <p className="text-xs" style={{ color: "#9ca3af" }}>잠시만 기다려주세요</p>
+    <div className="mt-5 space-y-3 animate-pulse">
+      <div className="h-14 rounded-xl" style={{ background: "#e8f5f0" }} />
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-xl" style={{ background: "#f0f4f3" }} />)}
+      </div>
+      <div className="h-6 rounded-lg w-1/3" style={{ background: "#e8f5f0" }} />
+      {[0, 1, 2].map(i => <div key={i} className="h-24 rounded-xl" style={{ background: "#f0f4f3" }} />)}
+      <div className="h-28 rounded-xl" style={{ background: "#f0f4f3" }} />
     </div>
   );
 }
@@ -99,7 +103,7 @@ export default function BiddingTab() {
         <div className="hidden lg:block space-y-2.5 mb-6">
           {[
             "소규모 예산 최적화 전략",
-            "키워드별 입찰가 자동 계산",
+            "키워드별 AI 추정 입찰가 제안",
             "단계별 광고 로드맵 제공",
           ].map((f) => (
             <div key={f} className="flex items-center gap-2">
@@ -188,7 +192,7 @@ export default function BiddingTab() {
           </button>
         </div>
 
-        {streaming && <LoadingBox />}
+        {streaming && <SkeletonResult />}
         {error && !streaming && (
           <div className="mt-4 rounded-xl p-4 border" style={{ background: "#fff1f0", borderColor: "#fca5a5" }}>
             <p className="text-sm text-red-600">{error}</p>
@@ -239,6 +243,8 @@ export default function BiddingTab() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs" style={{ color: "#6b7280" }}>
                         예상 CPC: <strong style={{ color: "#0f2a1e" }}>{kw.estimated_cpc}원</strong>
+                        <span className="ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded"
+                          style={{ background: "#f0f4f3", color: "#9ca3af" }}>AI 추정값</span>
                       </span>
                       {kw.bid_amount && (
                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
