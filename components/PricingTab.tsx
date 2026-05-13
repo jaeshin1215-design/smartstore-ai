@@ -26,12 +26,16 @@ const inputStyle: React.CSSProperties = { background: "#f7faf9", border: "1px so
 const labelCls = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
 const labelStyle: React.CSSProperties = { color: "#9ca3af" };
 
-function LoadingBox() {
+function SkeletonResult() {
   return (
-    <div className="mt-4 rounded-xl p-6 flex flex-col items-center gap-3" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-      <span className="w-8 h-8 rounded-full animate-spin" style={{ borderWidth: 3, borderStyle: "solid", borderColor: "#e0ede9", borderTopColor: "#00aa6c" }} />
-      <p className="text-sm font-semibold" style={{ color: "#0f2a1e" }}>AI가 분석 중입니다...</p>
-      <p className="text-xs" style={{ color: "#9ca3af" }}>잠시만 기다려주세요</p>
+    <div className="mt-5 space-y-3 animate-pulse">
+      <div className="h-14 rounded-xl" style={{ background: "#e8f5f0" }} />
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map(i => <div key={i} className="h-20 rounded-xl" style={{ background: "#f0f4f3" }} />)}
+      </div>
+      <div className="h-16 rounded-xl" style={{ background: "#f0f4f3" }} />
+      <div className="h-20 rounded-xl" style={{ background: "#f0f4f3" }} />
+      {[0, 1, 2].map(i => <div key={i} className="h-10 rounded-xl" style={{ background: "#f0f4f3" }} />)}
     </div>
   );
 }
@@ -53,6 +57,19 @@ function MarginBar({ rate }: { rate: number }) {
   );
 }
 
+const GRADE_OPTIONS = [
+  { value: "micro",  label: "영세 (3억 미만)",  rate: 1.98 },
+  { value: "small1", label: "중소1 (3~5억)",    rate: 2.585 },
+  { value: "small2", label: "중소2 (5~10억)",   rate: 2.75 },
+  { value: "small3", label: "중소3 (10~30억)",  rate: 3.025 },
+  { value: "normal", label: "일반 (30억+)",      rate: 3.63 },
+];
+
+const TRAFFIC_OPTIONS = [
+  { value: "naver_shopping", label: "네이버 쇼핑 유입", rate: 2.73 },
+  { value: "external",       label: "외부 마케팅",      rate: 0.91 },
+];
+
 export default function PricingTab() {
   const [productName, setProductName] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
@@ -61,12 +78,21 @@ export default function PricingTab() {
   const [targetMargin, setTargetMargin] = useState("");
   const [category, setCategory] = useState("");
   const [features, setFeatures] = useState("");
+  const [salesGrade, setSalesGrade] = useState("small3");
+  const [trafficSource, setTrafficSource] = useState("naver_shopping");
+  const [feeMode, setFeeMode] = useState<"auto" | "manual">("auto");
+  const [customFeeRate, setCustomFeeRate] = useState("");
   const [result, setResult] = useState<PricingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { streaming, readStream } = useStream();
 
-  const platformFee = purchasePrice ? Math.round(Number(purchasePrice) * 0.0585) : 0;
+  const gradeRate = GRADE_OPTIONS.find(g => g.value === salesGrade)?.rate ?? 3.025;
+  const trafficRate = TRAFFIC_OPTIONS.find(t => t.value === trafficSource)?.rate ?? 2.73;
+  const autoFeeRate = gradeRate + trafficRate;
+  const effectiveFeeRate = feeMode === "manual" && customFeeRate ? Number(customFeeRate) : autoFeeRate;
+
+  const platformFee = purchasePrice ? Math.round(Number(purchasePrice) * effectiveFeeRate / 100) : 0;
   const totalCost = purchasePrice ? Number(purchasePrice) + Number(shippingCost || 3000) + platformFee : 0;
 
   const handleSubmit = async () => {
@@ -75,7 +101,11 @@ export default function PricingTab() {
     try {
       const res = await fetch("/api/pricing", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName, purchasePrice, shippingCost, competitorPrice, targetMargin, category, features }),
+        body: JSON.stringify({
+          productName, purchasePrice, shippingCost, competitorPrice, targetMargin, category, features,
+          salesGrade, trafficSource,
+          customFeeRate: feeMode === "manual" ? customFeeRate : undefined,
+        }),
       });
       setLoading(false);
       await readStream(res, (text) => {
@@ -140,7 +170,7 @@ export default function PricingTab() {
               {[
                 { label: "매입가", val: Number(purchasePrice) },
                 { label: "배송비", val: Number(shippingCost || 3000) },
-                { label: "수수료 (5.85%)", val: platformFee },
+                { label: `수수료 (${effectiveFeeRate.toFixed(3).replace(/\.?0+$/, "")}%)`, val: platformFee },
               ].map((r) => (
                 <div key={r.label} className="flex justify-between text-sm" style={{ color: "#007a4d" }}>
                   <span>{r.label}</span>
@@ -221,6 +251,79 @@ export default function PricingTab() {
             </div>
           </div>
 
+          {/* 수수료 설정 */}
+          <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#9ca3af" }}>수수료 설정</p>
+              <div className="flex rounded-lg overflow-hidden border text-[11px] font-semibold" style={{ borderColor: "#e0ede9" }}>
+                <button
+                  type="button"
+                  onClick={() => setFeeMode("auto")}
+                  className="px-3 py-1 transition-colors"
+                  style={{ background: feeMode === "auto" ? "#0f2a1e" : "white", color: feeMode === "auto" ? "white" : "#6b7280" }}>
+                  자동
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFeeMode("manual")}
+                  className="px-3 py-1 transition-colors"
+                  style={{ background: feeMode === "manual" ? "#0f2a1e" : "white", color: feeMode === "manual" ? "white" : "#6b7280" }}>
+                  직접입력
+                </button>
+              </div>
+            </div>
+
+            {feeMode === "auto" ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9ca3af" }}>매출 등급</label>
+                  <select
+                    value={salesGrade}
+                    onChange={e => setSalesGrade(e.target.value)}
+                    className="w-full text-xs rounded-lg px-3 py-2.5 outline-none"
+                    style={{ background: "#f0f4f3", border: "1px solid #e0ede9", color: "#0f2a1e" }}>
+                    {GRADE_OPTIONS.map(g => (
+                      <option key={g.value} value={g.value}>{g.label} ({g.rate}%)</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9ca3af" }}>유입 경로</label>
+                  <select
+                    value={trafficSource}
+                    onChange={e => setTrafficSource(e.target.value)}
+                    className="w-full text-xs rounded-lg px-3 py-2.5 outline-none"
+                    style={{ background: "#f0f4f3", border: "1px solid #e0ede9", color: "#0f2a1e" }}>
+                    {TRAFFIC_OPTIONS.map(t => (
+                      <option key={t.value} value={t.value}>{t.label} ({t.rate}%)</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="number"
+                  value={customFeeRate}
+                  onChange={e => setCustomFeeRate(e.target.value)}
+                  placeholder={`${autoFeeRate.toFixed(3).replace(/\.?0+$/, "")} (자동 계산값)`}
+                  className="w-full text-sm rounded-lg px-4 py-2.5 outline-none pr-10"
+                  style={{ background: "#f0f4f3", border: "1px solid #e0ede9", color: "#0f2a1e" }}
+                  step="0.001" min="0" max="30"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#9ca3af" }}>%</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-2.5">
+              <p className="text-[10px]" style={{ color: "#9ca3af" }}>
+                {feeMode === "auto"
+                  ? `합계 ${effectiveFeeRate.toFixed(3).replace(/\.?0+$/, "")}% · 2025-06-02 개편 반영`
+                  : "정확한 수수료: 스마트스토어 정산관리 → 나의 수수료 정보"}
+              </p>
+            </div>
+          </div>
+
           {/* Cost preview - mobile only */}
           {purchasePrice && (
             <div className="lg:hidden rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
@@ -229,7 +332,7 @@ export default function PricingTab() {
                 {[
                   { label: "매입가", val: Number(purchasePrice) },
                   { label: "배송비", val: Number(shippingCost || 3000) },
-                  { label: "수수료 5.85%", val: platformFee },
+                  { label: `수수료 ${effectiveFeeRate.toFixed(3).replace(/\.?0+$/, "")}%`, val: platformFee },
                 ].map((r) => (
                   <div key={r.label} className="flex justify-between text-xs" style={{ color: "#007a4d" }}>
                     <span>{r.label}</span><span>{r.val.toLocaleString()}원</span>
@@ -276,7 +379,7 @@ export default function PricingTab() {
           </button>
         </div>
 
-        {streaming && <LoadingBox />}
+        {streaming && <SkeletonResult />}
         {error && !streaming && (
           <div className="mt-4 rounded-xl p-4 border" style={{ background: "#fff1f0", borderColor: "#fca5a5" }}>
             <p className="text-sm text-red-600">{error}</p>
