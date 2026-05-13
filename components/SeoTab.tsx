@@ -79,15 +79,52 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
   const [copied, setCopied] = useState<number | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendData, setTrendData] = useState<{ avgRatio: number; growth: number } | null>(null);
+  const [relatedKeywords, setRelatedKeywords] = useState<{ keyword: string; avg: number; growth: number }[]>([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   const handleSubmit = async () => {
     if (!productName) return;
-    setLoading(true); setResult(null); setError(""); setStreaming(false); setTrendData(null);
+    setLoading(true); setResult(null); setError(""); setStreaming(false);
+    setTrendData(null); setRelatedKeywords([]);
 
-    // DataLab 검색량 자동 조회 (SEO 분석과 병렬)
+    // ① 연관 키워드 조회 — SEO 분석과 병렬 실행 (fire & forget)
+    setRelatedLoading(true);
+    void (async () => {
+      try {
+        const tr = await fetch("/api/naver-trend", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keyword: productName }),
+        });
+        if (!tr.ok || !tr.body) return;
+        const reader = tr.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const obj = JSON.parse(line);
+              if (obj.type === "naver" && Array.isArray(obj.related) && obj.related.length) {
+                setRelatedKeywords(obj.related.slice(0, 5));
+                setRelatedLoading(false);
+                reader.cancel();
+                return;
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } catch { /* 실패해도 SEO 진행 */ }
+      finally { setRelatedLoading(false); }
+    })();
+
+    // ② DataLab 검색량 자동 조회 (빠른 단일 호출)
     setTrendLoading(true);
     let autoSearchVolume = searchVolume;
-    let autoGrowth = 0;
     try {
       const tvRes = await fetch("/api/search-volume", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -97,7 +134,6 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
         const tv = await tvRes.json();
         if (tv.avgRatio !== undefined) {
           setTrendData({ avgRatio: tv.avgRatio, growth: tv.growth });
-          autoGrowth = tv.growth;
           if (!searchVolume) autoSearchVolume = `검색지수 ${tv.avgRatio} (전주대비 ${tv.growth > 0 ? "+" : ""}${tv.growth}%)`;
         }
       }
@@ -109,7 +145,6 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productName, category, keywords, searchVolume: autoSearchVolume, competitorCount, clickRate, priceRange }),
       });
-      void autoGrowth;
       setLoading(false);
       if (!res.ok || !res.body) { setError("오류가 발생했습니다."); return; }
 
@@ -370,6 +405,42 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
                   </div>
                 </div>
                 <p className="text-xs" style={{ color: "#6b7280" }}>{result.keyword_strategy.recommendation}</p>
+              </div>
+            )}
+
+            {/* 연관 키워드 검색 트렌드 */}
+            {(relatedLoading || relatedKeywords.length > 0) && (
+              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#9ca3af" }}>연관 키워드 검색 트렌드</p>
+                  <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 DataLab</span>
+                </div>
+                {relatedLoading ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0"
+                      style={{ borderColor: "#00aa6c", borderTopColor: "transparent" }} />
+                    <span className="text-xs" style={{ color: "#9ca3af" }}>연관 검색량 조회 중...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {relatedKeywords.map((kw, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-sm font-medium" style={{ color: "#0f2a1e" }}>{kw.keyword}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full"
+                            style={{ background: "#e8f5f0", color: "#00aa6c" }}>지수 {kw.avg}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                            style={{
+                              background: kw.growth > 5 ? "#e8f5f0" : kw.growth < -5 ? "#fff1f0" : "#f0f4f3",
+                              color: kw.growth > 5 ? "#00aa6c" : kw.growth < -5 ? "#ef4444" : "#9ca3af",
+                            }}>
+                            {kw.growth > 0 ? "+" : ""}{kw.growth}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
