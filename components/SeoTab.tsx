@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
-import { useStream } from "@/lib/useStream";
 
 interface OptimizedName { name: string; reason: string; keywords_used: string[] }
 interface SeoResult {
@@ -25,12 +24,30 @@ const inputStyle: React.CSSProperties = { background: "#f7faf9", border: "1px so
 const labelCls = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
 const labelStyle: React.CSSProperties = { color: "#9ca3af" };
 
-function LoadingBox() {
+function SkeletonResult() {
   return (
-    <div className="mt-4 rounded-xl p-6 flex flex-col items-center gap-3" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-      <span className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin" style={{ borderWidth: 3, borderColor: "#e0ede9", borderTopColor: "#00aa6c" }} />
-      <p className="text-sm font-semibold" style={{ color: "#0f2a1e" }}>AI가 분석 중입니다...</p>
-      <p className="text-xs" style={{ color: "#9ca3af" }}>잠시만 기다려주세요</p>
+    <div className="mt-5 space-y-3">
+      <div className="rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm">⚡</span>
+          <span className="text-xs font-semibold" style={{ color: "#00aa6c" }}>AI 상품명 분석 작성 중</span>
+          <span className="flex gap-0.5 items-center">
+            {[0, 1, 2].map(i => (
+              <span key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                style={{ background: "#00aa6c", animationDelay: `${i * 0.18}s` }} />
+            ))}
+          </span>
+        </div>
+      </div>
+      <div className="animate-pulse space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-20 rounded-xl" style={{ background: "#f0f4f3" }} />
+          <div className="h-20 rounded-xl" style={{ background: "#e8f5f0" }} />
+        </div>
+        <div className="h-28 rounded-xl" style={{ background: "#f0f4f3" }} />
+        {[0, 1, 2].map(i => <div key={i} className="h-24 rounded-xl" style={{ background: "#f0f4f3" }} />)}
+        <div className="h-32 rounded-xl" style={{ background: "#f0f4f3" }} />
+      </div>
     </div>
   );
 }
@@ -57,27 +74,84 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
   const [showItemscout, setShowItemscout] = useState(false);
   const [result, setResult] = useState<SeoResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
-  const { streaming, readStream } = useStream();
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendData, setTrendData] = useState<{ avgRatio: number; growth: number } | null>(null);
 
   const handleSubmit = async () => {
     if (!productName) return;
-    setLoading(true); setResult(null); setError("");
+    setLoading(true); setResult(null); setError(""); setStreaming(false); setTrendData(null);
+
+    // DataLab 검색량 자동 조회 (SEO 분석과 병렬)
+    setTrendLoading(true);
+    let autoSearchVolume = searchVolume;
+    let autoGrowth = 0;
+    try {
+      const tvRes = await fetch("/api/search-volume", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: productName }),
+      });
+      if (tvRes.ok) {
+        const tv = await tvRes.json();
+        if (tv.avgRatio !== undefined) {
+          setTrendData({ avgRatio: tv.avgRatio, growth: tv.growth });
+          autoGrowth = tv.growth;
+          if (!searchVolume) autoSearchVolume = `검색지수 ${tv.avgRatio} (전주대비 ${tv.growth > 0 ? "+" : ""}${tv.growth}%)`;
+        }
+      }
+    } catch { /* 실패해도 SEO 진행 */ }
+    setTrendLoading(false);
+
     try {
       const res = await fetch("/api/seo", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName, category, keywords, searchVolume, competitorCount, clickRate, priceRange }),
+        body: JSON.stringify({ productName, category, keywords, searchVolume: autoSearchVolume, competitorCount, clickRate, priceRange }),
       });
+      void autoGrowth;
       setLoading(false);
-      await readStream(res, (text) => {
-        try {
-          const match = text.match(/\{[\s\S]*\}/);
-          if (!match) throw new Error("No JSON");
-          setResult(JSON.parse(match[0]));
-        } catch { setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요."); }
-      }, () => setError("오류가 발생했습니다. 다시 시도해주세요."));
-    } catch { setLoading(false); setError("오류가 발생했습니다. 다시 시도해주세요."); }
+      if (!res.ok || !res.body) { setError("오류가 발생했습니다."); return; }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === "seo_stream") { setStreaming(true); }
+            if (obj.type === "seo_phase1") {
+              setStreaming(false);
+              setResult({
+                action_command: obj.action_command,
+                score: obj.score,
+                optimized_names: obj.optimized_names ?? [],
+                seo_tips: [],
+                avoid: [],
+              });
+            }
+            if (obj.type === "seo_phase2") {
+              setResult(prev => prev ? {
+                ...prev,
+                keyword_strategy: obj.keyword_strategy,
+                seo_tips: obj.seo_tips ?? [],
+                avoid: obj.avoid ?? [],
+              } : null);
+            }
+            if (obj.type === "error") { setStreaming(false); setError(obj.error); }
+          } catch { /* 파싱 실패 무시 */ }
+        }
+      }
+    } catch { setError("오류가 발생했습니다. 다시 시도해주세요."); }
+    finally { setLoading(false); setStreaming(false); }
   };
 
   const handleCopy = (text: string, index: number) => {
@@ -170,6 +244,28 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
             <label className={labelCls} style={labelStyle}>현재 상품명 <span className="text-red-400 normal-case">*</span></label>
             <input type="text" value={productName} onChange={e => setProductName(e.target.value)}
               placeholder="예) 아로니아 분말 500g" className={inputCls} style={inputStyle} />
+            {trendLoading && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00aa6c", borderTopColor: "transparent" }} />
+                <span className="text-[11px]" style={{ color: "#9ca3af" }}>검색량 조회 중...</span>
+              </div>
+            )}
+            {trendData && !trendLoading && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                  style={{ background: "#e8f5f0", color: "#00aa6c" }}>
+                  검색지수 {trendData.avgRatio}
+                </span>
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                  style={{
+                    background: trendData.growth > 0 ? "#e8f5f0" : trendData.growth < 0 ? "#fff1f0" : "#f0f4f3",
+                    color: trendData.growth > 0 ? "#00aa6c" : trendData.growth < 0 ? "#ef4444" : "#9ca3af",
+                  }}>
+                  전주 대비 {trendData.growth > 0 ? "+" : ""}{trendData.growth}%
+                </span>
+                <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 DataLab 자동조회</span>
+              </div>
+            )}
           </div>
           <div>
             <label className={labelCls} style={labelStyle}>카테고리</label>
@@ -221,7 +317,7 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
           </button>
         </div>
 
-        {streaming && <LoadingBox />}
+        {streaming && <SkeletonResult />}
         {error && !streaming && (
           <div className="mt-4 rounded-xl p-4 border" style={{ background: "#fff1f0", borderColor: "#fca5a5" }}>
             <p className="text-sm text-red-600">{error}</p>
