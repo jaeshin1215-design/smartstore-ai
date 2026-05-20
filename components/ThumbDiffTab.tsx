@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 interface CompetitorPattern { background: string; composition: string; text_usage: string; weakness: string; }
 interface Differentiation { background_tip: string; composition_tip: string; color_palette: string[]; text_tip: string; }
@@ -204,6 +205,8 @@ export default function ThumbDiffTab() {
               </div>
             </div>
           )}
+
+          <PolicyFilter text={[result.differentiation?.text_tip, ...(result.click_hooks?.map(h => h.how) ?? [])].filter(Boolean).join(" ")} />
         </div>
       )}
     </div>

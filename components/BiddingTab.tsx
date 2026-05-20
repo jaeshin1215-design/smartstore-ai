@@ -60,11 +60,29 @@ export default function BiddingTab() {
   const [result, setResult] = useState<BiddingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cpcData, setCpcData] = useState<{ monthlySearch: number; pcCpc: number | null; mobileCpc: number | null; competition: number | null } | null>(null);
+  const [cpcLoading, setCpcLoading] = useState(false);
   const { streaming, readStream } = useStream();
 
   const handleSubmit = async () => {
     if (!productName) return;
-    setLoading(true); setResult(null); setError("");
+    setLoading(true); setResult(null); setError(""); setCpcData(null);
+
+    // 실제 CPC 조회 (병렬)
+    setCpcLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/searchad-cpc", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keyword: productName }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.error) setCpcData(data);
+        }
+      } catch { /* 실패해도 진행 */ }
+      finally { setCpcLoading(false); }
+    })();
     try {
       const res = await fetch("/api/bidding", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -156,6 +174,31 @@ export default function BiddingTab() {
             <label className={labelCls} style={labelStyle}>상품명 <span className="text-red-400 normal-case">*</span></label>
             <input type="text" value={productName} onChange={e => setProductName(e.target.value)}
               placeholder="예) 무선 블루투스 이어폰" className={inputCls} style={inputStyle} />
+            {/* 실제 CPC 표시 */}
+            {cpcLoading && (
+              <p className="text-[11px] mt-1.5" style={{ color: "#9ca3af" }}>실제 CPC 조회 중...</p>
+            )}
+            {cpcData && !cpcLoading && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                  style={{ background: "#e8f5f0", color: "#00aa6c" }}>
+                  월 검색수 {cpcData.monthlySearch.toLocaleString()}회
+                </span>
+                {cpcData.pcCpc !== null && (
+                  <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                    style={{ background: "#fff8ed", color: "#f59e0b" }}>
+                    PC CPC {cpcData.pcCpc}
+                  </span>
+                )}
+                {cpcData.mobileCpc !== null && (
+                  <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                    style={{ background: "#f0f4f3", color: "#0f2a1e" }}>
+                    모바일 CPC {cpcData.mobileCpc}
+                  </span>
+                )}
+                <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 SearchAd 실측</span>
+              </div>
+            )}
           </div>
           <div>
             <label className={labelCls} style={labelStyle}>카테고리</label>

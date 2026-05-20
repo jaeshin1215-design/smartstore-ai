@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 interface AdCopy {
   title: string;
@@ -226,6 +227,8 @@ export default function AdCopyTab() {
               <p className="text-xs text-yellow-600">{result.review_strategy}</p>
             </div>
           )}
+
+          <PolicyFilter text={[...(result.ad_copies?.map(a => `${a.title} ${a.description}`) ?? []), result.review_strategy ?? ""].join(" ")} />
         </div>
       )}
     </div>

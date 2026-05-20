@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 interface Section { title: string; content: string; tip: string; }
 interface Faq { question: string; answer: string; }
@@ -179,6 +180,8 @@ export default function StoryTab() {
               </div>
             </div>
           )}
+
+          <PolicyFilter text={[result.hook, result.problem, result.solution, result.evidence, result.urgency, result.cta].join(" ")} />
         </div>
       )}
     </div>

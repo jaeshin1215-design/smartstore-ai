@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 interface Option { name: string; description: string; add_price: string; reason: string; }
 interface Bundle { name: string; products: string[]; original_total: string; bundle_price: string; discount_rate: string; selling_point: string; }
@@ -201,6 +202,8 @@ export default function UpsellTab() {
               </div>
             </div>
           )}
+
+          <PolicyFilter text={(result.copy_examples ?? []).join(" ")} />
         </div>
       )}
     </div>

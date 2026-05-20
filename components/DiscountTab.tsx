@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 interface ValueAdd { idea: string; cost: string; effect: string; }
 interface SeasonPromo { season: string; strategy: string; copy: string; }
@@ -191,6 +192,8 @@ export default function DiscountTab() {
               <p className="text-xs text-green-600">{result.competitor_strategy}</p>
             </div>
           )}
+
+          <PolicyFilter text={[result.discount_strategy?.method ?? "", ...(result.season_promotions?.map(s => s.copy) ?? [])].join(" ")} />
         </div>
       )}
     </div>

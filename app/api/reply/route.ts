@@ -1,42 +1,28 @@
-import { NextRequest, NextResponse } from "next/server";
+export const maxDuration = 60;
+
+import { NextRequest } from "next/server";
+import { createGeminiStream } from "@/lib/claude";
 
 export async function POST(req: NextRequest) {
   const { inquiry } = await req.json();
+  if (!inquiry) return new Response("문의 내용을 입력해주세요.", { status: 400 });
 
-  if (!inquiry) {
-    return NextResponse.json({ error: "문의 내용을 입력해주세요." }, { status: 400 });
-  }
-
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "anthropic/claude-3-haiku",
-      messages: [
-        {
-          role: "user",
-          content: `당신은 친절하고 전문적인 스마트스토어 고객 응대 담당자입니다.
-아래 고객 문의에 대한 답변 초안을 작성해주세요.
+  const prompt = `당신은 스마트스토어 고객 응대 전문가입니다.
+고객 문의를 분석하고, 셀러가 바로 복사·붙여넣기할 수 있는 완성형 답변을 작성해주세요.
 
 고객 문의:
 ${inquiry}
 
 답변 작성 규칙:
-- 정중하고 친절한 말투 사용 (합쇼체)
-- 고객의 불편함에 먼저 공감
-- 명확하고 실용적인 해결책 제시
-- 마지막에 추가 문의 환영 표현 포함
-- 200~300자 내외로 간결하게 작성
-- 이모지 1~2개 자연스럽게 활용`,
-        },
-      ],
-    }),
-  });
+1. 문의 유형 파악: 배송지연 / 교환반품 / 상품문의 / 결제오류 / 기타 중 해당 유형에 맞게 작성
+2. 첫 문장: 고객 불편에 진심으로 공감 (단, 과도하게 사과하지 않음)
+3. 본문: 구체적 해결 액션을 단계별로 안내
+4. 배송 지연이면 → 현재 상황 인정 + 처리 예정일 안내 + 보상 제안 포함
+5. 교환/반품이면 → 접수 방법 3단계 이내로 명확히 안내
+6. 마지막 문장: 추가 문의 환영 + [셀러명] 자리 표시
+7. 200~300자, 합쇼체, 이모지 1개만`;
 
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "결과를 가져오지 못했습니다.";
-  return NextResponse.json({ result: text });
+  return new Response(createGeminiStream(prompt, 400), {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 export default function TagsTab() {
   const [productName, setProductName] = useState("");
@@ -99,6 +100,7 @@ export default function TagsTab() {
               </span>
             ))}
           </div>
+          <PolicyFilter text={tags.join(" ")} />
         </div>
       )}
     </div>

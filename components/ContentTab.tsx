@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 interface MarketingCopy { type: string; copy: string; sub: string; }
 interface ThumbnailSet { main: string; sub: string; badge: string; }
@@ -101,13 +102,18 @@ export default function ContentTab() {
     setImagePlan(null);
     try {
       const payload = { productName, category, features, targetCustomer, price, uniquePoint };
-      const [contentRes, imageRes] = await Promise.all([
+      const [contentSettled, imageSettled] = await Promise.allSettled([
         fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
         fetch("/api/imageplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
       ]);
-      const [contentData, imageData] = await Promise.all([contentRes.json(), imageRes.json()]);
-      if (contentData.result) { setResult(contentData.result); setActiveSection("marketing"); }
-      if (imageData.result) { setImagePlan(imageData.result); setOpenImageSections([1]); }
+      if (contentSettled.status === "fulfilled") {
+        const contentData = await contentSettled.value.json();
+        if (contentData.result) { setResult(contentData.result); setActiveSection("marketing"); }
+      }
+      if (imageSettled.status === "fulfilled") {
+        const imageData = await imageSettled.value.json();
+        if (imageData.result) { setImagePlan(imageData.result); setOpenImageSections([1]); }
+      }
     } catch {
       alert("오류가 발생했습니다.");
     } finally {
@@ -234,6 +240,7 @@ export default function ContentTab() {
                   <p className="text-sm text-gray-500">{c.sub}</p>
                 </div>
               ))}
+              <PolicyFilter text={result.marketing_copies.map((c) => `${c.copy} ${c.sub}`).join(" ")} />
             </div>
           )}
 

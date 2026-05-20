@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import PolicyFilter from "@/components/PolicyFilter";
 
 export default function ImageEditTab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -242,6 +243,7 @@ export default function ImageEditTab() {
             <p className="text-xs text-center text-gray-400">
               JPG 형식으로 저장 · 스마트스토어 썸네일 권장 사이즈 1000×1000px
             </p>
+            {(text || subText) && <PolicyFilter text={`${text} ${subText}`} />}
           </>
         )}
       </div>

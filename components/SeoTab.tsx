@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
 
 interface OptimizedName { name: string; reason: string; keywords_used: string[] }
@@ -63,7 +63,22 @@ function ScoreBar({ score, color }: { score: number; color: string }) {
 
 export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) {
   const [productName, setProductName] = useState(initialKeyword ?? "");
-  useEffect(() => { if (initialKeyword) setProductName(initialKeyword); }, [initialKeyword]);
+  const autoSubmitted = useRef(false);
+
+  useEffect(() => {
+    if (initialKeyword) {
+      setProductName(initialKeyword);
+      autoSubmitted.current = false;
+    }
+  }, [initialKeyword]);
+
+  useEffect(() => {
+    if (initialKeyword && productName === initialKeyword && !autoSubmitted.current) {
+      autoSubmitted.current = true;
+      handleSubmit();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productName, initialKeyword]);
 
   const [category, setCategory] = useState("");
   const [keywords, setKeywords] = useState("");
@@ -81,11 +96,14 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
   const [trendData, setTrendData] = useState<{ avgRatio: number; growth: number } | null>(null);
   const [relatedKeywords, setRelatedKeywords] = useState<{ keyword: string; avg: number; growth: number }[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [productCount, setProductCount] = useState<number | null>(null);
+  const [productCountLoading, setProductCountLoading] = useState(false);
+  const [competitionRatio, setCompetitionRatio] = useState<number | null>(null);
 
   const handleSubmit = async () => {
     if (!productName) return;
     setLoading(true); setResult(null); setError(""); setStreaming(false);
-    setTrendData(null); setRelatedKeywords([]);
+    setTrendData(null); setRelatedKeywords([]); setProductCount(null); setCompetitionRatio(null);
 
     // ① 연관 키워드 조회 — SEO 분석과 병렬 실행 (fire & forget)
     setRelatedLoading(true);
@@ -122,7 +140,25 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
       finally { setRelatedLoading(false); }
     })();
 
-    // ② DataLab 검색량 자동 조회 (빠른 단일 호출)
+    // ② 상품수 + 경쟁강도 조회
+    setProductCountLoading(true);
+    void (async () => {
+      try {
+        const pc = await fetch("/api/product-count", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keyword: productName }),
+        });
+        if (pc.ok) {
+          const pcData = await pc.json();
+          const total: number = pcData.total ?? 0;
+          setProductCount(total);
+          setCompetitorCount(String(total));
+        }
+      } catch { /* 실패해도 진행 */ }
+      finally { setProductCountLoading(false); }
+    })();
+
+    // ③ DataLab 검색량 자동 조회 (빠른 단일 호출)
     setTrendLoading(true);
     let autoSearchVolume = searchVolume;
     try {
@@ -301,6 +337,32 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
                 <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 DataLab 자동조회</span>
               </div>
             )}
+
+            {/* 상품수 + 경쟁강도 */}
+            {productCountLoading && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-[11px]" style={{ color: "#9ca3af" }}>상품수 조회 중...</span>
+              </div>
+            )}
+            {productCount !== null && !productCountLoading && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+                  style={{ background: "#f0f4f3", color: "#0f2a1e" }}>
+                  등록 상품수 {productCount.toLocaleString()}개
+                </span>
+                {trendData && (() => {
+                  const ratio = trendData.avgRatio > 0 ? Math.round((productCount / trendData.avgRatio) * 100) / 100 : null;
+                  const level = ratio === null ? null : ratio < 1 ? "낮음" : ratio < 10 ? "보통" : ratio < 100 ? "높음" : "매우높음";
+                  const color = ratio === null ? "#9ca3af" : ratio < 1 ? "#00aa6c" : ratio < 10 ? "#f59e0b" : "#ef4444";
+                  return ratio !== null ? (
+                    <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: "#fff8ed", color }}>
+                      경쟁강도 {ratio} ({level})
+                    </span>
+                  ) : null;
+                })()}
+                <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 쇼핑 자동조회</span>
+              </div>
+            )}
           </div>
           <div>
             <label className={labelCls} style={labelStyle}>카테고리</label>
@@ -453,11 +515,18 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
                     <div className="flex items-center justify-between mb-2.5">
                       <span className="text-xs font-bold px-2.5 py-1 rounded-full text-white"
                         style={{ background: strategyColors[i] }}>{strategyLabels[i]}</span>
-                      <button onClick={() => handleCopy(item.name, i)}
-                        className="text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition-colors"
-                        style={{ background: copied === i ? "#e8f5f0" : "#f0f0f5", color: copied === i ? "#00aa6c" : "#6b7280" }}>
-                        {copied === i ? "✓ 복사됨!" : "📋 복사"}
-                      </button>
+                      <div className="flex flex-col items-end gap-1">
+                        <button onClick={() => handleCopy(item.name, i)}
+                          className="text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition-colors"
+                          style={{ background: copied === i ? "#e8f5f0" : "#f0f0f5", color: copied === i ? "#00aa6c" : "#6b7280" }}>
+                          {copied === i ? "✓ 복사됨!" : "📋 복사"}
+                        </button>
+                        {copied === i && (
+                          <span className="text-[10px]" style={{ color: "#9ca3af" }}>
+                            → 스마트스토어 센터 &gt; 상품 수정 &gt; 상품명에 붙여넣기
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="font-bold text-sm mb-1.5" style={{ color: "#0f2a1e" }}>{item.name}</p>
                     <p className="text-xs mb-2" style={{ color: "#6b7280" }}>{item.reason}</p>

@@ -1,6 +1,54 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+
+/* ── Module-level cache: survives tab switches ── */
+let _autoCache: AutoResult | null = null;
+let _autoFetching = false;
+type PhaseCb = (keywords: HotKeyword[], season: string) => void;
+type FinalCb = (result: AutoResult) => void;
+let _phaseListeners: PhaseCb[] = [];
+let _finalListeners: FinalCb[] = [];
+
+async function _runAutoStream() {
+  if (_autoFetching) return;
+  _autoFetching = true;
+  try {
+    const res = await fetch("/api/naver-trend", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "auto" }),
+    });
+    if (!res.ok || !res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.type === "auto_phase") {
+            [..._phaseListeners].forEach(fn => fn(obj.hotKeywords, obj.season));
+          }
+          if (obj.type === "auto_final") {
+            _autoCache = { mode: "auto", season: obj.season, hotKeywords: obj.hotKeywords, updatedAt: obj.updatedAt };
+            [..._finalListeners].forEach(fn => fn(_autoCache!));
+            _phaseListeners = []; _finalListeners = [];
+          }
+        } catch { /* 파싱 실패 무시 */ }
+      }
+    }
+  } catch { /* silent */ }
+  finally { _autoFetching = false; }
+}
+
+export function preloadHotKeywords() {
+  if (!_autoCache && !_autoFetching) _runAutoStream();
+}
 
 interface TrendData { dates: string[]; ratios: number[] }
 interface Gender { male_pct: number; female_pct: number }
@@ -18,7 +66,7 @@ interface TrendResult {
   gender: Gender;
   age: Age;
   related: Related[];
-  aiAnalysis: AiAnalysis;
+  aiAnalysis: AiAnalysis | null;
 }
 interface HotKeyword { keyword: string; avg: number; growth: number; comment: string }
 interface AutoResult { mode: "auto"; season: string; hotKeywords: HotKeyword[]; updatedAt: string }
@@ -99,6 +147,7 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
   const [keyword, setKeyword] = useState("");
   const [result, setResult] = useState<TrendResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [aiStreaming, setAiStreaming] = useState(false);
   const [error, setError] = useState("");
   const [autoData, setAutoData] = useState<AutoResult | null>(null);
   const [loadingAuto, setLoadingAuto] = useState(false);
@@ -110,38 +159,73 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
     }
   }, [loading]);
 
-  const loadHotKeywords = async () => {
+  const loadHotKeywords = useCallback(async (forceRefresh = false) => {
+    if (forceRefresh) { _autoCache = null; _autoFetching = false; _phaseListeners = []; _finalListeners = []; }
+    if (_autoCache && !forceRefresh) { setAutoData(_autoCache); return; }
     setLoadingAuto(true);
-    try {
-      const res = await fetch("/api/naver-trend", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "auto" }),
+    await new Promise<void>((resolve) => {
+      _phaseListeners.push((keywords, season) => {
+        setAutoData({ mode: "auto", season, hotKeywords: keywords, updatedAt: "" });
+        setLoadingAuto(false);
       });
-      const data = await res.json();
-      if (!data.error) setAutoData(data);
-    } catch { /* silent */ }
-    finally { setLoadingAuto(false); }
-  };
+      _finalListeners.push((result) => {
+        setAutoData(result);
+        setLoadingAuto(false);
+        resolve();
+      });
+      _runAutoStream();
+    });
+  }, []);
 
-  useEffect(() => { loadHotKeywords(); }, []);
+  useEffect(() => { loadHotKeywords(); }, [loadHotKeywords]);
 
-  const handleSearch = async (kw?: string) => {
+  const handleSearch = useCallback(async (kw?: string) => {
     const target = (kw ?? keyword).trim();
     if (!target) return;
     if (!kw) setKeyword(target);
-    setLoading(true); setResult(null); setError("");
+    setLoading(true); setResult(null); setError(""); setAiStreaming(false);
     try {
       const res = await fetch("/api/naver-trend", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyword: target }),
       });
-      const data = await res.json();
-      if (data.error) { setError(data.error); return; }
-      setResult(data);
+      if (!res.ok || !res.body) { setError("오류가 발생했습니다."); return; }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === "error") { setError(obj.error); return; }
+            if (obj.type === "naver") {
+              setResult({ keyword: obj.keyword, trend: obj.trend, gender: obj.gender, age: obj.age, related: obj.related, aiAnalysis: null });
+              setLoading(false);
+            }
+            if (obj.type === "ai_stream") {
+              setAiStreaming(true);
+            }
+            if (obj.type === "ai") {
+              setAiStreaming(false);
+              setResult(prev => prev ? { ...prev, aiAnalysis: obj.aiAnalysis } : null);
+            }
+          } catch { /* 파싱 실패 시 무시 */ }
+        }
+      }
     } catch {
       setError("오류가 발생했습니다. 다시 시도해주세요.");
-    } finally { setLoading(false); }
-  };
+    } finally {
+      setLoading(false); setAiStreaming(false);
+    }
+  }, [keyword]);
 
   const verdictCfg = {
     good:    { bg: "#e8f5f0", border: "#00aa6c", icon: "🟢", label: "지금 팔기 좋음",   color: "#007a4d" },
@@ -195,7 +279,7 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
                 </span>
               )}
             </div>
-            <button onClick={loadHotKeywords} disabled={loadingAuto}
+            <button onClick={() => loadHotKeywords(true)} disabled={loadingAuto}
               className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full cursor-pointer border transition-colors disabled:opacity-40"
               style={{ background: "#f7faf9", color: "#00aa6c", borderColor: "#e0ede9" }}>
               {loadingAuto
@@ -206,9 +290,18 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
           </div>
 
           {loadingAuto && (
-            <div className="flex items-center gap-2 py-4" style={{ color: "#9ca3af" }}>
-              <span className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00aa6c" }} />
-              <span className="text-sm">시즌 키워드 분석 중...</span>
+            <div className="space-y-2 animate-pulse">
+              {[0,1,2,3,4].map(i => (
+                <div key={i} className="rounded-xl px-4 py-3 flex items-center gap-3"
+                  style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                  <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ background: "#e0ede9" }} />
+                  <div className="flex-1">
+                    <div className="h-3 w-24 rounded mb-2" style={{ background: "#e0ede9" }} />
+                    <div className="h-2.5 w-40 rounded" style={{ background: "#e8f5f0" }} />
+                  </div>
+                  <div className="h-5 w-12 rounded-full" style={{ background: "#e0ede9" }} />
+                </div>
+              ))}
             </div>
           )}
 
@@ -285,7 +378,7 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
           <div className="py-8 flex flex-col items-center gap-3">
             <span className="w-8 h-8 rounded-full animate-spin" style={{ borderWidth: 3, borderStyle: "solid", borderColor: "#e0ede9", borderTopColor: "#00aa6c" }} />
             <p className="text-sm font-semibold" style={{ color: "#0f2a1e" }}>AI가 분석 중입니다...</p>
-            <p className="text-xs" style={{ color: "#9ca3af" }}>네이버 실시간 데이터 수집 중 (10~30초 소요)</p>
+            <p className="text-xs" style={{ color: "#9ca3af" }}>네이버 실시간 데이터 수집 중...</p>
           </div>
         )}
 
@@ -293,21 +386,49 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
         {result && !loading && (
           <div className="space-y-4">
             {/* AI verdict */}
-            {result.aiAnalysis?.verdict && (() => {
-              const cfg = verdictCfg[result.aiAnalysis.verdict];
-              return (
-                <div className="rounded-xl p-4 border-l-4" style={{ background: cfg.bg, borderColor: cfg.border }}>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-base">{cfg.icon}</span>
-                    <span className="font-bold text-sm" style={{ color: cfg.color }}>{cfg.label}</span>
+            {result.aiAnalysis ? (
+              result.aiAnalysis.verdict && (() => {
+                const cfg = verdictCfg[result.aiAnalysis!.verdict];
+                return (
+                  <div className="rounded-xl p-4 border-l-4" style={{ background: cfg.bg, borderColor: cfg.border }}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-base">{cfg.icon}</span>
+                      <span className="font-bold text-sm" style={{ color: cfg.color }}>{cfg.label}</span>
+                    </div>
+                    <p className="text-sm font-bold mb-1.5" style={{ color: cfg.color }}>
+                      ⚡ {result.aiAnalysis!.action_command}
+                    </p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{result.aiAnalysis!.reason}</p>
                   </div>
-                  <p className="text-sm font-bold mb-1.5" style={{ color: cfg.color }}>
-                    ⚡ {result.aiAnalysis.action_command}
-                  </p>
-                  <p className="text-xs text-slate-600 leading-relaxed">{result.aiAnalysis.reason}</p>
+                );
+              })()
+            ) : (
+              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  {aiStreaming ? (
+                    <>
+                      <span className="text-sm">⚡</span>
+                      <span className="text-xs font-semibold" style={{ color: "#00aa6c" }}>AI 판매 분석 작성 중</span>
+                      <span className="flex gap-0.5 items-center">
+                        {[0,1,2].map(i => (
+                          <span key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                            style={{ background: "#00aa6c", animationDelay: `${i * 0.18}s` }} />
+                        ))}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-4 h-4 rounded-full animate-pulse" style={{ background: "#e0ede9" }} />
+                      <div className="h-3 w-28 rounded animate-pulse" style={{ background: "#e0ede9" }} />
+                    </>
+                  )}
                 </div>
-              );
-            })()}
+                <div className="h-4 w-3/4 rounded mb-2 animate-pulse" style={{ background: "#e0ede9" }} />
+                <div className="h-3 w-full rounded mb-1 animate-pulse" style={{ background: "#e0ede9" }} />
+                <div className="h-3 w-5/6 rounded animate-pulse" style={{ background: "#e0ede9" }} />
+                {!aiStreaming && <p className="text-xs mt-3" style={{ color: "#9ca3af" }}>⏳ AI 판매 분석 중...</p>}
+              </div>
+            )}
 
             {/* 3 metrics */}
             {result.trend.ratios.length > 0 && (
@@ -317,8 +438,8 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
                   value={String(result.related.length)}
                   sub="상승 키워드" color="#00aa6c" />
                 <MetricCard label="AI 판정"
-                  value={result.aiAnalysis.verdict === "good" ? "🟢" : result.aiAnalysis.verdict === "bad" ? "🔴" : "🟡"}
-                  sub={result.aiAnalysis.verdict === "good" ? "판매 적합" : result.aiAnalysis.verdict === "bad" ? "위험" : "보통"} />
+                  value={result.aiAnalysis?.verdict === "good" ? "🟢" : result.aiAnalysis?.verdict === "bad" ? "🔴" : "🟡"}
+                  sub={result.aiAnalysis?.verdict === "good" ? "판매 적합" : result.aiAnalysis?.verdict === "bad" ? "위험" : "분석 중"} />
               </div>
             )}
 
@@ -386,7 +507,17 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
             </div>
 
             {/* Action plan */}
-            {result.aiAnalysis.tips?.length > 0 && (
+            {result.aiAnalysis === null ? (
+              <div className="rounded-xl p-4 animate-pulse" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
+                <div className="h-3 w-24 rounded mb-4" style={{ background: "#b2d8c8" }} />
+                {[0,1,2].map(i => (
+                  <div key={i} className="flex gap-2.5 mb-3">
+                    <div className="w-5 h-5 rounded-full flex-shrink-0" style={{ background: "#b2d8c8" }} />
+                    <div className="flex-1 h-4 rounded" style={{ background: "#b2d8c8" }} />
+                  </div>
+                ))}
+              </div>
+            ) : result.aiAnalysis.tips?.length > 0 && (
               <div className="rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#00aa6c" }}>
                   실행 액션 플랜

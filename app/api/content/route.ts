@@ -91,6 +91,6 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(cleaned);
     return NextResponse.json({ result: parsed });
   } catch {
-    return NextResponse.json({ error: "결과 파싱 실패", raw: text, openrouter: data }, { status: 500 });
+    return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
   }
 }
