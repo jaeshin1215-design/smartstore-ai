@@ -34,6 +34,46 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, id });
 }
 
+// 상품 정보 수정 (PATCH)
+export async function PATCH(req: NextRequest) {
+  const body = await req.json();
+  const { id, matrix_x, matrix_y, price, is_price_confirmed } = body;
+
+  if (!id) return NextResponse.json({ error: "id 필요" }, { status: 400 });
+
+  const fields: string[] = [];
+  const args: any[] = [];
+
+  if (matrix_x !== undefined) {
+    fields.push("matrix_x = ?");
+    args.push(matrix_x);
+  }
+  if (matrix_y !== undefined) {
+    fields.push("matrix_y = ?");
+    args.push(matrix_y);
+  }
+  if (price !== undefined) {
+    fields.push("price = ?");
+    args.push(price ? Number(price) : null);
+  }
+  if (is_price_confirmed !== undefined) {
+    fields.push("is_price_confirmed = ?");
+    args.push(is_price_confirmed);
+  }
+
+  if (fields.length === 0) {
+    return NextResponse.json({ error: "수정할 항목 없음" }, { status: 400 });
+  }
+
+  args.push(id);
+  await db.execute({
+    sql: `UPDATE sellfit_products SET ${fields.join(", ")} WHERE id = ?`,
+    args,
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
 // 상품 삭제
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");

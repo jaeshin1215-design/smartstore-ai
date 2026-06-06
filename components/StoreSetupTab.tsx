@@ -207,12 +207,12 @@ export default function StoreSetupTab() {
   }
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <div style={{ maxWidth: 760, margin: "0 auto", width: "100%" }}>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#0f2a1e", marginBottom: 6 }}>
-          📌 내 스토어 설정
+        <h2 style={{ fontSize: 16, fontWeight: 500, color: "#1a1b1e", marginBottom: 6 }}>
+          내 스토어 설정
         </h2>
-        <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.6 }}>
           자사 상품 + 경쟁사 상품을 한 번만 등록하면 — AI가 밤새 추적합니다.
         </p>
       </div>
@@ -245,8 +245,8 @@ export default function StoreSetupTab() {
               onClick={handleRegisterStore}
               style={{
                 padding: "12px", borderRadius: 8, border: "none",
-                background: "#0f2a1e", color: "#fff", fontSize: 14,
-                fontWeight: 700, cursor: "pointer",
+              background: "#ef567c", color: "#fff", fontSize: 14,
+                fontWeight: 600, cursor: "pointer",
               }}
             >
               등록하기 →
@@ -260,11 +260,12 @@ export default function StoreSetupTab() {
         <>
           {/* 스토어 정보 */}
           <div style={{
-            background: "#e8f5f0", borderRadius: 10, padding: "14px 18px",
+            background: "#f7f8fa", borderRadius: 10, padding: "14px 18px",
             marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center",
+            border: "1px solid #e8eaed"
           }}>
             <div>
-              <span style={{ fontWeight: 700, color: "#0f2a1e", fontSize: 14 }}>{store.name}</span>
+              <span style={{ fontWeight: 500, color: "#1a1b1e", fontSize: 13 }}>{store.name}</span>
               {store.email && <span style={{ fontSize: 12, color: "#6b7280", marginLeft: 10 }}>{store.email}</span>}
             </div>
             <button onClick={handleReset}
@@ -291,7 +292,7 @@ export default function StoreSetupTab() {
                     background: pIsOwn === own ? "#0f2a1e" : "#fff",
                     color: pIsOwn === own ? "#fff" : "#6b7280",
                   }}>
-                  {own ? "✅ 자사 상품" : "🔍 경쟁사 상품"}
+                  {own ? "자사 상품" : "경쟁사 상품"}
                 </button>
               ))}
             </div>
@@ -335,8 +336,8 @@ export default function StoreSetupTab() {
                 disabled={addingProduct}
                 style={{
                   padding: "11px", borderRadius: 8, border: "none",
-                  background: addingProduct ? "#9ca3af" : "#00aa6c",
-                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  background: addingProduct ? "#c4c8cc" : "#ef567c",
+                  color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
                 }}>
                 {addingProduct ? "등록 중..." : "+ 상품 추가"}
               </button>
@@ -350,7 +351,7 @@ export default function StoreSetupTab() {
                 등록된 상품 ({ownProducts.length}개 자사 · {compProducts.length}개 경쟁사)
               </div>
 
-              {[{ label: "✅ 자사 상품", list: ownProducts }, { label: "🔍 경쟁사 상품", list: compProducts }].map(group => (
+              {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }].map(group => (
                 group.list.length > 0 && (
                   <div key={group.label} style={{ marginBottom: 20 }}>
                     <div style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.1em", marginBottom: 10 }}>
@@ -381,20 +382,21 @@ export default function StoreSetupTab() {
               {ownProducts.length > 0 && compProducts.length > 0 && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{
-                    padding: "12px 16px", background: "#e8f5f0",
-                    borderRadius: 8, fontSize: 12, color: "#0f2a1e", marginBottom: 12,
+                    padding: "12px 16px", background: "#f7f9fb",
+                    borderRadius: 8, fontSize: 12, color: "#64676b", marginBottom: 12,
+                    border: "1px solid #e8eaed"
                   }}>
-                    ✅ 설정 완료 — AI가 매일 새벽 {ownProducts.length}개 자사 상품 + {compProducts.length}개 경쟁사를 추적합니다.
+                    설정 완료 — AI가 매일 새벽 {ownProducts.length}개 자사 상품 + {compProducts.length}개 경쟁사를 추적합니다.
                   </div>
                   <button
                     onClick={handleCollect}
                     disabled={collecting}
                     style={{
                       width: "100%", padding: "12px", borderRadius: 8, border: "none",
-                      background: collecting ? "#9ca3af" : "#0f2a1e",
-                      color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                      background: collecting ? "#c4c8cc" : "#4a4f57",
+                      color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
                     }}>
-                    {collecting ? "수집 중... (DataLab·SearchAd·쇼핑 API)" : "📊 지금 데이터 수집 (테스트)"}
+                    {collecting ? "수집 중... (DataLab·SearchAd·쇼핑 API)" : "지금 데이터 수집 (테스트)"}
                   </button>
                   {collectResult && (
                     <div style={{ marginTop: 16, background: "#fff", borderRadius: 8, border: "1px solid #e0ede9", overflow: "hidden" }}>
@@ -419,7 +421,7 @@ export default function StoreSetupTab() {
           {/* 매출 수동 입력 */}
           {store && (
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>📈 오늘 매출 입력</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>오늘 매출 입력</div>
               <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 5분 · 30일 누적 = PoC 결과 보고서</div>
 
               {yesterdaySales && (
@@ -448,9 +450,9 @@ export default function StoreSetupTab() {
               </div>
               <button onClick={handleSaveSales} disabled={savingSales}
                 style={{ width: "100%", padding: "11px", borderRadius: 8, border: "none",
-                  background: salesSaved ? "#00aa6c" : savingSales ? "#9ca3af" : "#0f2a1e",
-                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                {salesSaved ? "✅ 저장 완료" : savingSales ? "저장 중..." : "오늘 매출 저장 →"}
+                  background: salesSaved ? "#4a4f57" : savingSales ? "#c4c8cc" : "#4a4f57",
+                  color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {salesSaved ? "저장 완료" : savingSales ? "저장 중..." : "오늘 매출 저장 →"}
               </button>
             </div>
           )}

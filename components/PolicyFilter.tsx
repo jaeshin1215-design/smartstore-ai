@@ -12,25 +12,29 @@ export default function PolicyFilter({ text }: Props) {
 
   if (!result.hasViolation) {
     return (
-      <div className="mt-3 flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-xl px-4 py-2">
-        <span>✅</span>
+      <div className="mt-3 flex items-center gap-2 text-sm rounded-lg px-4 py-2"
+        style={{ background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
+        <span>✓</span>
         <span>네이버 정책 위반 표현이 없습니다.</span>
       </div>
     );
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4 space-y-3">
-      {/* 요약 배지 */}
+    <div className="mt-4 rounded-xl p-4 space-y-3"
+      style={{ background: "white", border: "1px solid #e8eaed" }}>
+      {/* 요약 배지 — 파스텔 칩 */}
       <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-sm font-semibold text-gray-700">⚠️ 네이버 정책 검토 필요</span>
+        <span className="text-sm font-semibold" style={{ color: "#4a4f57" }}>⚠️ 네이버 정책 검토 필요</span>
         {result.bannedCount > 0 && (
-          <span className="text-xs font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-md"
+            style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}>
             금지 {result.bannedCount}건
           </span>
         )}
         {result.warningCount > 0 && (
-          <span className="text-xs font-bold bg-yellow-400 text-white px-2 py-0.5 rounded-full">
+          <span className="text-xs font-medium px-2 py-0.5 rounded-md"
+            style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#b45309" }}>
             주의 {result.warningCount}건
           </span>
         )}
@@ -39,14 +43,17 @@ export default function PolicyFilter({ text }: Props) {
       {/* 위반 목록 */}
       <ul className="space-y-1">
         {result.violations.map((v: PolicyViolation, i: number) => (
-          <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
-            <span className={v.level === "banned" ? "text-red-500 font-bold" : "text-yellow-600 font-bold"}>
+          <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "#4a4f57" }}>
+            <span style={{ color: v.level === "banned" ? "#b91c1c" : "#b45309", fontWeight: 600 }}>
               {v.level === "banned" ? "🚫" : "⚠️"}
             </span>
             <span>
-              <strong className={v.level === "banned" ? "text-red-500" : "text-yellow-600"}>
+              <span className="font-medium px-1 py-0.5 rounded text-xs"
+                style={v.level === "banned"
+                  ? { background: "#fef2f2", color: "#b91c1c" }
+                  : { background: "#fffbeb", color: "#b45309" }}>
                 「{v.match}」
-              </strong>{" "}
+              </span>{" "}
               — {v.reason}
             </span>
           </li>

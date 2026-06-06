@@ -1,0 +1,155 @@
+{
+  "name": "SellFit — 릴스 업로드",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a0000001-0000-0000-0000-000000000001",
+      "name": "수동 실행",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 320]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "accessToken",
+              "value": "PASTE_META_ACCESS_TOKEN_HERE",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "userId",
+              "value": "PASTE_INSTAGRAM_USER_ID_HERE",
+              "type": "string"
+            },
+            {
+              "id": "s3",
+              "name": "videoUrl",
+              "value": "https://PASTE_REEL_A_PUBLIC_URL_HERE.mp4",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "caption",
+              "value": "AI로 만든 광고 영상 테스트 📹\nAI 생성 콘텐츠 · AI기본법 제33조\n#AI생성 #테스트영상 #test_수경",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a0000002-0000-0000-0000-000000000002",
+      "name": "Set: 설정",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [420, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.userId }}/media",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ media_type: 'REELS', video_url: $json.videoUrl, caption: $json.caption, share_to_feed: true, access_token: $json.accessToken }) }}",
+        "options": {}
+      },
+      "id": "a0000003-0000-0000-0000-000000000003",
+      "name": "HTTP: 컨테이너 생성",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [640, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 이전 노드: HTTP 컨테이너 생성 응답 (containerId)\nconst httpResp = $input.first().json;\nconst setData = $('Set: 설정').first().json;\n\nconst containerId = httpResp.id;\nconst accessToken = setData.accessToken;\n\nif (!containerId) {\n  throw new Error('컨테이너 ID 없음: ' + JSON.stringify(httpResp));\n}\n\nlet attempts = 0;\nlet statusCode = 'IN_PROGRESS';\n\n// 최대 75초 대기 (15회 × 5초)\nwhile (statusCode !== 'FINISHED' && statusCode !== 'ERROR' && attempts < 15) {\n  await new Promise(r => setTimeout(r, 5000));\n  const res = await fetch(\n    `https://graph.facebook.com/v21.0/${containerId}?fields=status_code&access_token=${accessToken}`\n  );\n  const body = await res.json();\n  statusCode = body.status_code ?? 'ERROR';\n  attempts++;\n  console.log(`폴링 ${attempts}/15: ${statusCode}`);\n}\n\nif (statusCode !== 'FINISHED') {\n  throw new Error(`업로드 실패: status=${statusCode} (${attempts}회 시도)`);\n}\n\nreturn [{\n  json: {\n    containerId,\n    accessToken,\n    userId: setData.userId,\n    statusCode,\n    pollAttempts: attempts\n  }\n}];"
+      },
+      "id": "a0000004-0000-0000-0000-000000000004",
+      "name": "Code: 업로드 완료 대기",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.userId }}/media_publish",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ creation_id: $json.containerId, access_token: $json.accessToken }) }}",
+        "options": {}
+      },
+      "id": "a0000005-0000-0000-0000-000000000005",
+      "name": "HTTP: 릴스 게시",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1080, 320]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "mediaId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "status",
+              "value": "게시 완료 ✅",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "message",
+              "value": "={{ '릴스 게시 완료. Media ID: ' + $json.id + '  →  인사이트는 24시간 후 n8n_reels_insights 워크플로우에서 조회' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a0000006-0000-0000-0000-000000000006",
+      "name": "Set: 완료",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [1300, 320]
+    }
+  ],
+  "connections": {
+    "수동 실행": {
+      "main": [
+        [{"node": "Set: 설정", "type": "main", "index": 0}]
+      ]
+    },
+    "Set: 설정": {
+      "main": [
+        [{"node": "HTTP: 컨테이너 생성", "type": "main", "index": 0}]
+      ]
+    },
+    "HTTP: 컨테이너 생성": {
+      "main": [
+        [{"node": "Code: 업로드 완료 대기", "type": "main", "index": 0}]
+      ]
+    },
+    "Code: 업로드 완료 대기": {
+      "main": [
+        [{"node": "HTTP: 릴스 게시", "type": "main", "index": 0}]
+      ]
+    },
+    "HTTP: 릴스 게시": {
+      "main": [
+        [{"node": "Set: 완료", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b0000001-0000-0000-0000-000000000001"
+}

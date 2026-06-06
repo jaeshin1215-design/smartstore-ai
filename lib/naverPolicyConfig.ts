@@ -40,4 +40,15 @@ export const NAVER_POLICY_RULES: PolicyRule[] = [
   { pattern: /다이어트/g,          level: "warning", reason: "다이어트 효과 주장 — 근거 필요" },
   { pattern: /탈모/g,              level: "warning", reason: "탈모 관련 — 의약외품 허가 없으면 주의" },
   { pattern: /리뷰\s*이벤트/g,     level: "warning", reason: "리뷰 유도 이벤트 — 조건부 리뷰 금지 정책 주의" },
+
+  // ── 실증 자료 필요 표현 (표시광고법·KC인증 관련) ──────────────────
+  { pattern: /\d+\s*kg\s*(견고|하중|내구|지지)/g, level: "warning", reason: "하중·강도 수치 — KC인증서·시험성적서 실측 근거 필요 (표시광고법)" },
+  { pattern: /(견고성|내구성|강도)\s*\d+/g,       level: "warning", reason: "강도 수치 주장 — 시험성적서 근거 없으면 위반" },
+  { pattern: /\d+\s*배\s*(더|강|튼튼|오래)/g,     level: "warning", reason: "N배 비교 주장 — 비교 대상·근거 명시 없으면 금지" },
+  { pattern: /KC\s*인증/g,                        level: "warning", reason: "KC인증 표현 — 인증번호 병기 필수. 번호 없으면 허위인증 위험" },
+  { pattern: /안전\s*인증/g,                      level: "warning", reason: "안전인증 표현 — KC 인증번호·발급기관 명시 필요" },
+  { pattern: /평생\s*(보증|AS|무상)/g,            level: "warning", reason: "평생 보증 — 실제 이행 가능 여부 확인 필요" },
+  { pattern: /\d+\s*년\s*보증/g,                  level: "warning", reason: "N년 보증 — 보증 조건·범위 명시 필요" },
+  { pattern: /임상\s*(시험|결과|증명)/g,           level: "banned",  reason: "임상 표현 — 식약처 허가 없는 임상 주장 금지" },
+  { pattern: /과학적\s*(증명|검증)/g,             level: "banned",  reason: "과학적 증명 주장 — 공인기관 근거 없으면 금지" },
 ];

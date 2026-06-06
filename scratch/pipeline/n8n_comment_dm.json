@@ -1,0 +1,239 @@
+{
+  "name": "SellFit — 댓글→DM 자동화",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "ALL",
+        "path": "sellfit-ig-comments",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c0000001-0000-0000-0000-000000000001",
+      "name": "Webhook: Instagram 댓글",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 320],
+      "webhookId": "c0000001-0000-0000-0000-000000000099"
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $input.first();\nconst query = req.query || {};\nconst body = req.body || {};\n\n// Meta webhook 검증 요청 (GET)\nif (query['hub.mode'] === 'subscribe') {\n  return [\n    [{ json: { type: 'verification', challenge: query['hub.challenge'] } }],\n    []\n  ];\n}\n\n// 댓글 이벤트 처리 (POST)\nconst entry = body.entry?.[0];\nconst change = entry?.changes?.[0];\n\nif (!change || change.field !== 'comments') {\n  // 댓글 아닌 이벤트 — 200만 반환\n  return [[], [{ json: { type: 'skip', reason: 'not a comment event' } }]];\n}\n\nconst value = change.value || {};\nreturn [\n  [],\n  [{\n    json: {\n      type: 'comment',\n      commentId: value.id,\n      commenterId: value.from?.id,\n      commenterUsername: value.from?.username || '고객님',\n      commentText: (value.text || '').toLowerCase(),\n      mediaId: value.media?.id\n    }\n  }]\n];"
+      },
+      "id": "c0000002-0000-0000-0000-000000000002",
+      "name": "Code: 요청 분기",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c0000003-0000-0000-0000-000000000003",
+      "name": "Respond: 검증 완료",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [640, 160]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "accessToken",
+              "value": "PASTE_META_ACCESS_TOKEN_HERE",
+              "type": "string"
+            },
+            {
+              "id": "d2",
+              "name": "userId",
+              "value": "PASTE_INSTAGRAM_USER_ID_HERE",
+              "type": "string"
+            },
+            {
+              "id": "d3",
+              "name": "landingUrl",
+              "value": "https://your-domain.com/landing/bag",
+              "type": "string"
+            },
+            {
+              "id": "d4",
+              "name": "keywords",
+              "value": "링크,구매,어디서,살 수,파는,주문,어디,얼마",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "includeOtherFields": true
+        }
+      },
+      "id": "c0000004-0000-0000-0000-000000000004",
+      "name": "Set: 크레덴셜",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [640, 460]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "k1",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "링크",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k2",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "구매",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k3",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "어디서",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k4",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "살 수",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k5",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "파는",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k6",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "주문",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k7",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "어디",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k8",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "얼마",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k9",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "초록",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            },
+            {
+              "id": "k10",
+              "leftValue": "={{ $json.commentText }}",
+              "rightValue": "화분",
+              "operator": {"type": "string", "operation": "contains", "name": "filter.operator.contains"}
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "c0000005-0000-0000-0000-000000000005",
+      "name": "IF: 구매 키워드",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [860, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.userId }}/messages",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ recipient: { comment_id: $json.commentId }, message: { text: '안녕하세요 ' + $json.commenterUsername + '님! ✅\\n\\nAI 광고 자동화 파이프라인 테스트 중입니다.\\n키워드 감지 → 자동 DM 정상 작동 확인됐어요.\\n\\n(실제 상품 판매 아님 · 파이프라인 검증용)' }, messaging_type: 'RESPONSE', access_token: $json.accessToken }) }}",
+        "options": {}
+      },
+      "id": "c0000006-0000-0000-0000-000000000006",
+      "name": "HTTP: DM 발송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1080, 380]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, action: 'dm_sent', to: $json.commenterUsername }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c0000007-0000-0000-0000-000000000007",
+      "name": "Respond: DM 완료",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1300, 380]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": true, \"action\": \"skipped\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c0000008-0000-0000-0000-000000000008",
+      "name": "Respond: 무시",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1080, 560]
+    }
+  ],
+  "connections": {
+    "Webhook: Instagram 댓글": {
+      "main": [
+        [{"node": "Code: 요청 분기", "type": "main", "index": 0}]
+      ]
+    },
+    "Code: 요청 분기": {
+      "main": [
+        [{"node": "Respond: 검증 완료", "type": "main", "index": 0}],
+        [{"node": "Set: 크레덴셜", "type": "main", "index": 0}]
+      ]
+    },
+    "Set: 크레덴셜": {
+      "main": [
+        [{"node": "IF: 구매 키워드", "type": "main", "index": 0}]
+      ]
+    },
+    "IF: 구매 키워드": {
+      "main": [
+        [{"node": "HTTP: DM 발송", "type": "main", "index": 0}],
+        [{"node": "Respond: 무시", "type": "main", "index": 0}]
+      ]
+    },
+    "HTTP: DM 발송": {
+      "main": [
+        [{"node": "Respond: DM 완료", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d0000001-0000-0000-0000-000000000001"
+}

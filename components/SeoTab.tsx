@@ -1,72 +1,56 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
 
 interface OptimizedName { name: string; reason: string; keywords_used: string[] }
+interface KeywordStrategy { main_keyword: string; sub_keywords: string[]; recommendation: string }
 interface SeoResult {
   action_command?: string;
   score?: { current: string; issues: string[] };
   optimized_names: OptimizedName[];
-  keyword_strategy?: { main_keyword: string; sub_keywords: string[]; recommendation: string };
+  keyword_strategy?: KeywordStrategy;
   seo_tips: string[];
   avoid: string[];
 }
+interface Phase2Buffer { keyword_strategy?: KeywordStrategy; seo_tips: string[]; avoid: string[] }
 
-const CARD: React.CSSProperties = {
-  background: "#ffffff",
-  borderRadius: 12,
-  boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-  border: "1px solid #e0ede9",
+const inputStyle: React.CSSProperties = {
+  width: "100%", fontSize: "14px", borderRadius: "8px", padding: "11px 16px",
+  outline: "none", background: "#f7f8fa", border: "1px solid #e8eaed",
+  color: "#1a1a1a", fontFamily: "inherit",
 };
-const inputCls = "w-full text-sm rounded-lg px-4 py-3 outline-none transition-all placeholder:text-gray-400 text-[#0f2a1e]";
-const inputStyle: React.CSSProperties = { background: "#f7faf9", border: "1px solid #e0ede9" };
-const labelCls = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
-const labelStyle: React.CSSProperties = { color: "#9ca3af" };
-
-function SkeletonResult() {
-  return (
-    <div className="mt-5 space-y-3">
-      <div className="rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm">⚡</span>
-          <span className="text-xs font-semibold" style={{ color: "#00aa6c" }}>AI 상품명 분석 작성 중</span>
-          <span className="flex gap-0.5 items-center">
-            {[0, 1, 2].map(i => (
-              <span key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
-                style={{ background: "#00aa6c", animationDelay: `${i * 0.18}s` }} />
-            ))}
-          </span>
-        </div>
-      </div>
-      <div className="animate-pulse space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="h-20 rounded-xl" style={{ background: "#f0f4f3" }} />
-          <div className="h-20 rounded-xl" style={{ background: "#e8f5f0" }} />
-        </div>
-        <div className="h-28 rounded-xl" style={{ background: "#f0f4f3" }} />
-        {[0, 1, 2].map(i => <div key={i} className="h-24 rounded-xl" style={{ background: "#f0f4f3" }} />)}
-        <div className="h-32 rounded-xl" style={{ background: "#f0f4f3" }} />
-      </div>
-    </div>
-  );
-}
+const labelStyle: React.CSSProperties = {
+  display: "block", fontSize: "11px", fontWeight: 500,
+  textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "5px",
+};
 
 function ScoreBar({ score, color }: { score: number; color: string }) {
   return (
-    <div className="h-2 rounded-full mt-2" style={{ background: "#e0ede9" }}>
-      <div className="h-2 rounded-full transition-all duration-700"
-        style={{ width: `${Math.min(score, 100)}%`, background: color }} />
+    <div style={{ height: "4px", borderRadius: "2px", background: "#f0f1f3", marginTop: "6px" }}>
+      <div style={{ height: "4px", borderRadius: "2px", transition: "width 0.7s", width: `${Math.min(score, 100)}%`, background: color }} />
     </div>
   );
 }
+
+/* Strategy badge system — all pastel, differentiated by hue only */
+const STRATEGY_BADGE: Record<number, { bg: string; color: string; label: string }> = {
+  0: { bg: "#fff1f0", color: "#b94040", label: "공격형" },
+  1: { bg: "#f5f5f5", color: "#4a4f57", label: "균형형" },
+  2: { bg: "#eff6ff", color: "#1a56b0", label: "안전형" },
+};
 
 export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) {
   const [productName, setProductName] = useState(initialKeyword ?? "");
   const autoSubmitted = useRef(false);
+  const prevInitialKeyword = useRef<string | undefined>(undefined);
+  const submitting = useRef(false); /* atomic guard — React state보다 먼저 체크 */
+  /* phase2가 phase1보다 먼저 도착할 때 버퍼 */
+  const phase2Buffer = useRef<unknown>(null);
 
   useEffect(() => {
-    if (initialKeyword) {
+    if (initialKeyword && initialKeyword !== prevInitialKeyword.current) {
+      prevInitialKeyword.current = initialKeyword;
       setProductName(initialKeyword);
       autoSubmitted.current = false;
     }
@@ -99,13 +83,20 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
   const [productCount, setProductCount] = useState<number | null>(null);
   const [productCountLoading, setProductCountLoading] = useState(false);
   const [competitionRatio, setCompetitionRatio] = useState<number | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result]);
 
   const handleSubmit = async () => {
-    if (!productName) return;
+    if (!productName || submitting.current) return;
+    submitting.current = true;
+    phase2Buffer.current = null; /* 이전 버퍼 초기화 */
     setLoading(true); setResult(null); setError(""); setStreaming(false);
     setTrendData(null); setRelatedKeywords([]); setProductCount(null); setCompetitionRatio(null);
 
-    // ① 연관 키워드 조회 — SEO 분석과 병렬 실행 (fire & forget)
+    // ① 연관 키워드 조회 (fire & forget)
     setRelatedLoading(true);
     void (async () => {
       try {
@@ -140,7 +131,7 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
       finally { setRelatedLoading(false); }
     })();
 
-    // ② 상품수 + 경쟁강도 조회
+    // ② 상품수 조회
     setProductCountLoading(true);
     void (async () => {
       try {
@@ -158,7 +149,7 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
       finally { setProductCountLoading(false); }
     })();
 
-    // ③ DataLab 검색량 자동 조회 (빠른 단일 호출)
+    // ③ DataLab 검색량
     setTrendLoading(true);
     let autoSearchVolume = searchVolume;
     try {
@@ -181,13 +172,12 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productName, category, keywords, searchVolume: autoSearchVolume, competitorCount, clickRate, priceRange }),
       });
-      setLoading(false);
-      if (!res.ok || !res.body) { setError("오류가 발생했습니다."); return; }
+      /* setLoading(false)를 여기서 제거 — streaming 시작 전 false가 되면 guard 뚫림 */
+      if (!res.ok || !res.body) { setLoading(false); setError("오류가 발생했습니다."); return; }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -200,29 +190,52 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
             const obj = JSON.parse(line);
             if (obj.type === "seo_stream") { setStreaming(true); }
             if (obj.type === "seo_phase1") {
+              const buf = phase2Buffer.current;
+              phase2Buffer.current = null;
               setStreaming(false);
-              setResult({
+              const base: SeoResult = {
                 action_command: obj.action_command,
                 score: obj.score,
                 optimized_names: obj.optimized_names ?? [],
                 seo_tips: [],
                 avoid: [],
-              });
+              };
+              if (buf) {
+                const b = buf as Phase2Buffer;
+                base.keyword_strategy = b.keyword_strategy;
+                base.seo_tips = b.seo_tips;
+                base.avoid = b.avoid;
+              }
+              setResult(base);
             }
             if (obj.type === "seo_phase2") {
-              setResult(prev => prev ? {
-                ...prev,
-                keyword_strategy: obj.keyword_strategy,
-                seo_tips: obj.seo_tips ?? [],
-                avoid: obj.avoid ?? [],
-              } : null);
+              setResult(prev => {
+                if (!prev) {
+                  /* phase1보다 먼저 도착 — 버퍼에 보관 */
+                  phase2Buffer.current = {
+                    keyword_strategy: obj.keyword_strategy,
+                    seo_tips: obj.seo_tips ?? [],
+                    avoid: obj.avoid ?? [],
+                  };
+                  return null;
+                }
+                return {
+                  ...prev,
+                  keyword_strategy: obj.keyword_strategy,
+                  seo_tips: obj.seo_tips ?? [],
+                  avoid: obj.avoid ?? [],
+                };
+              });
             }
             if (obj.type === "error") { setStreaming(false); setError(obj.error); }
           } catch { /* 파싱 실패 무시 */ }
         }
       }
     } catch { setError("오류가 발생했습니다. 다시 시도해주세요."); }
-    finally { setLoading(false); setStreaming(false); }
+    finally {
+      submitting.current = false;
+      setLoading(false); setStreaming(false);
+    }
   };
 
   const handleCopy = (text: string, index: number) => {
@@ -238,341 +251,266 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
 
   const currentScore = result?.score ? Number(result.score.current) || 0 : 0;
   const improvedScore = Math.min(currentScore + 22, 97);
-  const strategyLabels = ["공격적", "중간", "안전"];
-  const strategyColors = ["#ef4444", "#0f2a1e", "#00aa6c"];
 
   return (
-    <div className="lg:grid lg:gap-7" style={{ gridTemplateColumns: "1fr 420px" }}>
+    /* ── 2-column: LEFT heading+bullets+score | CENTER form+results ── */
+    <div className="lg:grid" style={{ gridTemplateColumns: "200px minmax(0, 720px)", gap: "0 25vw" }}>
 
-      {/* ── LEFT: Hero ── */}
-      <div className="mb-6 lg:mb-0">
-        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#00aa6c" }}>
+      {/* ════ LEFT: Section heading + feature bullets + score ════ */}
+      <div style={{ background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px" }}>
+        <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>
           SEO OPTIMIZER
         </p>
-        <h1 className="font-extrabold leading-tight mb-2"
-          style={{ fontSize: "clamp(26px,5vw,36px)", color: "#0f2a1e" }}>
+        <h2 style={{ fontSize: "clamp(20px,3vw,26px)", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, marginBottom: "8px" }}>
           검색 1페이지<br />올리기
-        </h1>
-        <p className="text-sm leading-relaxed mb-5" style={{ color: "#6b8c7a" }}>
-          상품명 하나로 노출이 10배 달라집니다.<br className="hidden lg:block" />
-          AI가 최적의 상품명을 만들어드려요.
+        </h2>
+        <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "20px", lineHeight: 1.6 }}>
+          상품명 하나로 노출이 10배 달라집니다.<br />AI가 최적의 상품명을 만들어드려요.
         </p>
-        <div className="hidden lg:block space-y-2.5 mb-6">
-          {[
-            "네이버 검색 알고리즘 최적화",
-            "경쟁사 키워드 전략 분석",
-            "상품명 3가지 버전 제공",
-          ].map((f) => (
-            <div key={f} className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                style={{ background: "#00aa6c" }}>✓</span>
-              <span className="text-sm" style={{ color: "#4b7a63" }}>{f}</span>
-            </div>
-          ))}
-        </div>
 
-        {/* Score preview (after result) - desktop only */}
+        {["네이버 검색 알고리즘 최적화", "경쟁사 키워드 전략 분석", "상품명 3가지 버전 제공"].map(f => (
+          <div key={f} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+            <span style={{ fontSize: "10px", color: "#9ca3af" }}>✓</span>
+            <span style={{ fontSize: "12px", color: "#6b7280" }}>{f}</span>
+          </div>
+        ))}
+
         {result?.score && (
-          <div className="hidden lg:block space-y-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#9ca3af" }}>점수 비교</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9ca3af" }}>현재 점수</p>
-                <p className="font-extrabold text-2xl" style={{ color: "#ef4444" }}>{result.score.current}점</p>
-                <ScoreBar score={currentScore} color="#ef4444" />
-              </div>
-              <div className="rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#00aa6c" }}>예상 개선</p>
-                <p className="font-extrabold text-2xl" style={{ color: "#00aa6c" }}>{improvedScore}점</p>
-                <ScoreBar score={improvedScore} color="#00aa6c" />
-              </div>
+          <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            <div style={{ padding: "10px 12px", border: "1px solid #e8eaed", borderRadius: "6px", background: "white" }}>
+              <p style={{ fontSize: "9px", color: "#9ca3af", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>현재 점수</p>
+              <p style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>{result.score.current}점</p>
+              <ScoreBar score={currentScore} color="#9ca3af" />
             </div>
-            {result.score.issues?.length > 0 && (
-              <div className="space-y-1.5">
-                {result.score.issues.map((issue, i) => (
-                  <div key={i} className="flex gap-2 text-xs" style={{ color: "#9ca3af" }}>
-                    <span style={{ color: "#f59e0b" }}>⚠</span>{issue}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div style={{ padding: "10px 12px", border: "1px solid #e8eaed", borderRadius: "6px", background: "white" }}>
+              <p style={{ fontSize: "9px", color: "#9ca3af", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>예상 개선</p>
+              <p style={{ fontSize: "18px", fontWeight: 700, color: "#ef567c" }}>{improvedScore}점</p>
+              <ScoreBar score={improvedScore} color="#ef567c" />
+            </div>
           </div>
         )}
       </div>
 
-      {/* ── RIGHT: Card ── */}
-      <div style={CARD} className="p-5">
-        {/* Card header */}
-        <div className="mb-5">
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "#00aa6c" }}>분석 입력</p>
-          <h2 className="font-bold text-base" style={{ color: "#0f2a1e" }}>상품명 SEO 최적화</h2>
-          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>현재 상품명을 입력하면 AI가 분석합니다</p>
-        </div>
-
-        {/* Form */}
-        <div className="space-y-3.5">
-          <div>
-            <label className={labelCls} style={labelStyle}>현재 상품명 <span className="text-red-400 normal-case">*</span></label>
-            <input type="text" value={productName} onChange={e => setProductName(e.target.value)}
-              placeholder="예) 아로니아 분말 500g" className={inputCls} style={inputStyle} />
-            {trendLoading && (
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#00aa6c", borderTopColor: "transparent" }} />
-                <span className="text-[11px]" style={{ color: "#9ca3af" }}>검색량 조회 중...</span>
-              </div>
-            )}
-            {trendData && !trendLoading && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
-                  style={{ background: "#e8f5f0", color: "#00aa6c" }}>
-                  검색지수 {trendData.avgRatio}
-                </span>
-                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
-                  style={{
-                    background: trendData.growth > 0 ? "#e8f5f0" : trendData.growth < 0 ? "#fff1f0" : "#f0f4f3",
-                    color: trendData.growth > 0 ? "#00aa6c" : trendData.growth < 0 ? "#ef4444" : "#9ca3af",
-                  }}>
-                  전주 대비 {trendData.growth > 0 ? "+" : ""}{trendData.growth}%
-                </span>
-                <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 DataLab 자동조회</span>
-              </div>
-            )}
-
-            {/* 상품수 + 경쟁강도 */}
-            {productCountLoading && (
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[11px]" style={{ color: "#9ca3af" }}>상품수 조회 중...</span>
-              </div>
-            )}
-            {productCount !== null && !productCountLoading && (
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
-                  style={{ background: "#f0f4f3", color: "#0f2a1e" }}>
-                  등록 상품수 {productCount.toLocaleString()}개
-                </span>
-                {trendData && (() => {
-                  const ratio = trendData.avgRatio > 0 ? Math.round((productCount / trendData.avgRatio) * 100) / 100 : null;
-                  const level = ratio === null ? null : ratio < 1 ? "낮음" : ratio < 10 ? "보통" : ratio < 100 ? "높음" : "매우높음";
-                  const color = ratio === null ? "#9ca3af" : ratio < 1 ? "#00aa6c" : ratio < 10 ? "#f59e0b" : "#ef4444";
-                  return ratio !== null ? (
-                    <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: "#fff8ed", color }}>
-                      경쟁강도 {ratio} ({level})
-                    </span>
-                  ) : null;
-                })()}
-                <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 쇼핑 자동조회</span>
-              </div>
-            )}
-          </div>
-          <div>
-            <label className={labelCls} style={labelStyle}>카테고리</label>
-            <input type="text" value={category} onChange={e => setCategory(e.target.value)}
-              placeholder="예) 식품 > 건강식품" className={inputCls} style={inputStyle} />
-          </div>
-          <div>
-            <label className={labelCls} style={labelStyle}>강조 키워드</label>
-            <input type="text" value={keywords} onChange={e => setKeywords(e.target.value)}
-              placeholder="예) 유기농, 국산, 당일발송" className={inputCls} style={inputStyle} />
+      {/* ════ CENTER: Form card + Results card ════ */}
+      <div>
+        {/* Form card */}
+        <div style={{ background: "#ffffff", border: "1px solid #e8eaed", borderRadius: "8px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "3px" }}>분석 입력</p>
+            <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", marginBottom: "2px" }}>상품명 SEO 최적화</h3>
+            <p style={{ fontSize: "12px", color: "#9ca3af" }}>현재 상품명을 입력하면 AI가 분석합니다</p>
           </div>
 
-          {/* Itemscout */}
-          <div className="rounded-xl border-dashed border p-4" style={{ borderColor: "#b2d8c8", background: "#f7fdf9" }}>
-            <button type="button" onClick={() => setShowItemscout(!showItemscout)}
-              className="w-full flex items-center justify-between text-sm font-semibold cursor-pointer"
-              style={{ color: "#00aa6c" }}>
-              <span>📊 아이템스카우트 데이터 입력 <span className="text-xs font-normal" style={{ color: "#9ca3af" }}>(선택)</span></span>
-              <span className="text-xs" style={{ color: "#9ca3af" }}>{showItemscout ? "▲" : "▼"}</span>
-            </button>
-            {showItemscout && (
-              <div className="mt-3 grid grid-cols-2 gap-2.5">
-                {[
-                  { label: "월간 검색량", val: searchVolume, set: setSearchVolume, ph: "예) 12,400" },
-                  { label: "경쟁 상품 수", val: competitorCount, set: setCompetitorCount, ph: "예) 3,200개" },
-                  { label: "클릭 경쟁률", val: clickRate, set: setClickRate, ph: "예) 낮음 / 0.26" },
-                  { label: "상위 가격대", val: priceRange, set: setPriceRange, ph: "예) 15,000~25,000원" },
-                ].map((f) => (
-                  <div key={f.label}>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9ca3af" }}>{f.label}</label>
-                    <input type="text" value={f.val} onChange={e => f.set(e.target.value)}
-                      placeholder={f.ph}
-                      className="w-full text-xs rounded-lg px-3 py-2 outline-none placeholder:text-gray-400"
-                      style={{ background: "white", border: "1px solid #e0ede9", color: "#0f2a1e" }} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button onClick={handleSubmit} disabled={loading || streaming || !productName}
-            className="w-full py-3.5 rounded-xl font-bold text-white text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-            style={{ background: "#00aa6c" }}>
-            {loading
-              ? <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />연결 중...
-                </span>
-              : "🔍 상품명 최적화하기"}
-          </button>
-        </div>
-
-        {streaming && <SkeletonResult />}
-        {error && !streaming && (
-          <div className="mt-4 rounded-xl p-4 border" style={{ background: "#fff1f0", borderColor: "#fca5a5" }}>
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
-
-        {/* Results */}
-        {result && !streaming && (
-          <div className="mt-5 space-y-4">
-            {/* Action command */}
-            {result.action_command && (
-              <div className="rounded-xl p-4 border-l-4" style={{ background: "#e8f5f0", borderColor: "#00aa6c" }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "#00aa6c" }}>⚡ 지금 바로 실행하세요</p>
-                <p className="text-sm font-bold" style={{ color: "#0f2a1e" }}>{result.action_command}</p>
-              </div>
-            )}
-
-            {/* Score cards - mobile only (desktop shows in hero col) */}
-            {result.score && (
-              <div className="lg:hidden grid grid-cols-2 gap-3">
-                <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9ca3af" }}>현재 점수</p>
-                  <p className="font-extrabold text-2xl" style={{ color: "#ef4444" }}>{result.score.current}점</p>
-                  <ScoreBar score={currentScore} color="#ef4444" />
-                </div>
-                <div className="rounded-xl p-4" style={{ background: "#e8f5f0", border: "1px solid #b2d8c8" }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#00aa6c" }}>예상 개선</p>
-                  <p className="font-extrabold text-2xl" style={{ color: "#00aa6c" }}>{improvedScore}점</p>
-                  <ScoreBar score={improvedScore} color="#00aa6c" />
-                </div>
-              </div>
-            )}
-
-            {/* Keyword strategy */}
-            {result.keyword_strategy && (
-              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9ca3af" }}>키워드 전략</p>
-                <div className="mb-3">
-                  <p className="text-xs mb-1.5" style={{ color: "#9ca3af" }}>메인 키워드</p>
-                  <span className="text-sm font-bold px-3 py-1.5 rounded-full text-white"
-                    style={{ background: "#0f2a1e" }}>{result.keyword_strategy.main_keyword}</span>
-                </div>
-                <div className="mb-3">
-                  <p className="text-xs mb-1.5" style={{ color: "#9ca3af" }}>세부 키워드</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.keyword_strategy.sub_keywords?.map((kw, i) => (
-                      <span key={i} className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                        style={{ background: "#e8f5f0", color: "#00aa6c" }}>#{kw}</span>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: "#6b7280" }}>{result.keyword_strategy.recommendation}</p>
-              </div>
-            )}
-
-            {/* 연관 키워드 검색 트렌드 */}
-            {(relatedLoading || relatedKeywords.length > 0) && (
-              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#9ca3af" }}>연관 키워드 검색 트렌드</p>
-                  <span className="text-[10px]" style={{ color: "#9ca3af" }}>네이버 DataLab</span>
-                </div>
-                {relatedLoading ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0"
-                      style={{ borderColor: "#00aa6c", borderTopColor: "transparent" }} />
-                    <span className="text-xs" style={{ color: "#9ca3af" }}>연관 검색량 조회 중...</span>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {relatedKeywords.map((kw, i) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <span className="text-sm font-medium" style={{ color: "#0f2a1e" }}>{kw.keyword}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full"
-                            style={{ background: "#e8f5f0", color: "#00aa6c" }}>지수 {kw.avg}</span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-                            style={{
-                              background: kw.growth > 5 ? "#e8f5f0" : kw.growth < -5 ? "#fff1f0" : "#f0f4f3",
-                              color: kw.growth > 5 ? "#00aa6c" : kw.growth < -5 ? "#ef4444" : "#9ca3af",
-                            }}>
-                            {kw.growth > 0 ? "+" : ""}{kw.growth}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Optimized names */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9ca3af" }}>추천 상품명 3가지</p>
-              <div className="space-y-2.5">
-                {result.optimized_names?.map((item, i) => (
-                  <div key={i} className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full text-white"
-                        style={{ background: strategyColors[i] }}>{strategyLabels[i]}</span>
-                      <div className="flex flex-col items-end gap-1">
-                        <button onClick={() => handleCopy(item.name, i)}
-                          className="text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition-colors"
-                          style={{ background: copied === i ? "#e8f5f0" : "#f0f0f5", color: copied === i ? "#00aa6c" : "#6b7280" }}>
-                          {copied === i ? "✓ 복사됨!" : "📋 복사"}
-                        </button>
-                        {copied === i && (
-                          <span className="text-[10px]" style={{ color: "#9ca3af" }}>
-                            → 스마트스토어 센터 &gt; 상품 수정 &gt; 상품명에 붙여넣기
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="font-bold text-sm mb-1.5" style={{ color: "#0f2a1e" }}>{item.name}</p>
-                    <p className="text-xs mb-2" style={{ color: "#6b7280" }}>{item.reason}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {item.keywords_used?.map((kw, j) => (
-                        <span key={j} className="text-[10px] px-2 py-0.5 rounded-full"
-                          style={{ background: "#e8f5f0", color: "#00aa6c" }}>#{kw}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <label style={labelStyle}>현재 상품명 <span style={{ color: "#ef567c", textTransform: "none", fontWeight: 600 }}>*</span></label>
+              <input type="text" value={productName}
+                onChange={e => setProductName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSubmit()}
+                placeholder="예) 제습제 무향 450ml 4개입"
+                style={inputStyle} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={labelStyle}>카테고리</label>
+                <input type="text" value={category} onChange={e => setCategory(e.target.value)}
+                  placeholder="예) 생활용품 > 제습제" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>핵심 키워드</label>
+                <input type="text" value={keywords} onChange={e => setKeywords(e.target.value)}
+                  placeholder="예) 제습제, 습기제거, 옷장용" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={labelStyle}>
+                  월 검색량
+                  {trendLoading && <span style={{ color: "#b0b5bc", marginLeft: "6px", fontWeight: 400, textTransform: "none" }}>조회 중...</span>}
+                  {trendData && !trendLoading && <span style={{ color: "#8f9399", marginLeft: "6px", fontWeight: 400, textTransform: "none" }}>지수 {trendData.avgRatio}</span>}
+                </label>
+                <input type="text" value={searchVolume} onChange={e => setSearchVolume(e.target.value)}
+                  placeholder="자동 조회됨" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>
+                  경쟁 상품수
+                  {productCountLoading && <span style={{ color: "#b0b5bc", marginLeft: "6px", fontWeight: 400, textTransform: "none" }}>조회 중...</span>}
+                  {productCount !== null && !productCountLoading && <span style={{ color: "#8f9399", marginLeft: "6px", fontWeight: 400, textTransform: "none" }}>{productCount.toLocaleString()}개</span>}
+                </label>
+                <input type="text" value={competitorCount} onChange={e => setCompetitorCount(e.target.value)}
+                  placeholder="자동 조회됨" style={inputStyle} />
               </div>
             </div>
 
-            {/* SEO Tips */}
-            {result.seo_tips?.length > 0 && (
-              <div className="rounded-xl p-4" style={{ background: "#f7faf9", border: "1px solid #e0ede9" }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: "#9ca3af" }}>SEO 노출 팁</p>
-                <div className="space-y-2">
-                  {result.seo_tips.map((tip, i) => (
-                    <div key={i} className="flex gap-2.5 items-start">
-                      <span className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
-                        style={{ background: "#00aa6c" }}>{i + 1}</span>
-                      <p className="text-sm" style={{ color: "#374151" }}>{tip}</p>
-                    </div>
-                  ))}
+            <button onClick={() => setShowItemscout(v => !v)}
+              style={{ fontSize: "12px", color: "#8f9399", background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+              {showItemscout ? "▾" : "▸"} 아이템스카우트 고급 입력 (선택)
+            </button>
+            {showItemscout && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", padding: "12px 14px", background: "#f7f8fa", borderRadius: "8px" }}>
+                <div>
+                  <label style={labelStyle}>클릭률 (CTR)</label>
+                  <input type="text" value={clickRate} onChange={e => setClickRate(e.target.value)} placeholder="예) 3.2%" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>판매가 범위</label>
+                  <input type="text" value={priceRange} onChange={e => setPriceRange(e.target.value)} placeholder="예) 8000~15000" style={inputStyle} />
                 </div>
               </div>
             )}
 
-            {/* Avoid */}
-            {result.avoid?.length > 0 && (
-              <div className="rounded-xl p-4 bg-red-50 border border-red-100">
-                <p className="text-[10px] font-bold uppercase tracking-widest mb-3 text-red-500">이것은 피하세요</p>
-                <div className="space-y-1.5">
-                  {result.avoid.map((item, i) => (
-                    <div key={i} className="flex gap-2 items-start">
-                      <span className="text-red-400 text-xs mt-0.5">✕</span>
-                      <p className="text-xs text-red-600">{item}</p>
-                    </div>
-                  ))}
-                </div>
+            {(relatedLoading || relatedKeywords.length > 0) && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+                <span style={{ fontSize: "11px", color: "#9ca3af" }}>연관:</span>
+                {relatedLoading && <span style={{ fontSize: "11px", color: "#b0b5bc" }}>조회 중...</span>}
+                {relatedKeywords.map(rk => (
+                  <button key={rk.keyword}
+                    onClick={() => setKeywords(prev => prev ? `${prev}, ${rk.keyword}` : rk.keyword)}
+                    style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", border: "1px solid #e8eaed", background: "#f7f8fa", color: "#4a4f57", cursor: "pointer" }}>
+                    + {rk.keyword}
+                  </button>
+                ))}
               </div>
             )}
 
-            <PolicyFilter text={result.optimized_names?.map(n => n.name).join(" ")} />
+            <button onClick={handleSubmit} disabled={loading || streaming || !productName}
+              style={{
+                width: "100%", padding: "13px 0", borderRadius: "8px", border: "none",
+                background: "#ef567c", color: "#fff", fontSize: "14px", fontWeight: 600,
+                cursor: "pointer", opacity: loading || streaming || !productName ? 0.45 : 1, marginTop: "4px",
+              }}>
+              {loading
+                ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />연결 중...
+                  </span>
+                : "✨ 상품명 최적화하기"}
+            </button>
+          </div>
+
+          {streaming && (
+            <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "12px", color: "#6b7280" }}>AI 상품명 분석 작성 중</span>
+              {[0, 1, 2].map(i => (
+                <span key={i} className="w-1 h-1 rounded-full animate-bounce" style={{ background: "#9ca3af", animationDelay: `${i * 0.18}s` }} />
+              ))}
+            </div>
+          )}
+          {error && !streaming && (
+            <div style={{ marginTop: "12px", padding: "12px 14px", borderRadius: "8px", background: "#fff1f0", border: "1px solid #fca5a5", fontSize: "13px", color: "#dc2626" }}>{error}</div>
+          )}
+        </div>
+
+        {/* Results card */}
+        {result && !streaming && (
+          <div ref={resultRef} style={{ background: "#ffffff", border: "1px solid #e8eaed", borderRadius: "8px", padding: "20px", marginTop: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+              {result.action_command && (
+                <div style={{ padding: "12px 14px", borderRadius: "8px", background: "#fafafa", borderLeft: "3px solid #d5d8dc" }}>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "3px" }}>⚡ 지금 바로 실행하세요</p>
+                  <p style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a" }}>{result.action_command}</p>
+                </div>
+              )}
+
+              {result.score?.issues && result.score.issues.length > 0 && (
+                <div>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>현재 상품명 문제</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {result.score.issues.map((issue, i) => (
+                      <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                        <span style={{ fontSize: "11px", color: "#9ca3af", marginTop: "1px" }}>✕</span>
+                        <p style={{ fontSize: "13px", color: "#4a4f57" }}>{issue}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {result.optimized_names?.slice(0, 3).length > 0 && (
+                <div>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>추천 상품명 (최대 3개)</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {result.optimized_names.slice(0, 3).map((item, i) => {
+                      const badge = STRATEGY_BADGE[i] ?? STRATEGY_BADGE[2];
+                      return (
+                        <div key={i} style={{ padding: "14px 16px", border: "1px solid #e8eaed", borderRadius: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                            <span style={{ fontSize: "10px", fontWeight: 500, padding: "2px 8px", borderRadius: "10px", background: badge.bg, color: badge.color }}>
+                              {badge.label}
+                            </span>
+                            <button onClick={() => handleCopy(item.name, i)}
+                              style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "6px", border: "1px solid #e8eaed", background: "#f7f8fa", color: "#6b7280", cursor: "pointer" }}>
+                              {copied === i ? "✓ 복사됨" : "복사"}
+                            </button>
+                          </div>
+                          <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", marginBottom: "4px", lineHeight: 1.4 }}>{item.name}</p>
+                          <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>{item.reason}</p>
+                          {item.keywords_used?.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                              {item.keywords_used.map((kw, j) => (
+                                <span key={j} style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "8px", background: "#f5f5f5", color: "#8f9399" }}>#{kw}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {result.keyword_strategy && (
+                <div>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>키워드 전략</p>
+                  <div style={{ padding: "12px 14px", border: "1px solid #e8eaed", borderRadius: "8px" }}>
+                    <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>
+                      메인: <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{result.keyword_strategy.main_keyword}</span>
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                      {result.keyword_strategy.sub_keywords?.map((kw, i) => (
+                        <span key={i} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", border: "1px solid #e8eaed", background: "#f7f8fa", color: "#4a4f57" }}>{kw}</span>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: "12px", color: "#6b7280" }}>{result.keyword_strategy.recommendation}</p>
+                  </div>
+                </div>
+              )}
+
+              {result.seo_tips?.length > 0 && (
+                <div>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>SEO 개선 팁</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                    {result.seo_tips.map((tip, i) => (
+                      <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                        <span style={{ fontSize: "10px", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0f1f3", color: "#6b7280", borderRadius: "4px", flexShrink: 0, marginTop: "1px" }}>{i + 1}</span>
+                        <p style={{ fontSize: "13px", color: "#4a4f57", lineHeight: 1.55 }}>{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {result.avoid?.length > 0 && (
+                <div>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>피해야 할 표현</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {result.avoid.map((a, i) => (
+                      <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                        <span style={{ fontSize: "11px", color: "#9ca3af", marginTop: "1px" }}>✕</span>
+                        <p style={{ fontSize: "13px", color: "#4a4f57" }}>{a}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 0" }}>
+                <span style={{ fontSize: "11px", color: "#9ca3af" }}>✓</span>
+                <span style={{ fontSize: "12px", color: "#8f9399" }}>네이버 정책 검토 완료</span>
+                <PolicyFilter text={[...(result.optimized_names?.map(n => n.name) ?? []), ...(result.seo_tips ?? [])].join(" ")} />
+              </div>
+            </div>
           </div>
         )}
       </div>
