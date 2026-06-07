@@ -24,6 +24,8 @@ export default function MezzaninePage() {
   const [activeTab, setActiveTab] = useState<TabId>("discover");
   const [ready, setReady] = useState(false);
 
+  const isFullHeight = activeTab === "discover" || activeTab === "diagnose";
+
   useEffect(() => {
     async function init() {
       try {
@@ -57,8 +59,8 @@ export default function MezzaninePage() {
           height: "44px",
           flexShrink: 0,
         }}>
-          <span style={{ fontSize: "13px", fontWeight: 700, color: "#3b4fd8", letterSpacing: "-0.01em" }}>
-            Aiges Pontos
+          <span style={{ fontSize: "14px", fontWeight: 800, color: "#111827", letterSpacing: "-0.03em" }}>
+            MEZZANINE
           </span>
           <span style={{ fontSize: "11px", color: "#9ca3af" }}>북가좌</span>
         </div>
@@ -111,7 +113,10 @@ export default function MezzaninePage() {
       </header>
 
       {/* ── 메인 ── */}
-      <main style={{ padding: "24px 24px 80px" }}>
+      <main style={isFullHeight
+        ? { height: "calc(100vh - 44px)", overflow: "hidden" }
+        : { padding: "20px 20px 80px", minHeight: "calc(100vh - 44px)" }
+      }>
         {!ready ? (
           <div style={{
             textAlign: "center", padding: "80px 0",

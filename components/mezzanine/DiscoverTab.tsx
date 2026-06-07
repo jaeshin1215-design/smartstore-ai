@@ -143,7 +143,7 @@ export default function DiscoverTab() {
   const detail = DETAIL[selected];
 
   return (
-    <div style={{ display: "flex", gap: "0", fontFamily: FF, height: "calc(100vh - 100px)", overflow: "hidden" }}>
+    <div style={{ display: "flex", gap: "0", fontFamily: FF, height: "100%", overflow: "hidden" }}>
 
       {/* 좌: 사이드바 */}
       <div style={{

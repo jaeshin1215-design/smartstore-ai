@@ -99,7 +99,13 @@ export default function OptimizeTab() {
   const [capex, setCapex]       = useState("");
   const [opFeeRate, setOpFeeRate] = useState("10");
   const [weeks, setWeeks]       = useState("4");
-  const [result, setResult]     = useState<Result | null>(null);
+  const [result, setResult]     = useState<Result | null>({
+    ownerNOI: 2_550_000,
+    brandCost: 4_500_000,
+    opFee: 300_000,
+    brandROI: 0.57,
+    signal: "red",
+  });
 
   const calc = () => {
     const r  = Number(rent)      || 0;
@@ -125,7 +131,7 @@ export default function OptimizeTab() {
     <div style={{
       display: "grid",
       gridTemplateColumns: "200px minmax(0,720px)",
-      gap: "0 48px",
+      gap: "0 25vw",
       fontFamily: FF,
     }}>
 
