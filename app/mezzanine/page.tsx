@@ -24,7 +24,7 @@ export default function MezzaninePage() {
   const [activeTab, setActiveTab] = useState<TabId>("discover");
   const [ready, setReady] = useState(false);
 
-  const isFullHeight = activeTab === "discover" || activeTab === "diagnose";
+  const isFullHeight = activeTab === "diagnose";
 
   useEffect(() => {
     async function init() {

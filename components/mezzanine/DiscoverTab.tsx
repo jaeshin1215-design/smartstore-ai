@@ -143,13 +143,13 @@ export default function DiscoverTab() {
   const detail = DETAIL[selected];
 
   return (
-    <div style={{ display: "flex", gap: "0", fontFamily: FF, height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "210px minmax(0,720px)", gap: "0 25vw", fontFamily: FF }}>
 
       {/* 좌: 사이드바 */}
       <div style={{
-        width: "210px", flexShrink: 0,
         background: "#F7F8FA",
         borderRight: "1px solid #e8eaed",
+        borderRadius: "8px",
         padding: "14px 12px",
         overflowY: "auto",
       }}>
@@ -195,7 +195,7 @@ export default function DiscoverTab() {
       </div>
 
       {/* 우: 메인 */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+      <div style={{ padding: "20px 0", overflowY: "auto" }}>
 
         {/* 제목 + 적합도 */}
         <div style={{ marginBottom: "20px" }}>
