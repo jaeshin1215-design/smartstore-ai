@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import MatrixBox, { getProductColor } from "./MatrixBox";
+import MatrixBox, { getProductColor, MEZZANINE_CONFIG, SELLFIT_CONFIG } from "./MatrixBox";
 import PolicyFilter from "./PolicyFilter";
+import { DemoBadge } from "./DemoBadge";
 
-const STORE_KEY = "sellfit_store_id";
+const STORE_KEY_MAP = {
+  sellfit:   "sellfit_store_id",
+  mezzanine: "mezzanine_store_id",
+} as const;
 
 interface OfferDraft {
   dream_result: string;
@@ -34,7 +38,15 @@ interface Product {
   rawY?: number;
 }
 
-export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: string) => void }) {
+export default function DiagnosisTab({
+  onSeoNavigate,
+  mode = "sellfit",
+}: {
+  onSeoNavigate?: (keyword: string) => void;
+  mode?: "sellfit" | "mezzanine";
+}) {
+  const storeKey = STORE_KEY_MAP[mode];
+  const matrixConfig = mode === "mezzanine" ? MEZZANINE_CONFIG : SELLFIT_CONFIG;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [storeId, setStoreId] = useState<string | null>(null);
@@ -83,7 +95,7 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
   }, [selectedProductId]);
 
   useEffect(() => {
-    const sid = localStorage.getItem(STORE_KEY);
+    const sid = localStorage.getItem(storeKey);
     if (sid) {
       setStoreId(sid);
       loadProducts(sid);
@@ -136,6 +148,7 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
           matrixX: selectedProduct.matrix_x ?? 50,
           matrixY: selectedProduct.matrix_y ?? 50,
           decision: decisions[selectedProductId] || "",
+          mode,
         }),
       });
       if (res.ok) {
@@ -167,15 +180,58 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
   }
 
   if (!storeId) {
+    const isMezzanine = mode === "mezzanine";
+    const seedEndpoint = isMezzanine ? "/api/db/seed-mezzanine" : "/api/db/seed";
+    const demoStoreId  = isMezzanine ? "mezzanine-demo-001" : "demo-store-001";
+    const btnLabel     = isMezzanine ? "✨ 브랜드 데모 데이터 로드" : "✨ 데모 데이터로 즉시 확인";
+
     return (
-      <div style={{ 
-        textAlign: "center", 
-        padding: "80px 0", 
-        color: "#8f9399", 
-        fontSize: "13px", 
-        fontFamily: "'Pretendard', sans-serif" 
+      <div style={{
+        textAlign: "center", padding: "80px 0",
+        fontFamily: "'Pretendard', sans-serif",
       }}>
-        📌 설정 탭에서 스토어를 먼저 등록해주세요.
+        <span style={{ fontSize: "36px", display: "block", marginBottom: "16px" }}>
+          {isMezzanine ? "🏢" : "📊"}
+        </span>
+        <p style={{ fontSize: "15px", fontWeight: 700, color: "#0d0d0e", marginBottom: "8px" }}>
+          {isMezzanine ? "브랜드 데이터가 없습니다" : "스토어 데이터가 없습니다"}
+        </p>
+        <p style={{ fontSize: "13px", color: "#8f9399", marginBottom: "28px" }}>
+          {isMezzanine
+            ? "7개 입점 후보 브랜드를 매트릭스에 배치합니다."
+            : "데모 데이터로 매트릭스를 바로 확인할 수 있습니다."}
+        </p>
+        <button
+          onClick={async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            btn.innerText = "⏳ 로딩 중...";
+            try {
+              await fetch("/api/db/init", { method: "POST" });
+              await fetch("/api/db/migrate", { method: "POST" });
+              await fetch(seedEndpoint, { method: "POST" });
+              localStorage.setItem(storeKey, demoStoreId);
+              if (!isMezzanine) {
+                localStorage.setItem("product_registered", "true");
+                localStorage.setItem("sellfit_store_info", JSON.stringify({
+                  id: demoStoreId, name: "데모 스토어",
+                  email: "demo@sellfit.kr", kakao: "01000000000",
+                }));
+              }
+              window.location.reload();
+            } catch {
+              btn.disabled = false;
+              btn.innerText = btnLabel;
+            }
+          }}
+          style={{
+            padding: "12px 28px", background: "#3b4fd8", color: "white",
+            border: "none", borderRadius: "8px", fontSize: "14px",
+            fontWeight: 700, cursor: "pointer", fontFamily: "'Pretendard', sans-serif",
+          }}
+        >
+          {btnLabel}
+        </button>
       </div>
     );
   }
@@ -193,8 +249,12 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
     return true;
   });
 
-  /* Frill 파스텔 칩 — border 있는 옅은 칩 */
+  /* Frill 파스텔 칩 */
   const getProductStatus = (p: Product) => {
+    if (mode === "mezzanine") {
+      if (p.is_own === 1) return { label: "★ 공간 이력", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" };
+      return { label: "○ 엔진 후보", bg: "#f5f3ff", border: "#ddd6fe", text: "#6d28d9" };
+    }
     if (p.is_own === 1) return { label: "Planned", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" };
     if (p.is_own === 2) return { label: "Under consideration", bg: "#fdf2f8", border: "#f5d0e4", text: "#9d174d" };
     return { label: "In Development", bg: "#f5f3ff", border: "#ddd6fe", text: "#6d28d9" };
@@ -203,10 +263,11 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
   const getProductQuadrant = (p: Product) => {
     const mx = p.matrix_x !== null && p.matrix_x !== undefined ? p.matrix_x : 50;
     const my = p.matrix_y !== null && p.matrix_y !== undefined ? p.matrix_y : 50;
-    if (mx >= 50 && my >= 50) return { label: "Major Projects", bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" };
-    if (mx < 50 && my >= 50) return { label: "Quick Wins", bg: "#fefce8", border: "#fde68a", text: "#92400e" };
-    if (mx < 50 && my < 50) return { label: "Fill Ins", bg: "#f9fafb", border: "#e5e7eb", text: "#6b7280" };
-    return { label: "Thankless Tasks", bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" };
+    const q = matrixConfig.quadrants;
+    if (mx >= 50 && my >= 50) return { label: q.topRight,    bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" };
+    if (mx < 50  && my >= 50) return { label: q.topLeft,     bg: "#fefce8", border: "#fde68a", text: "#92400e" };
+    if (mx < 50  && my < 50)  return { label: q.bottomLeft,  bg: "#f9fafb", border: "#e5e7eb", text: "#6b7280" };
+    return                           { label: q.bottomRight, bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" };
   };
 
   return (
@@ -534,11 +595,11 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
                 if (id) setDrawerOpen(true);
               }}
               handleUpdateProduct={handleUpdateProduct}
-              onSeoNavigate={onSeoNavigate}
               showLabels={showLabels}
               showGrid={showGrid}
               hoverProductId={hoverProductId}
               setHoverProductId={setHoverProductId}
+              config={matrixConfig}
             />
           </div>
 
@@ -689,50 +750,78 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
 
                   {/* ■ Section 1: AI 진단 (데이터) */}
                   <div style={{ border: "1px solid #e8eaed", borderRadius: "8px", padding: "16px 18px" }}>
-                    <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af", marginBottom: "10px" }}>📊 AI 진단</p>
+                    <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af", marginBottom: "10px" }}>
+                      {mode === "mezzanine" ? "📍 배치 근거" : "📊 AI 진단"}
+                    </p>
                     {/* Data chips */}
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
                       <span style={{ fontSize: "11px", fontWeight: 500, padding: "2px 8px", borderRadius: "6px", background: getProductQuadrant(selectedProduct).bg, border: `1px solid ${getProductQuadrant(selectedProduct).border}`, color: getProductQuadrant(selectedProduct).text }}>
                         {getProductQuadrant(selectedProduct).label}
                       </span>
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
-                        수요 {selectedProduct.matrix_x ?? 50}
+                        {mode === "mezzanine" ? "공간 적합도" : "수요"} {selectedProduct.matrix_x ?? 50}
                       </span>
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
-                        마진율 {selectedProduct.matrix_y ?? 50}
+                        {mode === "mezzanine" ? "집객력" : "마진율"} {selectedProduct.matrix_y ?? 50}
                       </span>
                     </div>
                     {/* Diagnosis text */}
                     <p style={{ fontSize: "12px", color: "#4a4f57", lineHeight: 1.65, marginBottom: "12px" }}>
-                      {selectedProduct.is_own === 1
-                        ? `현재 ${getProductQuadrant(selectedProduct).label} 영역. 마진율을 방어하며 검색지수가 급상승하도록 SEO 최적화를 즉각 수행하세요. 상품명 공백 제거 및 핵심 속성 태그 보완을 권장합니다.`
-                        : `현재 ${getProductQuadrant(selectedProduct).label} 영역. 경쟁 키워드 입찰 한계선(CPC 350원 상한)을 고려하여 광고 효율을 모니터링하세요.`}
+                      {mode === "mezzanine"
+                        ? (selectedProduct.is_own === 1
+                          ? `${getProductQuadrant(selectedProduct).label} 영역. 공간의 실증 이력 — 이 브랜드가 이 공간과 이미 호흡한 결과다. 발굴 로직 + 현장 판단으로 배치한 예시.`
+                          : `${getProductQuadrant(selectedProduct).label} 영역. 엔진이 다녀간 행사 이력을 읽고 뽑은 후보. 미접촉 상태 — 파일럿 기간에 컨택·검증 예정.`)
+                        : (selectedProduct.is_own === 1
+                          ? `현재 ${getProductQuadrant(selectedProduct).label} 영역. 마진율을 방어하며 검색지수가 급상승하도록 SEO 최적화를 즉각 수행하세요.`
+                          : `현재 ${getProductQuadrant(selectedProduct).label} 영역. 경쟁 키워드 입찰 한계선(CPC 350원 상한)을 고려하여 광고 효율을 모니터링하세요.`)}
                     </p>
                     {/* Attribute chips */}
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
-                      {[
-                        `키워드: ${selectedProduct.keyword}`,
-                        `가격: ${selectedProduct.price.toLocaleString()}원`,
-                        `매입가: ${selectedProduct.purchase_price.toLocaleString()}원`,
-                      ].map(t => (
-                        <span key={t} style={{ fontSize: "10px", padding: "2px 8px", background: "#f9fafb", border: "1px solid #e8eaed", borderRadius: "5px", color: "#6b7280" }}>{t}</span>
-                      ))}
-                    </div>
-                    {/* SEO CTA */}
-                    <button onClick={() => onSeoNavigate?.(selectedProduct.keyword)}
-                      style={{ padding: "7px 14px", borderRadius: "6px", border: "none", background: "#ef567c", color: "white", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "'Pretendard', sans-serif" }}>
-                      🧭 SEO 최적화 →
-                    </button>
+                    {mode !== "mezzanine" && (
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
+                        {[
+                          `키워드: ${selectedProduct.keyword}`,
+                          `가격: ${selectedProduct.price.toLocaleString()}원`,
+                          `매입가: ${selectedProduct.purchase_price.toLocaleString()}원`,
+                        ].map(t => (
+                          <span key={t} style={{ fontSize: "10px", padding: "2px 8px", background: "#f9fafb", border: "1px solid #e8eaed", borderRadius: "5px", color: "#6b7280" }}>{t}</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* SEO CTA (sellfit only) */}
+                    {mode !== "mezzanine" && (
+                      <button onClick={() => onSeoNavigate?.(selectedProduct.keyword)}
+                        style={{ padding: "7px 14px", borderRadius: "6px", border: "none", background: "#ef567c", color: "white", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "'Pretendard', sans-serif" }}>
+                        🧭 SEO 최적화 →
+                      </button>
+                    )}
+                    {/* 경제 지표 (mezzanine only) */}
+                    {mode === "mezzanine" && (
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                        {["예상 집객", "월 매출 기여", "NOI 기여"].map(label => (
+                          <span key={label} style={{
+                            fontSize: "10px", padding: "3px 10px",
+                            background: "#f9fafb", border: "1px solid #e8eaed",
+                            borderRadius: "5px", color: "#9ca3af",
+                          }}>
+                            {label}: <strong style={{ color: "#c4c8ce" }}>[파일럿 후 실측]</strong>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* ■ Section 2: 직관 노트 (사람 입력) */}
                   <div style={{ border: "1px solid #e8eaed", borderRadius: "8px", padding: "16px 18px" }}>
-                    <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af", marginBottom: "4px" }}>✏️ 직관 노트</p>
+                    <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af", marginBottom: "4px" }}>✏️ 현장 노트</p>
                     <p style={{ fontSize: "11px", color: "#b0b5bc", marginBottom: "10px" }}>
-                      데이터로 안 잡히는 현장 감. 이다슬·빈 대표의 직접 메모.
+                      {mode === "mezzanine"
+                        ? "데이터로 안 잡히는 현장 감. 건축주·담당자 직접 메모."
+                        : "데이터로 안 잡히는 현장 감. 이다슬·빈 대표의 직접 메모."}
                     </p>
                     <textarea
-                      placeholder='"스테디다 / 호응도 좋다 / 재고 빠진다"'
+                      placeholder={mode === "mezzanine"
+                        ? '"건축주 코멘트 / 선호도 / 계약 조건"'
+                        : '"스테디다 / 호응도 좋다 / 재고 빠진다"'}
                       value={intuitionNotes[selectedProductId ?? ""] ?? ""}
                       onChange={e => setIntuitionNotes(prev => ({ ...prev, [selectedProductId!]: e.target.value }))}
                       rows={3}
@@ -761,7 +850,10 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
                   <div style={{ border: "1px solid #e8eaed", borderRadius: "8px", padding: "16px 18px" }}>
                     <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af", marginBottom: "12px" }}>⚡ 결정</p>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      {["개발", "소싱", "위탁", "관리유지", "철수"].map(d => {
+                      {(mode === "mezzanine"
+                        ? ["입점 확정", "협상", "조건부", "보류"]
+                        : ["개발", "소싱", "위탁", "관리유지", "철수"]
+                      ).map(d => {
                         const isChosen = decisions[selectedProductId ?? ""] === d;
                         return (
                           <button key={d}
@@ -803,23 +895,27 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
                     return (
                       <div style={{ border: "1px solid #e8eaed", borderRadius: "8px", padding: "16px 18px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af" }}>📣 오퍼 설계</p>
+                          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af" }}>
+                            {mode === "mezzanine" ? "📩 입점 제안 초안" : "📣 오퍼 설계"}
+                          </p>
                           <button
                             onClick={handleGenerateOffer}
                             disabled={offerLoading}
                             style={{
                               padding: "5px 12px", borderRadius: "5px", border: "none",
-                              background: offerLoading ? "#f0f1f3" : "#ef567c",
+                              background: offerLoading ? "#f0f1f3" : (mode === "mezzanine" ? "#3b4fd8" : "#ef567c"),
                               color: offerLoading ? "#9ca3af" : "white",
                               fontSize: "11px", fontWeight: 600, cursor: offerLoading ? "not-allowed" : "pointer",
                               fontFamily: "inherit",
                             }}
                           >
-                            {offerLoading ? "생성 중..." : "AI 초안 생성"}
+                            {offerLoading ? "생성 중..." : (mode === "mezzanine" ? "제안 초안 생성" : "AI 초안 생성")}
                           </button>
                         </div>
                         <p style={{ fontSize: "11px", color: "#b0b5bc", marginBottom: "12px" }}>
-                          AI 초안 → 빈 대표·이다슬이 현장 감각으로 다듬기
+                          {mode === "mezzanine"
+                            ? "AI 초안 → 담당자가 현장 감각으로 다듬기. 승인 시 Aiges Pontos 기획 파트너 명의로 발송."
+                            : "AI 초안 → 빈 대표·이다슬이 현장 감각으로 다듬기"}
                         </p>
 
                         {offer ? (
@@ -854,6 +950,80 @@ export default function DiagnosisTab({ onSeoNavigate }: { onSeoNavigate?: (keywo
                             "AI 초안 생성" 버튼으로 오퍼 초안을 만드세요.
                           </p>
                         )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ■ Section 5: 전환 마케팅 */}
+                  {(() => {
+                    if (mode === "mezzanine") {
+                      return (
+                        <div style={{ border: "1px solid #fde68a", borderRadius: "8px", padding: "16px 18px", background: "#fffbf0" }}>
+                          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#92400e", marginBottom: "10px" }}>
+                            ⚡ 집객·전환
+                          </p>
+                          <DemoBadge note="매칭된 브랜드 팝업을 이렇게 영상·인스타로 집객합니다 — Jae 제작 영상 슬롯" />
+                          {/* 영상 슬롯 — Jae 제작 영상 파일 전달 후 src 교체 */}
+                          <div style={{
+                            width: "100%", aspectRatio: "16/9",
+                            background: "#1a1a1a", borderRadius: "10px",
+                            marginBottom: "12px",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            flexDirection: "column", gap: "6px",
+                          }}>
+                            <span style={{ fontSize: "20px" }}>🎬</span>
+                            <span style={{ color: "#6b7280", fontSize: "12px", fontFamily: "inherit" }}>
+                              메자닌 집객 영상 — 제작 후 교체 예정
+                            </span>
+                          </div>
+                          <a
+                            href="https://www.instagram.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", background: "#3b4fd8", color: "white", fontSize: "13px", fontWeight: 700, textDecoration: "none", borderRadius: "8px", boxSizing: "border-box", marginBottom: "8px" }}
+                          >
+                            📲 인스타 → 방문 전환 →
+                          </a>
+                          <p style={{ fontSize: "10px", color: "#b45309", textAlign: "center", margin: 0 }}>
+                            증산역까지의 유입을 영상·인스타로 디지털 집객합니다
+                          </p>
+                        </div>
+                      );
+                    }
+                    const qMx = selectedProduct.matrix_x ?? 50;
+                    const qMy = selectedProduct.matrix_y ?? 50;
+                    if (!(qMx < 50 && qMy >= 50)) return null;
+                    return (
+                      <div style={{ border: "1px solid #fde68a", borderRadius: "8px", padding: "16px 18px", background: "#fffbf0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#92400e" }}>⚡ 전환 마케팅</p>
+                          <span style={{ fontSize: "9px", fontWeight: 600, padding: "1px 6px", borderRadius: "4px", background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e" }}>Quick Wins</span>
+                        </div>
+                        <p style={{ fontSize: "11px", color: "#b45309", marginBottom: "12px" }}>
+                          밀어줄 상품. 전환형 영상 + 랜딩으로 연결됩니다.
+                        </p>
+                        <video
+                          src="/videos/sugyeong_final.mp4"
+                          controls
+                          playsInline
+                          style={{ width: "100%", borderRadius: "10px", marginBottom: "12px", background: "#0d0d0d", display: "block" }}
+                        />
+                        <a
+                          href="https://sellfit.kr/landing/plant"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", background: "#ef567c", color: "white", fontSize: "13px", fontWeight: 700, textDecoration: "none", borderRadius: "8px", boxSizing: "border-box", marginBottom: "8px" }}
+                        >
+                          랜딩 미리보기 →
+                        </a>
+                        <a
+                          href="/pipeline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", width: "100%", padding: "9px", background: "white", color: "#4a4f57", fontSize: "12px", fontWeight: 600, textDecoration: "none", borderRadius: "8px", boxSizing: "border-box", border: "1px solid #e8eaed" }}
+                        >
+                          📲 파이프라인 — 인스타 배포·측정 →
+                        </a>
                       </div>
                     );
                   })()}

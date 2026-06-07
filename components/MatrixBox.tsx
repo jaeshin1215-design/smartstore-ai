@@ -45,6 +45,39 @@ interface Bounds {
   maxY: number;
 }
 
+export interface MatrixConfig {
+  axisX: string;
+  axisY: string;
+  quadrants: {
+    topLeft: string;
+    topRight: string;
+    bottomLeft: string;
+    bottomRight: string;
+  };
+}
+
+export const SELLFIT_CONFIG: MatrixConfig = {
+  axisX: "수요(검색지수)",
+  axisY: "마진율",
+  quadrants: {
+    topLeft:     "Quick Wins",
+    topRight:    "Major Projects",
+    bottomLeft:  "Fill Ins",
+    bottomRight: "Thankless Tasks",
+  },
+};
+
+export const MEZZANINE_CONFIG: MatrixConfig = {
+  axisX: "Space Fit (공간 적합도)",
+  axisY: "Draw (집객력)",
+  quadrants: {
+    topLeft:     "Crowd Pullers",
+    topRight:    "Prime Picks",
+    bottomLeft:  "Wild Card",
+    bottomRight: "Curated Gems",
+  },
+};
+
 interface MatrixBoxProps {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
@@ -55,6 +88,7 @@ interface MatrixBoxProps {
   showGrid?: boolean;
   hoverProductId?: string | null;
   setHoverProductId?: (id: string | null) => void;
+  config?: MatrixConfig;
 }
 
 export default function MatrixBox({
@@ -62,11 +96,11 @@ export default function MatrixBox({
   setProducts,
   setSelectedProductId,
   handleUpdateProduct,
-  onSeoNavigate,
   showLabels = true,
   showGrid = true,
   hoverProductId,
-  setHoverProductId
+  setHoverProductId,
+  config = SELLFIT_CONFIG,
 }: MatrixBoxProps) {
   const [bounds, setBounds] = useState<Bounds | null>({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -325,12 +359,12 @@ export default function MatrixBox({
           <line x1={PX} y1={PY} x2={PX} y2={PY + PLOT_H} stroke="#e8eaed" strokeWidth="1" style={{ pointerEvents: "none" }} />
           <line x1={PX} y1={PY + PLOT_H} x2={PX + PLOT_W} y2={PY + PLOT_H} stroke="#e8eaed" strokeWidth="1" style={{ pointerEvents: "none" }} />
 
-          {/* A. 사분면 라벨 — Frill 실측: 13px, 연한 회색, 중앙 배경처럼 */}
+          {/* A. 사분면 라벨 */}
           <g style={{ pointerEvents: "none", userSelect: "none" }}>
-            <text x={PX + PLOT_W / 4} y={PY + PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" opacity="1" fontFamily="'Pretendard', sans-serif">Quick Wins</text>
-            <text x={PX + 3 * PLOT_W / 4} y={PY + PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" opacity="1" fontFamily="'Pretendard', sans-serif">Major Projects</text>
-            <text x={PX + PLOT_W / 4} y={PY + 3 * PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" opacity="1" fontFamily="'Pretendard', sans-serif">Fill Ins</text>
-            <text x={PX + 3 * PLOT_W / 4} y={PY + 3 * PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" opacity="1" fontFamily="'Pretendard', sans-serif">Thankless Tasks</text>
+            <text x={PX + PLOT_W / 4} y={PY + PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" fontFamily="'Pretendard', sans-serif">{config.quadrants.topLeft}</text>
+            <text x={PX + 3 * PLOT_W / 4} y={PY + PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" fontFamily="'Pretendard', sans-serif">{config.quadrants.topRight}</text>
+            <text x={PX + PLOT_W / 4} y={PY + 3 * PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" fontFamily="'Pretendard', sans-serif">{config.quadrants.bottomLeft}</text>
+            <text x={PX + 3 * PLOT_W / 4} y={PY + 3 * PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" fontFamily="'Pretendard', sans-serif">{config.quadrants.bottomRight}</text>
           </g>
 
           {/* B. 사분면 경계선 — Frill 실측: 얇은 실선 #e2e8f0 */}
@@ -351,14 +385,12 @@ export default function MatrixBox({
             );
           })}
 
-          {/* D. 축 라벨 — Y축: 왼쪽 마진 중앙 세로 / X축: 플롯 아래 좌측 */}
-          {/* X축 */}
+          {/* D. 축 라벨 */}
           <text x={PX + 6} y={PY + PLOT_H + 24} textAnchor="start"
             fill="#c4c8ce" fontSize="10" fontWeight="400"
             style={{ pointerEvents: "none", userSelect: "none", fontFamily: "'Pretendard', sans-serif" }}>
-            수요(검색지수) →
+            {config.axisX} →
           </text>
-          {/* Y축 — Frill: ↑ 위, 마진율 아래로 읽히는 방향 (rotate 90°) */}
           <text x={PX - 20} y={PY + PLOT_H - 55} textAnchor="middle"
             fill="#c4c8ce" fontSize="10" fontWeight="400"
             style={{ pointerEvents: "none", userSelect: "none", fontFamily: "'Pretendard', sans-serif" }}>
@@ -369,10 +401,10 @@ export default function MatrixBox({
             textAnchor="start"
             fill="#c4c8ce" fontSize="10" fontWeight="400"
             style={{ pointerEvents: "none", userSelect: "none", fontFamily: "'Pretendard', sans-serif" }}>
-            마진율
+            {config.axisY}
           </text>
 
-          {/* E. 점 렌더링 (자사 채움 ●, 경쟁사/후보 비어있음 ○ 복구) */}
+          {/* E. 점 렌더링 — is_own===1: filled ★ 이력 / 그 외: hollow [ ] 후보 */}
           {(() => {
             const spreadCoords = getSpreadCoordinates(products);
             return products.map((p) => {
@@ -381,14 +413,13 @@ export default function MatrixBox({
               const { cx, cy, mx, my, ly, labelPosition } = coords;
 
               const isHovered = p.id === hoverProductId;
-              /* dim은 hover할 때만 트리거 — selectedProductId는 dim에 영향 없음 */
               const hasActive = !!hoverProductId;
               const isActive = isHovered;
               const dotColor = getProductColor(p.id);
               const r = 5;
               const dotOpacity = hasActive ? (isActive ? 1 : 0.2) : 1;
-              /* 텍스트: hover active면 해당 dotColor, dim이면 연한 회색, 평상시 기본 */
               const textFill = hasActive ? (isActive ? dotColor : "#c4c8ce") : "#6b7280";
+              const isLegacy = p.is_own === 1; // ★ 공간 이력 (filled) vs [ ] 후보 (hollow)
 
               return (
                 <g
@@ -398,16 +429,23 @@ export default function MatrixBox({
                   onMouseLeave={() => setHoverProductId?.(null)}
                   onMouseDown={e => handleMouseDown(e, p.id, mx, my)}
                 >
-                  {/* 선택/hover halo */}
+                  {/* hover halo */}
                   {isActive && (
                     <circle cx={cx} cy={cy} r={r + 6} fill={dotColor} fillOpacity="0.15" />
                   )}
 
-                  {/* circle */}
-                  <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
-                    fill={dotColor} stroke="white" strokeWidth="1.5"
-                    style={{ transition: "r 0.1s ease" }}
-                  />
+                  {/* ★ 이력(filled) vs [ ] 후보(hollow) */}
+                  {isLegacy ? (
+                    <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
+                      fill={dotColor} stroke="white" strokeWidth="1.5"
+                      style={{ transition: "r 0.1s ease" }}
+                    />
+                  ) : (
+                    <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
+                      fill="white" stroke={dotColor} strokeWidth="2"
+                      style={{ transition: "r 0.1s ease" }}
+                    />
+                  )}
                   <circle cx={cx} cy={cy} r="18" fill="transparent" />
 
                   {showLabels && renderNameLines(p.name, cx, ly, labelPosition, textFill)}
@@ -415,6 +453,30 @@ export default function MatrixBox({
               );
             });
           })()}
+
+          {/* F. 범례 (mezzanine 모드에서만 — 우하단 고정) */}
+          {config !== SELLFIT_CONFIG && (
+            <g style={{ pointerEvents: "none", userSelect: "none" }}>
+              <rect
+                x={PX + PLOT_W - 200} y={PY + PLOT_H - 42}
+                width="196" height="36"
+                rx="4" ry="4"
+                fill="white" stroke="#e8eaed" strokeWidth="1"
+              />
+              {/* ★ 이력 */}
+              <circle cx={PX + PLOT_W - 188} cy={PY + PLOT_H - 30} r="4" fill="#4a4f57" />
+              <text x={PX + PLOT_W - 180} y={PY + PLOT_H - 26}
+                fontSize="9" fill="#6b7280" fontFamily="'Pretendard', sans-serif">
+                ★ 공간의 실증 이력
+              </text>
+              {/* [ ] 후보 */}
+              <circle cx={PX + PLOT_W - 188} cy={PY + PLOT_H - 16} r="4" fill="white" stroke="#4a4f57" strokeWidth="1.5" />
+              <text x={PX + PLOT_W - 180} y={PY + PLOT_H - 12}
+                fontSize="9" fill="#6b7280" fontFamily="'Pretendard', sans-serif">
+                ○ 엔진 후보 (미접촉 · 파일럿 대상)
+              </text>
+            </g>
+          )}
         </svg>
       </div>
     </div>
