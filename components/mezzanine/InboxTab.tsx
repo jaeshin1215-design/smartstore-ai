@@ -189,7 +189,18 @@ const ITEMS: AnnoItem[] = [
   },
 ];
 
-export default function InboxTab() {
+// para4 클릭 시 이동할 탭
+const PARA4_TARGET: Record<string, string> = {
+  m1: "diagnose",
+  m2: "optimize",
+  m3: "diagnose",
+};
+
+interface Props {
+  onNavigate: (tabId: string) => void;
+}
+
+export default function InboxTab({ onNavigate }: Props) {
   const [counts, setCounts] = useState<Record<string, Record<string, number>>>({});
   const react = (id: string, emoji: string) =>
     setCounts(p => ({ ...p, [id]: { ...(p[id] || {}), [emoji]: ((p[id] || {})[emoji] || 0) + 1 } }));
@@ -284,7 +295,12 @@ export default function InboxTab() {
 
                   <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "12px" }}>{item.para3}</p>
                   <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "28px" }}>
-                    <span style={{ color: "#3b4fd8", textDecoration: "underline", cursor: "pointer" }}>{item.para4}</span>
+                    <span
+                      onClick={() => onNavigate(PARA4_TARGET[item.id] ?? "diagnose")}
+                      style={{ color: "#3b4fd8", textDecoration: "underline", cursor: "pointer" }}
+                    >
+                      {item.para4}
+                    </span>
                   </p>
 
                   {/* Emoji reactions */}

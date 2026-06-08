@@ -5,7 +5,6 @@ import { DemoBadge } from "@/components/DemoBadge";
 
 const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
-// 카테고리 정의 (growth 배수 완전 제거)
 const CATS = [
   { id: "wellness",  label: "웰니스·아로마",      comment: "인증샷 화제 성장" },
   { id: "decor",     label: "감성 소품·인센스",    comment: "팝업 화제성 최상" },
@@ -15,7 +14,15 @@ const CATS = [
 ] as const;
 type CatId = typeof CATS[number]["id"];
 
-// 정적 상세 (desc·tags·fit은 라이브로 교체됨, bars·cases는 정적 유지)
+// CTA 클릭 시 이동할 탭 매핑
+const CTA_TARGET: Record<CatId, string> = {
+  wellness:  "diagnose",
+  decor:     "diagnose",
+  bodycare:  "inbox",
+  lifestyle: "setup",
+  local:     "setup",
+};
+
 const STATIC_DETAIL: Record<CatId, {
   desc: string;
   fit: number;
@@ -95,6 +102,11 @@ interface LiveCatData {
   risk: string;
 }
 
+interface Props {
+  onSelectCategory: (cat: { id: string; label: string; matchRate: number | null }) => void;
+  onNavigate: (tabId: string, updates?: Record<string, unknown>) => void;
+}
+
 function MiniBarChart({ bars, labels }: { bars: number[]; labels: string[] }) {
   const W = 340, H = 70, PX = 6, PY = 8;
   const max = Math.max(...bars, 1);
@@ -134,7 +146,6 @@ function MiniBarChart({ bars, labels }: { bars: number[]; labels: string[] }) {
   );
 }
 
-// matchRate 막대 (배수 칩 대체)
 function MatchRateBar({ rate }: { rate: number }) {
   const clamped = Math.min(100, Math.max(0, rate));
   const color = clamped >= 75 ? "#3b4fd8" : clamped >= 55 ? "#6272c4" : "#9ca3af";
@@ -165,15 +176,23 @@ function StarFit({ n }: { n: number }) {
   );
 }
 
-export default function DiscoverTab() {
+export default function DiscoverTab({ onSelectCategory, onNavigate }: Props) {
   const [selected, setSelected] = useState<CatId>("wellness");
   const [isLive, setIsLive] = useState(false);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveData, setLiveData] = useState<Record<string, LiveCatData>>({});
-  // 건축주 직접 입력 매출 추정 (케이스별 state, catId+index 키)
   const [ownerRev, setOwnerRev] = useState<Record<string, string>>({});
 
-  // 라이브 실행: 5개 카테고리 일괄 분석 후 캐싱
+  const handleSelectCat = (catId: CatId) => {
+    setSelected(catId);
+    const cat = CATS.find(c => c.id === catId)!;
+    onSelectCategory({
+      id: catId,
+      label: cat.label,
+      matchRate: liveData[catId]?.matchRate ?? null,
+    });
+  };
+
   const fetchLiveDiscover = async () => {
     if (liveLoading) return;
     setLiveLoading(true);
@@ -189,10 +208,14 @@ export default function DiscoverTab() {
       const json = await res.json();
       setLiveData(json.data);
       setIsLive(true);
-      // 라이브 후 matchRate 최고 카테고리로 자동 이동
       const top = Object.entries(json.data as Record<string, LiveCatData>)
         .sort((a, b) => b[1].matchRate - a[1].matchRate)[0];
-      if (top) setSelected(top[0] as CatId);
+      if (top) {
+        const topId = top[0] as CatId;
+        setSelected(topId);
+        const cat = CATS.find(c => c.id === topId)!;
+        onSelectCategory({ id: topId, label: cat.label, matchRate: top[1].matchRate });
+      }
     } catch {
       console.warn("라이브 Discover 실패 → 정적 데모로 대체");
       setLiveData({});
@@ -202,7 +225,6 @@ export default function DiscoverTab() {
     }
   };
 
-  // 사이드바 카테고리 정렬: 라이브면 matchRate 내림차순, 정적이면 원래 순서
   const sortedCats = isLive && Object.keys(liveData).length > 0
     ? [...CATS].sort((a, b) => (liveData[b.id]?.matchRate ?? 0) - (liveData[a.id]?.matchRate ?? 0))
     : [...CATS];
@@ -210,10 +232,19 @@ export default function DiscoverTab() {
   const staticDetail = STATIC_DETAIL[selected];
   const live = liveData[selected];
 
-  // 표시 데이터: 라이브면 동적, 아니면 정적
   const displayDesc = live?.description ?? staticDetail.desc;
   const displayTags = live?.tags ?? staticDetail.tags;
   const displayFit = live ? Math.min(5, Math.max(1, Math.round(live.matchRate / 20))) : staticDetail.fit;
+
+  const handleCTA = () => {
+    const cat = CATS.find(c => c.id === selected)!;
+    onSelectCategory({
+      id: selected,
+      label: cat.label,
+      matchRate: liveData[selected]?.matchRate ?? null,
+    });
+    onNavigate(CTA_TARGET[selected]);
+  };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "210px minmax(0,720px)", gap: "0 25vw", fontFamily: FF }}>
@@ -236,7 +267,7 @@ export default function DiscoverTab() {
             const isActive = selected === cat.id;
             const rate = liveData[cat.id]?.matchRate;
             return (
-              <div key={cat.id} onClick={() => setSelected(cat.id)} style={{
+              <div key={cat.id} onClick={() => handleSelectCat(cat.id)} style={{
                 display: "flex", alignItems: "center", gap: "7px",
                 padding: "8px 10px", borderRadius: "7px", cursor: "pointer",
                 background: isActive ? "#fff" : "transparent",
@@ -244,20 +275,17 @@ export default function DiscoverTab() {
                 boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.12s ease",
               }}>
-                {/* 순위 번호 */}
                 <span style={{
                   fontSize: "11px", fontWeight: 500, width: "18px", height: "18px",
                   display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   border: "1px solid #d5d8dc", borderRadius: "4px", color: "#9ca3af",
                 }}>{idx + 1}</span>
-                {/* 라벨 */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: "12px", fontWeight: 600, color: "#1a1a1a", margin: "0 0 1px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {cat.label}
                   </p>
                   <p style={{ fontSize: "10px", color: "#9ca3af", margin: 0 }}>{cat.comment}</p>
                 </div>
-                {/* matchRate 막대 (라이브 시) 또는 빈 자리 */}
                 {rate !== undefined
                   ? <MatchRateBar rate={rate} />
                   : <div style={{ width: "52px" }} />
@@ -267,7 +295,6 @@ export default function DiscoverTab() {
           })}
         </div>
 
-        {/* 라이브 버튼 영역 */}
         {isLive ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <div style={{
@@ -361,7 +388,7 @@ export default function DiscoverTab() {
           </div>
         )}
 
-        {/* 트렌드 차트 (정적 유지 — 예시 배지) */}
+        {/* 트렌드 차트 */}
         <div style={{
           background: "#fff", borderRadius: "12px", border: "1px solid #e8eaed",
           boxShadow: "0 2px 8px rgba(0,0,0,0.04)", padding: "20px 24px", marginBottom: "20px",
@@ -375,7 +402,7 @@ export default function DiscoverTab() {
           <MiniBarChart bars={staticDetail.bars} labels={staticDetail.labels} />
         </div>
 
-        {/* 유사 공간 사례 — 매출은 건축주 입력 인풋 */}
+        {/* 유사 공간 사례 */}
         <div style={{
           background: "#fff", borderRadius: "12px", border: "1px solid #e8eaed",
           boxShadow: "0 2px 8px rgba(0,0,0,0.04)", padding: "20px 24px", marginBottom: "20px",
@@ -436,13 +463,19 @@ export default function DiscoverTab() {
           ))}
         </div>
 
-        {/* CTA */}
-        <div style={{
-          background: "#f0f4ff", borderRadius: "8px", border: "1px solid #c7d2fe",
-          padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
+        {/* CTA — 실제 탭 전환 */}
+        <div
+          onClick={handleCTA}
+          style={{
+            background: "#f0f4ff", borderRadius: "8px", border: "1px solid #c7d2fe",
+            padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between",
+            cursor: "pointer", transition: "background 0.15s ease",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = "#e0eaff")}
+          onMouseLeave={e => (e.currentTarget.style.background = "#f0f4ff")}
+        >
           <span style={{ fontSize: "13px", fontWeight: 600, color: "#3b4fd8" }}>→ {staticDetail.cta}</span>
-          <span style={{ fontSize: "12px", color: "#6272c4" }}>탭 전환 →</span>
+          <span style={{ fontSize: "12px", color: "#6272c4", flexShrink: 0 }}>탭 전환 →</span>
         </div>
       </div>
     </div>

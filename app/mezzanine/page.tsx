@@ -11,20 +11,44 @@ const MEZZANINE_STORE_ID = "mezzanine-demo-001";
 const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
 const TABS = [
-  { id: "discover",  label: "Discover",  icon: "compass" },
-  { id: "optimize",  label: "Optimize",  icon: "adjustments" },
-  { id: "inbox",     label: "Inbox",     icon: "inbox" },
-  { id: "diagnose",  label: "Diagnose",  icon: "layout-grid" },
   { id: "setup",     label: "Setup",     icon: "settings" },
+  { id: "discover",  label: "Discover",  icon: "compass" },
+  { id: "diagnose",  label: "Diagnose",  icon: "layout-grid" },
+  { id: "inbox",     label: "Inbox",     icon: "inbox" },
+  { id: "optimize",  label: "Optimize",  icon: "adjustments" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
 
+interface MezzaninePipeline {
+  selectedCategory: {
+    id: string;
+    label: string;
+    matchRate: number | null;
+  } | null;
+  selectedBrand: {
+    id: string;
+    name: string;
+    category: string;
+    matrix_x: number;
+    matrix_y: number;
+  } | null;
+}
+
 export default function MezzaninePage() {
-  const [activeTab, setActiveTab] = useState<TabId>("discover");
+  const [activeTab, setActiveTab] = useState<TabId>("setup");
   const [ready, setReady] = useState(false);
+  const [pipeline, setPipeline] = useState<MezzaninePipeline>({
+    selectedCategory: null,
+    selectedBrand: null,
+  });
 
   const isFullHeight = activeTab === "diagnose";
+
+  const navigate = (tabId: TabId, updates?: Partial<MezzaninePipeline>) => {
+    if (updates) setPipeline(prev => ({ ...prev, ...updates }));
+    setActiveTab(tabId);
+  };
 
   useEffect(() => {
     async function init() {
@@ -42,7 +66,7 @@ export default function MezzaninePage() {
   return (
     <div style={{ minHeight: "100vh", background: "#f9f9fb", fontFamily: FF }}>
 
-      {/* ── 헤더 (SellFit 1:1 구조) ── */}
+      {/* ── 헤더 ── */}
       <header style={{
         position: "sticky", top: 0, zIndex: 20,
         background: "#fff",
@@ -95,6 +119,13 @@ export default function MezzaninePage() {
               }}>
                 {tab.label}
               </span>
+              {/* 파이프라인 상태 도트 */}
+              {tab.id === "discover" && pipeline.selectedCategory && (
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#3b4fd8", display: "inline-block" }} />
+              )}
+              {tab.id === "diagnose" && pipeline.selectedBrand && (
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#3b4fd8", display: "inline-block" }} />
+              )}
             </button>
           );
         })}
@@ -126,11 +157,31 @@ export default function MezzaninePage() {
           </div>
         ) : (
           <>
-            {activeTab === "discover"  && <DiscoverTab />}
-            {activeTab === "optimize"  && <OptimizeTab />}
-            {activeTab === "inbox"     && <InboxTab />}
-            {activeTab === "diagnose"  && <DiagnosisTab mode="mezzanine" />}
-            {activeTab === "setup"     && <SetupTab />}
+            {activeTab === "setup" && <SetupTab />}
+            {activeTab === "discover" && (
+              <DiscoverTab
+                onSelectCategory={cat => setPipeline(prev => ({ ...prev, selectedCategory: cat }))}
+                onNavigate={(tabId, updates) => navigate(tabId as TabId, updates)}
+              />
+            )}
+            {activeTab === "diagnose" && (
+              <DiagnosisTab
+                mode="mezzanine"
+                highlightCategory={pipeline.selectedCategory?.id}
+                onSelectBrand={brand => setPipeline(prev => ({ ...prev, selectedBrand: brand }))}
+                onNavigate={(tabId) => navigate(tabId as TabId)}
+              />
+            )}
+            {activeTab === "inbox" && (
+              <InboxTab
+                onNavigate={(tabId) => navigate(tabId as TabId)}
+              />
+            )}
+            {activeTab === "optimize" && (
+              <OptimizeTab
+                selectedBrand={pipeline.selectedBrand}
+              />
+            )}
           </>
         )}
       </main>

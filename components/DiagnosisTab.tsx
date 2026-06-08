@@ -41,9 +41,15 @@ interface Product {
 export default function DiagnosisTab({
   onSeoNavigate,
   mode = "sellfit",
+  highlightCategory,
+  onSelectBrand,
+  onNavigate,
 }: {
   onSeoNavigate?: (keyword: string) => void;
   mode?: "sellfit" | "mezzanine";
+  highlightCategory?: string;
+  onSelectBrand?: (brand: { id: string; name: string; category: string; matrix_x: number; matrix_y: number }) => void;
+  onNavigate?: (tabId: string) => void;
 }) {
   const storeKey = STORE_KEY_MAP[mode];
   const matrixConfig = mode === "mezzanine" ? MEZZANINE_CONFIG : SELLFIT_CONFIG;
@@ -296,6 +302,15 @@ export default function DiagnosisTab({
     return true;
   });
 
+  /* highlightCategory 있으면 좌측 리스트에서 해당 카테고리 제품 상단 정렬 */
+  const sortedProducts = highlightCategory
+    ? [...products].sort((a, b) => {
+        const aM = a.category === highlightCategory ? 0 : 1;
+        const bM = b.category === highlightCategory ? 0 : 1;
+        return aM - bM;
+      })
+    : products;
+
   /* Frill 파스텔 칩 */
   const getProductStatus = (p: Product) => {
     if (mode === "mezzanine") {
@@ -367,9 +382,10 @@ export default function DiagnosisTab({
           gap: "8px",
           paddingRight: "4px"
         }}>
-          {products.map((p) => {
+          {sortedProducts.map((p) => {
             const isSelected = p.id === selectedProductId;
             const isHovered = p.id === hoverProductId;
+            const isHighlighted = !!(highlightCategory && p.category === highlightCategory);
             /* dim은 hover할 때만 — selectedProductId는 dim에 영향 없음 */
             const hasActive = !!hoverProductId;
             const isActive = isHovered;
@@ -380,12 +396,17 @@ export default function DiagnosisTab({
                 onClick={() => {
                   setSelectedProductId(p.id);
                   setDrawerOpen(true);
+                  const dp = displayProducts.find(d => d.id === p.id) ?? p;
+                  onSelectBrand?.({
+                    id: p.id, name: p.name, category: p.category,
+                    matrix_x: dp.matrix_x ?? 50, matrix_y: dp.matrix_y ?? 50,
+                  });
                 }}
                 onMouseEnter={() => setHoverProductId(p.id)}
                 onMouseLeave={() => setHoverProductId(null)}
                 style={{
-                  background: isSelected ? "#f4f5f7" : "#ffffff",
-                  border: `1px solid ${isSelected ? "#d1d5db" : "#e5e7eb"}`,
+                  background: isSelected ? "#f4f5f7" : isHighlighted ? "#f0f4ff" : "#ffffff",
+                  border: `1px solid ${isHighlighted ? "#c7d2fe" : isSelected ? "#d1d5db" : "#e5e7eb"}`,
                   borderRadius: "6px",
                   padding: "10px 14px",
                   cursor: "pointer",
@@ -985,6 +1006,26 @@ export default function DiagnosisTab({
                       <p style={{ fontSize: "11px", color: "#9ca3af", marginTop: "8px" }}>
                         현재 결정: <strong style={{ color: "#1a1a1a" }}>{decisions[selectedProductId ?? ""]}</strong>
                       </p>
+                    )}
+                    {mode === "mezzanine" && decisions[selectedProductId ?? ""] && onNavigate && (
+                      <button
+                        onClick={() => {
+                          const dp = displayProducts.find(d => d.id === selectedProductId);
+                          if (dp) onSelectBrand?.({ id: dp.id, name: dp.name, category: dp.category, matrix_x: dp.matrix_x ?? 50, matrix_y: dp.matrix_y ?? 50 });
+                          onNavigate("optimize");
+                        }}
+                        style={{
+                          marginTop: "10px", width: "100%",
+                          padding: "9px 14px", borderRadius: "6px",
+                          background: "#3b4fd8", color: "#fff",
+                          border: "none", fontSize: "12px", fontWeight: 600,
+                          cursor: "pointer", fontFamily: "inherit",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
+                        }}
+                      >
+                        <i className="ti ti-chart-bar" style={{ fontSize: "12px" }} />
+                        Optimize에서 P&amp;L 확인 →
+                      </button>
                     )}
                   </div>
 

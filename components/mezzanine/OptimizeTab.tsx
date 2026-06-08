@@ -93,7 +93,17 @@ function ResultCard({ title, sub, value, color }: { title: string; sub: string; 
   );
 }
 
-export default function OptimizeTab() {
+interface Props {
+  selectedBrand?: {
+    id: string;
+    name: string;
+    category: string;
+    matrix_x: number;
+    matrix_y: number;
+  } | null;
+}
+
+export default function OptimizeTab({ selectedBrand }: Props) {
   const [rent, setRent]         = useState("");
   const [mgmt, setMgmt]         = useState("");
   const [capex, setCapex]       = useState("");
@@ -155,6 +165,19 @@ export default function OptimizeTab() {
             <span style={{ fontSize: "11px", color: "#8f9399" }}>{f}</span>
           </div>
         ))}
+
+        {selectedBrand && (
+          <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #e8eaed" }}>
+            <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "6px" }}>검토 중인 후보</p>
+            <div style={{ background: "#eff6ff", borderRadius: "6px", border: "1px solid #c7d2fe", padding: "8px 10px" }}>
+              <p style={{ fontSize: "12px", fontWeight: 700, color: "#1d4ed8", margin: "0 0 2px 0", lineHeight: 1.3 }}>{selectedBrand.name}</p>
+              <p style={{ fontSize: "10px", color: "#6b7280", margin: 0 }}>#{selectedBrand.category}</p>
+              <p style={{ fontSize: "10px", color: "#9ca3af", margin: "4px 0 0 0" }}>
+                적합 {selectedBrand.matrix_x} · 집객 {selectedBrand.matrix_y}
+              </p>
+            </div>
+          </div>
+        )}
 
         {result && (
           <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #e8eaed" }}>
