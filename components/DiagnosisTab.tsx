@@ -75,6 +75,11 @@ export default function DiagnosisTab({
   const [offerDrafts, setOfferDrafts] = useState<Record<string, OfferDraft>>({});
   const [offerLoading, setOfferLoading] = useState(false);
 
+  // Live matrix states (mezzanine mode only)
+  const [isLive, setIsLive] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveCoords, setLiveCoords] = useState<Record<string, { x: number; y: number; reason: string }>>({});
+
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
   const loadProducts = useCallback(async (sid: string) => {
@@ -165,6 +170,40 @@ export default function DiagnosisTab({
     setNewComment("");
   };
 
+  const fetchLiveMatrix = async () => {
+    if (liveLoading || products.length === 0) return;
+    setLiveLoading(true);
+    try {
+      const res = await fetch("/api/mezzanine/matrix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brands: products.map(p => ({
+            id: p.id,
+            name: p.name,
+            keyword: p.keyword,
+            category: p.category,
+            is_own: p.is_own,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error("API 실패");
+      const data = await res.json();
+      const coords: Record<string, { x: number; y: number; reason: string }> = {};
+      for (const r of data.results) {
+        coords[r.id] = { x: r.x, y: r.y, reason: r.reason };
+      }
+      setLiveCoords(coords);
+      setIsLive(true);
+    } catch {
+      console.warn("라이브 매트릭스 실패 → 정적 데모로 대체");
+      setLiveCoords({});
+      setIsLive(false);
+    } finally {
+      setLiveLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ 
@@ -238,8 +277,16 @@ export default function DiagnosisTab({
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
 
+  /* 라이브 좌표 오버라이드 (mezzanine 모드, liveCoords 있을 때만) */
+  const displayProducts = (mode === "mezzanine" && Object.keys(liveCoords).length > 0)
+    ? products.map(p => {
+        const lc = liveCoords[p.id];
+        return lc ? { ...p, matrix_x: lc.x, matrix_y: lc.y } : p;
+      })
+    : products;
+
   /* 사분면 필터 */
-  const filteredProducts = activeView === "all" ? products : products.filter(p => {
+  const filteredProducts = activeView === "all" ? displayProducts : displayProducts.filter(p => {
     const mx = p.matrix_x ?? 50;
     const my = p.matrix_y ?? 50;
     if (activeView === "quick_wins")      return mx < 50 && my >= 50;
@@ -521,7 +568,7 @@ export default function DiagnosisTab({
             gap: "8px"
           }}>
             {drawerOpen && (
-              <button 
+              <button
                 onClick={() => setDrawerOpen(false)}
                 style={{
                   background: "#ffffff",
@@ -540,6 +587,63 @@ export default function DiagnosisTab({
                 <i className="ti ti-arrow-left" style={{ fontSize: "11px" }}></i> Back to Matrix
               </button>
             )}
+
+            {/* 라이브 매트릭스 버튼 (mezzanine 전용) */}
+            {mode === "mezzanine" && (
+              isLive ? (
+                <>
+                  <span style={{
+                    display: "flex", alignItems: "center", gap: "5px",
+                    fontSize: "11px", color: "#3b4fd8", fontWeight: 600,
+                    padding: "5px 10px", borderRadius: "5px",
+                    border: "1px solid #c7d2fe", background: "#eff6ff",
+                  }}>
+                    <span style={{
+                      width: "6px", height: "6px", borderRadius: "50%",
+                      background: "#3b4fd8", display: "inline-block",
+                      animation: "pulse 2s infinite",
+                    }} />
+                    라이브 실행 중
+                  </span>
+                  <button
+                    onClick={fetchLiveMatrix}
+                    disabled={liveLoading}
+                    style={{
+                      background: "#ffffff",
+                      border: "1px solid #3b4fd8",
+                      borderRadius: "5px",
+                      padding: "5px 10px",
+                      fontSize: "11px",
+                      color: liveLoading ? "#9ca3af" : "#3b4fd8",
+                      fontWeight: 600,
+                      cursor: liveLoading ? "not-allowed" : "pointer",
+                      display: "flex", alignItems: "center", gap: "4px",
+                    }}
+                  >
+                    {liveLoading ? "분석 중..." : "↺ 조건 바꿔서 다시 돌리기"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={fetchLiveMatrix}
+                  disabled={liveLoading}
+                  style={{
+                    background: liveLoading ? "#f0f1f3" : "#3b4fd8",
+                    border: "none",
+                    borderRadius: "5px",
+                    padding: "5px 12px",
+                    fontSize: "11px",
+                    color: liveLoading ? "#9ca3af" : "#ffffff",
+                    fontWeight: 600,
+                    cursor: liveLoading ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", gap: "4px",
+                  }}
+                >
+                  {liveLoading ? "⏳ 분석 중..." : "▶ 라이브 매트릭스 실행"}
+                </button>
+              )
+            )}
+
             <button style={{
               background: "#ffffff",
               border: "1px solid #dededi",
@@ -768,9 +872,15 @@ export default function DiagnosisTab({
                     {/* Diagnosis text */}
                     <p style={{ fontSize: "12px", color: "#4a4f57", lineHeight: 1.65, marginBottom: "12px" }}>
                       {mode === "mezzanine"
-                        ? (selectedProduct.is_own === 1
-                          ? `${getProductQuadrant(selectedProduct).label} 영역. 공간의 실증 이력 — 이 브랜드가 이 공간과 이미 호흡한 결과다. 발굴 로직 + 현장 판단으로 배치한 예시.`
-                          : `${getProductQuadrant(selectedProduct).label} 영역. 엔진이 다녀간 행사 이력을 읽고 뽑은 후보. 미접촉 상태 — 파일럿 기간에 컨택·검증 예정.`)
+                        ? (() => {
+                            const liveReason = liveCoords[selectedProduct.id]?.reason;
+                            if (liveReason) {
+                              return `${getProductQuadrant(selectedProduct).label} 영역. ${liveReason}`;
+                            }
+                            return selectedProduct.is_own === 1
+                              ? `${getProductQuadrant(selectedProduct).label} 영역. 공간의 실증 이력 — 이 브랜드가 이 공간과 이미 호흡한 결과다. 발굴 로직 + 현장 판단으로 배치한 예시.`
+                              : `${getProductQuadrant(selectedProduct).label} 영역. 엔진이 다녀간 행사 이력을 읽고 뽑은 후보. 미접촉 상태 — 파일럿 기간에 컨택·검증 예정.`;
+                          })()
                         : (selectedProduct.is_own === 1
                           ? `현재 ${getProductQuadrant(selectedProduct).label} 영역. 마진율을 방어하며 검색지수가 급상승하도록 SEO 최적화를 즉각 수행하세요.`
                           : `현재 ${getProductQuadrant(selectedProduct).label} 영역. 경쟁 키워드 입찰 한계선(CPC 350원 상한)을 고려하여 광고 효율을 모니터링하세요.`)}
