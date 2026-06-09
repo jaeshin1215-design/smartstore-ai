@@ -33,6 +33,11 @@ interface MezzaninePipeline {
     matrix_x: number;
     matrix_y: number;
   } | null;
+  filter: {
+    category: string;
+    dong: string;
+    season: string;
+  };
 }
 
 export default function MezzaninePage() {
@@ -41,6 +46,7 @@ export default function MezzaninePage() {
   const [pipeline, setPipeline] = useState<MezzaninePipeline>({
     selectedCategory: null,
     selectedBrand: null,
+    filter: { category: "all", dong: "all", season: "all" },
   });
 
   const isFullHeight = activeTab === "diagnose";
@@ -53,9 +59,10 @@ export default function MezzaninePage() {
   useEffect(() => {
     async function init() {
       try {
-        await fetch("/api/db/init",          { method: "POST" });
-        await fetch("/api/db/migrate",        { method: "POST" });
-        await fetch("/api/db/seed-mezzanine", { method: "POST" });
+        await fetch("/api/db/init",                      { method: "POST" });
+        await fetch("/api/db/migrate",                   { method: "POST" });
+        await fetch("/api/db/migrate-mezzanine-brands",  { method: "POST" });
+        await fetch("/api/db/seed-mezzanine",            { method: "POST" });
       } catch { /* ignore */ }
       localStorage.setItem("mezzanine_store_id", MEZZANINE_STORE_ID);
       setReady(true);
@@ -157,7 +164,13 @@ export default function MezzaninePage() {
           </div>
         ) : (
           <>
-            {activeTab === "setup" && <SetupTab />}
+            {activeTab === "setup" && (
+              <SetupTab
+                filter={pipeline.filter}
+                onFilterChange={filter => setPipeline(prev => ({ ...prev, filter }))}
+                onBrandAdded={() => navigate("diagnose" as TabId)}
+              />
+            )}
             {activeTab === "discover" && (
               <DiscoverTab
                 onSelectCategory={cat => setPipeline(prev => ({ ...prev, selectedCategory: cat }))}
@@ -170,6 +183,7 @@ export default function MezzaninePage() {
                 highlightCategory={pipeline.selectedCategory?.id}
                 onSelectBrand={brand => setPipeline(prev => ({ ...prev, selectedBrand: brand }))}
                 onNavigate={(tabId) => navigate(tabId as TabId)}
+                filter={pipeline.filter}
               />
             )}
             {activeTab === "inbox" && (
