@@ -16,6 +16,7 @@ interface BrandRow {
   matrix_x: unknown;
   matrix_y: unknown;
   gemini_reason: unknown;
+  contact_status: unknown;
   created_at: unknown;
 }
 
@@ -26,14 +27,16 @@ export async function GET(request: Request) {
     const dong       = searchParams.get("dong")         || "all";
     const season     = searchParams.get("season")       || "all";
     const sourceType = searchParams.get("source_type") || "all";
+    const analyzed   = searchParams.get("analyzed")    === "true";
 
     let sql = "SELECT * FROM mezzanine_brands WHERE 1=1";
     const args: (string | number)[] = [];
 
-    if (category   !== "all") { sql += " AND category = ?";                          args.push(category); }
-    if (dong       !== "all") { sql += " AND dong = ?";                               args.push(dong); }
-    if (season     !== "all") { sql += " AND (season = ? OR season = 'all')";         args.push(season); }
-    if (sourceType !== "all") { sql += " AND source_type = ?";                        args.push(sourceType); }
+    if (category   !== "all") { sql += " AND category = ?";                        args.push(category); }
+    if (dong       !== "all") { sql += " AND dong = ?";                             args.push(dong); }
+    if (season     !== "all") { sql += " AND (season = ? OR season = 'all')";       args.push(season); }
+    if (sourceType !== "all") { sql += " AND source_type = ?";                      args.push(sourceType); }
+    if (analyzed)             { sql += " AND gemini_reason != '' AND gemini_reason IS NOT NULL"; }
 
     sql += " ORDER BY created_at DESC LIMIT 100";
 
@@ -108,8 +111,8 @@ export async function POST(request: Request) {
     await db.execute({
       sql: `INSERT INTO mezzanine_brands
               (id, name, instagram_handle, category, dong, season, followers, popup_count, region,
-               source_type, core_info, dynamic_filters, matrix_x, matrix_y, gemini_reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?)`,
+               source_type, core_info, dynamic_filters, matrix_x, matrix_y, gemini_reason, contact_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, 'untouched')`,
       args: [
         id,
         name.trim(),
@@ -129,6 +132,26 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, id, name: name.trim(), matrix_x, matrix_y, dong, gemini_reason });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, contact_status } = await request.json() as { id?: string; contact_status?: string };
+    if (!id || !contact_status) {
+      return NextResponse.json({ error: "id, contact_status 필수" }, { status: 400 });
+    }
+    const valid = ["untouched", "contacted", "replied"];
+    if (!valid.includes(contact_status)) {
+      return NextResponse.json({ error: "유효하지 않은 상태 (untouched|contacted|replied)" }, { status: 400 });
+    }
+    await db.execute({
+      sql: "UPDATE mezzanine_brands SET contact_status = ? WHERE id = ?",
+      args: [contact_status, id],
+    });
+    return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

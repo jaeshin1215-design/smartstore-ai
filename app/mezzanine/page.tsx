@@ -167,7 +167,10 @@ export default function MezzaninePage() {
             {activeTab === "setup" && (
               <SetupTab
                 filter={pipeline.filter}
-                onFilterChange={filter => setPipeline(prev => ({ ...prev, filter }))}
+                onFilterChange={filter => {
+                  setPipeline(prev => ({ ...prev, filter }));
+                  navigate("diagnose" as TabId);
+                }}
                 onBrandAdded={() => navigate("diagnose" as TabId)}
               />
             )}

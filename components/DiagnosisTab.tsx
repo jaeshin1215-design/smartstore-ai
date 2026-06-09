@@ -36,6 +36,8 @@ interface Product {
   is_price_confirmed?: number;
   rawX?: number;
   rawY?: number;
+  contact_status?: string;
+  source_type?: string;
 }
 
 export default function DiagnosisTab({
@@ -44,12 +46,14 @@ export default function DiagnosisTab({
   highlightCategory,
   onSelectBrand,
   onNavigate,
+  filter,
 }: {
   onSeoNavigate?: (keyword: string) => void;
   mode?: "sellfit" | "mezzanine";
   highlightCategory?: string;
   onSelectBrand?: (brand: { id: string; name: string; category: string; matrix_x: number; matrix_y: number }) => void;
   onNavigate?: (tabId: string) => void;
+  filter?: { category: string; dong: string; season: string };
 }) {
   const storeKey = STORE_KEY_MAP[mode];
   const matrixConfig = mode === "mezzanine" ? MEZZANINE_CONFIG : SELLFIT_CONFIG;
@@ -85,6 +89,39 @@ export default function DiagnosisTab({
   const [isLive, setIsLive] = useState(false);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveCoords, setLiveCoords] = useState<Record<string, { x: number; y: number; reason: string }>>({});
+
+  // mezzanine_brands 병합 (MANUAL + Gemini 분석 완료된 것만, filter 변경 시 재로드)
+  const [mezzBrands, setMezzBrands] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (mode !== "mezzanine") return;
+    const params = new URLSearchParams();
+    params.set("source_type", "MANUAL");
+    params.set("analyzed", "true");
+    if (filter?.category && filter.category !== "all") params.set("category", filter.category);
+    if (filter?.dong     && filter.dong     !== "all") params.set("dong",     filter.dong);
+    if (filter?.season   && filter.season   !== "all") params.set("season",   filter.season);
+    fetch(`/api/mezzanine/brands?${params.toString()}`)
+      .then(r => r.json())
+      .then((json: { brands?: Array<{ id: unknown; name: unknown; instagram_handle: unknown; category: unknown; matrix_x: unknown; matrix_y: unknown; contact_status: unknown }> }) => {
+        setMezzBrands(
+          (json.brands ?? []).map(b => ({
+            id:             String(b.id ?? ""),
+            name:           String(b.name ?? ""),
+            keyword:        String(b.instagram_handle ?? ""),
+            category:       String(b.category ?? "lifestyle"),
+            price:          0,
+            purchase_price: 0,
+            is_own:         3,        // MANUAL 등록 브랜드 (stroke 처리)
+            source_type:    "MANUAL",
+            matrix_x:       Number(b.matrix_x) || 50,
+            matrix_y:       Number(b.matrix_y) || 50,
+            contact_status: String(b.contact_status ?? "untouched"),
+          }))
+        );
+      })
+      .catch(() => {});
+  }, [mode, filter]);
 
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
@@ -174,6 +211,17 @@ export default function DiagnosisTab({
     if (!newComment.trim()) return;
     setComments(prev => [...prev, newComment]);
     setNewComment("");
+  };
+
+  const handleContactStatus = async (id: string, status: string) => {
+    try {
+      await fetch("/api/mezzanine/brands", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, contact_status: status }),
+      });
+      setMezzBrands(prev => prev.map(b => b.id === id ? { ...b, contact_status: status } : b));
+    } catch { /* 실패 무시 */ }
   };
 
   const fetchLiveMatrix = async () => {
@@ -281,15 +329,18 @@ export default function DiagnosisTab({
     );
   }
 
-  const selectedProduct = products.find(p => p.id === selectedProductId);
+  /* mezzanine 모드: seed products + 등록 mezzBrands 병합 */
+  const allProducts = mode === "mezzanine" ? [...products, ...mezzBrands] : products;
+
+  const selectedProduct = allProducts.find(p => p.id === selectedProductId);
 
   /* 라이브 좌표 오버라이드 (mezzanine 모드, liveCoords 있을 때만) */
   const displayProducts = (mode === "mezzanine" && Object.keys(liveCoords).length > 0)
-    ? products.map(p => {
+    ? allProducts.map(p => {
         const lc = liveCoords[p.id];
         return lc ? { ...p, matrix_x: lc.x, matrix_y: lc.y } : p;
       })
-    : products;
+    : allProducts;
 
   /* 사분면 필터 */
   const filteredProducts = activeView === "all" ? displayProducts : displayProducts.filter(p => {
@@ -304,12 +355,12 @@ export default function DiagnosisTab({
 
   /* highlightCategory 있으면 좌측 리스트에서 해당 카테고리 제품 상단 정렬 */
   const sortedProducts = highlightCategory
-    ? [...products].sort((a, b) => {
+    ? [...allProducts].sort((a, b) => {
         const aM = a.category === highlightCategory ? 0 : 1;
         const bM = b.category === highlightCategory ? 0 : 1;
         return aM - bM;
       })
-    : products;
+    : allProducts;
 
   /* Frill 파스텔 칩 */
   const getProductStatus = (p: Product) => {
@@ -821,6 +872,38 @@ export default function DiagnosisTab({
                       <i className="ti ti-chevron-right" style={{ fontSize: "10px", color: "#8f9399" }}></i>
                     </div>
                   </div>
+                  {/* Contact status row (MANUAL 등록 브랜드 전용) */}
+                  {mode === "mezzanine" && selectedProduct.source_type === "MANUAL" && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "#64676b", fontWeight: 600, marginBottom: "6px" }}>
+                        <i className="ti ti-phone" style={{ fontSize: "12px" }}></i>
+                        <span>컨택 상태</span>
+                      </div>
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        {[
+                          { value: "untouched", label: "미접촉", bg: "#f9fafb", border: "#e5e7eb", color: "#6b7280" },
+                          { value: "contacted", label: "컨택",   bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+                          { value: "replied",   label: "회신",   bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
+                        ].map(s => {
+                          const isActive = (selectedProduct.contact_status ?? "untouched") === s.value;
+                          return (
+                            <button key={s.value}
+                              onClick={() => handleContactStatus(selectedProductId!, s.value)}
+                              style={{
+                                fontSize: "10px", fontWeight: 600, padding: "3px 8px", borderRadius: "5px",
+                                background: isActive ? s.bg : "#ffffff",
+                                border: `1px solid ${isActive ? s.border : "#e8eaed"}`,
+                                color: isActive ? s.color : "#9ca3af",
+                                cursor: "pointer", fontFamily: "inherit",
+                              }}>
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Decision row */}
                   {decisions[selectedProductId ?? ""] && (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

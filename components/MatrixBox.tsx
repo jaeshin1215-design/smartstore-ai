@@ -419,7 +419,8 @@ export default function MatrixBox({
               const r = 5;
               const dotOpacity = hasActive ? (isActive ? 1 : 0.2) : 1;
               const textFill = hasActive ? (isActive ? dotColor : "#c4c8ce") : "#6b7280";
-              const isLegacy = p.is_own === 1; // ★ 공간 이력 (filled) vs [ ] 후보 (hollow)
+              const isLegacy   = p.is_own === 1; // ★ 공간 이력 (filled)
+              const isManual   = p.is_own === 3; // + 등록 후보 (filled + dark stroke)
 
               return (
                 <g
@@ -434,10 +435,15 @@ export default function MatrixBox({
                     <circle cx={cx} cy={cy} r={r + 6} fill={dotColor} fillOpacity="0.15" />
                   )}
 
-                  {/* ★ 이력(filled) vs [ ] 후보(hollow) */}
+                  {/* ★ 이력(filled) | + 등록 후보(filled+dark stroke) | ○ 엔진 후보(hollow) */}
                   {isLegacy ? (
                     <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
                       fill={dotColor} stroke="white" strokeWidth="1.5"
+                      style={{ transition: "r 0.1s ease" }}
+                    />
+                  ) : isManual ? (
+                    <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
+                      fill={dotColor} stroke="#1a1a1a" strokeWidth="2.5"
                       style={{ transition: "r 0.1s ease" }}
                     />
                   ) : (
@@ -458,20 +464,26 @@ export default function MatrixBox({
           {config !== SELLFIT_CONFIG && (
             <g style={{ pointerEvents: "none", userSelect: "none" }}>
               <rect
-                x={PX + PLOT_W - 200} y={PY + PLOT_H - 42}
-                width="196" height="36"
+                x={PX + PLOT_W - 210} y={PY + PLOT_H - 55}
+                width="206" height="50"
                 rx="4" ry="4"
                 fill="white" stroke="#e8eaed" strokeWidth="1"
               />
               {/* ★ 이력 */}
-              <circle cx={PX + PLOT_W - 188} cy={PY + PLOT_H - 30} r="4" fill="#4a4f57" />
-              <text x={PX + PLOT_W - 180} y={PY + PLOT_H - 26}
+              <circle cx={PX + PLOT_W - 198} cy={PY + PLOT_H - 43} r="4" fill="#4a4f57" />
+              <text x={PX + PLOT_W - 190} y={PY + PLOT_H - 39}
                 fontSize="9" fill="#6b7280" fontFamily="'Pretendard', sans-serif">
                 ★ 공간의 실증 이력
               </text>
+              {/* + 등록 후보 */}
+              <circle cx={PX + PLOT_W - 198} cy={PY + PLOT_H - 29} r="4" fill="#4a4f57" stroke="#1a1a1a" strokeWidth="2" />
+              <text x={PX + PLOT_W - 190} y={PY + PLOT_H - 25}
+                fontSize="9" fill="#6b7280" fontFamily="'Pretendard', sans-serif">
+                + 등록 후보 (직접 등록 · 미접촉)
+              </text>
               {/* [ ] 후보 */}
-              <circle cx={PX + PLOT_W - 188} cy={PY + PLOT_H - 16} r="4" fill="white" stroke="#4a4f57" strokeWidth="1.5" />
-              <text x={PX + PLOT_W - 180} y={PY + PLOT_H - 12}
+              <circle cx={PX + PLOT_W - 198} cy={PY + PLOT_H - 15} r="4" fill="white" stroke="#4a4f57" strokeWidth="1.5" />
+              <text x={PX + PLOT_W - 190} y={PY + PLOT_H - 11}
                 fontSize="9" fill="#6b7280" fontFamily="'Pretendard', sans-serif">
                 ○ 엔진 후보 (미접촉 · 파일럿 대상)
               </text>
