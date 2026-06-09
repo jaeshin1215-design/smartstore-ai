@@ -241,14 +241,18 @@ export default function DiscoverTab({ onSelectCategory, onNavigate }: Props) {
           followers_range: dorkFollowers, popup_history: dorkPopup, region: dorkRegion,
         }),
       });
-      const json = await res.json() as { queries?: DorkQuery[]; error?: string };
-      if (json.queries?.length) {
+      let json: { queries?: DorkQuery[]; error?: string } = {};
+      try { json = await res.json(); } catch { /* JSON 파싱 실패 — 빈 객체 유지 */ }
+
+      if (!res.ok) {
+        setDorkError(`서버 오류 ${res.status}: ${json.error ?? "잠시 후 다시 시도하세요."}`);
+      } else if (json.queries?.length) {
         setDorkQueries(json.queries);
       } else {
-        setDorkError("검색식 생성에 실패했습니다. 잠시 후 다시 시도하세요.");
+        setDorkError("검색식을 생성하지 못했습니다. 카테고리를 바꿔서 다시 시도하세요.");
       }
     } catch (e) {
-      setDorkError(String(e));
+      setDorkError(`네트워크 오류: ${String(e)}`);
     }
     setDorking(false);
   };
