@@ -5,7 +5,12 @@ import PolicyFilter from "@/components/PolicyFilter";
 import { useStream } from "@/lib/useStream";
 
 interface Keyword {
-  keyword: string; type: string; estimated_cpc: string; bid_amount?: string;
+  keyword: string; type: string;
+  estimated_cpc_range?: string;
+  break_even_limit?: string;
+  break_even_limit_meta?: string;
+  estimated_cpc?: string;
+  bid_amount?: string;
   bid_command?: string; competition: string; recommended: boolean; reason: string;
 }
 interface BiddingResult {
@@ -289,40 +294,32 @@ export default function BiddingTab() {
                         경쟁 {kw.competition}
                       </span>
                     </div>
-                    {kw.bid_amount && kw.estimated_cpc && Number(kw.estimated_cpc) > Number(kw.bid_amount) ? (
-                      <div style={{ marginBottom: "10px" }}>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "26px", fontWeight: 800, color: "#ef567c", lineHeight: 1 }}>
-                            ↓{(Number(kw.estimated_cpc) - Number(kw.bid_amount)).toLocaleString()}원
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      {kw.estimated_cpc_range ? (
+                        <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold"
+                          style={{ background: "#f7f8fa", border: "1px solid #e8eaed", color: "#4a4f57" }}>
+                          예상 CPC {kw.estimated_cpc_range}
+                          <span className="ml-1 font-normal text-[10px]"
+                            style={{ color: cpcData ? "#047857" : "#9ca3af" }}>
+                            {cpcData ? "실측 참고" : "AI 추정"}
                           </span>
-                          <span className="text-xs" style={{ color: "#6b7280" }}>여기까지 내려도 노출 유지</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "5px", flexWrap: "wrap" }}>
-                          <span className="text-[11px]" style={{ color: "#9ca3af" }}>
-                            {cpcData ? "실측" : "추정"} {Number(kw.estimated_cpc).toLocaleString()}원 → 제안 {Number(kw.bid_amount).toLocaleString()}원
-                          </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded"
-                            style={cpcData
-                              ? { background: "#e8f5f0", border: "1px solid #a7f3d0", color: "#047857" }
-                              : { background: "#f7f8fa", border: "1px solid #e8eaed", color: "#9ca3af" }}>
-                            {cpcData ? "실측 참고" : "AI 추정값"}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs" style={{ color: "#6b7280" }}>
-                          예상 CPC: <strong style={{ color: "#1a1a1a" }}>{kw.estimated_cpc}원</strong>
-                          <span className="ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded"
-                            style={{ background: "#f7f8fa", border: "1px solid #e8eaed", color: "#9ca3af" }}>AI 추정값</span>
                         </span>
-                        {kw.bid_amount && (
-                          <span className="text-[10px] font-medium px-2.5 py-1 rounded-md"
-                            style={{ background: "#f7f8fa", border: "1px solid #e8eaed", color: "#4a4f57" }}>
-                            권장 {Number(kw.bid_amount).toLocaleString()}원
-                          </span>
-                        )}
-                      </div>
+                      ) : kw.estimated_cpc ? (
+                        <span className="text-[11px] px-2 py-0.5 rounded-md"
+                          style={{ background: "#f7f8fa", border: "1px solid #e8eaed", color: "#4a4f57" }}>
+                          예상 CPC {kw.estimated_cpc}원
+                          <span className="ml-1 text-[10px]" style={{ color: "#9ca3af" }}>AI 추정값</span>
+                        </span>
+                      ) : null}
+                      {kw.break_even_limit && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold"
+                          style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}>
+                          손익분기 상한 {kw.break_even_limit}
+                        </span>
+                      )}
+                    </div>
+                    {kw.break_even_limit_meta && (
+                      <p className="text-[10px] mb-2" style={{ color: "#9ca3af" }}>{kw.break_even_limit_meta}</p>
                     )}
                     {kw.bid_command && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "#f7f8fa", border: "1px solid #e8eaed" }}>
