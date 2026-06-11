@@ -2,37 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { DemoBadge } from "@/components/DemoBadge";
+import {
+  FONT_SERIF, FONT_BODY,
+  COLOR_INK, COLOR_SUB, COLOR_RULE,
+  TEXT_CAPTION_SIZE, TRACKING_OVERLINE,
+} from "@/lib/tokens";
+import { CATEGORIES } from "@/lib/categories";
 
-const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+const SAGE = "#dfe5da";       // Calendar spring / pontos 히어로 좌측 컬러필드
+const LIGHT_BG = "#fafaf8";   // 우측 연한 면
 
-const CATEGORIES = [
-  { id: "all",         label: "전체" },
-  // ★ 현장 검증 (이 공간 실증)
-  { id: "performance", label: "★ 공연·굿즈" },
-  { id: "bakery_fb",   label: "★ F&B·베이커리" },
-  { id: "wellness",    label: "★ 웰니스" },
-  // ⚡ 인바운드 검증 (실제 문의 들어옴)
-  { id: "outdoor",     label: "⚡ 캠핑·아웃도어" },
-  // ☆ 시장 가설 (서울 시장 근거, 이 현장 미검증)
-  { id: "fashion",     label: "☆ 패션" },
-  { id: "ip_content",  label: "☆ IP·콘텐츠" },
-  { id: "beauty",      label: "☆ 뷰티" },
-];
-
-// 동별 운영 모드 (하이브리드 확정)
 const DONGS = [
-  { id: "all", label: "전체", mode: null as null | "anchor" | "popup" },
-  { id: "A",   label: "A동",  mode: "anchor" as const },
-  { id: "B",   label: "B동",  mode: "anchor" as const },
-  { id: "C",   label: "C동",  mode: "popup"  as const },
-];
-
-const SEASONS = [
-  { id: "all",    label: "전체" },
-  { id: "spring", label: "봄" },
-  { id: "summer", label: "여름" },
-  { id: "fall",   label: "가을" },
-  { id: "winter", label: "겨울" },
+  { id: "all", label: "ALL",    note: "" },
+  { id: "A",   label: "A ZONE", note: "B1F 앵커 · 1F~루프탑 정산" },
+  { id: "B",   label: "B ZONE", note: "정산 후보" },
+  { id: "C",   label: "C ZONE", note: "상시 입점 · 콜라보" },
 ];
 
 interface BrandEntry {
@@ -58,52 +42,28 @@ interface Props {
   onBrandAdded?: () => void;
 }
 
-function FilterBtn({
-  label, active, onClick,
-}: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "6px 10px", borderRadius: "6px",
-        border: `1px solid ${active ? "#3b4fd8" : "#e8eaed"}`,
-        background: active ? "#eff6ff" : "#fafafa",
-        color: active ? "#1d4ed8" : "#6b7280",
-        fontSize: "12px", fontWeight: active ? 600 : 400,
-        cursor: "pointer", textAlign: "left" as const, fontFamily: FF,
-        width: "100%",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
 export default function SetupTab({ filter: externalFilter, onFilterChange, onBrandAdded }: Props) {
   const [localFilter, setLocalFilter] = useState<Filter>(
     externalFilter ?? { category: "all", dong: "all", season: "all" }
   );
 
-  const [name,       setName]       = useState("");
-  const [handle,     setHandle]     = useState("");
-  const [catInput,   setCatInput]   = useState("lifestyle");
-  const [seasonInput,setSeasonInput]= useState("all");
-  const [followers,  setFollowers]  = useState("");
-  const [popupCount, setPopupCount] = useState("");
-  const [region,     setRegion]     = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [name,         setName]         = useState("");
+  const [handle,       setHandle]       = useState("");
+  const [catInput,     setCatInput]     = useState("lifestyle");
+  const [seasonInput,  setSeasonInput]  = useState("all");
+  const [followers,    setFollowers]    = useState("");
+  const [popupCount,   setPopupCount]   = useState("");
+  const [region,       setRegion]       = useState("");
+  const [submitting,   setSubmitting]   = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  /* 등록 목록 */
-  const [brands,     setBrands]     = useState<BrandEntry[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [brands, setBrands] = useState<BrandEntry[]>([]);
 
   const loadBrands = async () => {
     try {
       const r = await fetch("/api/mezzanine/brands?category=all&dong=all&season=all");
-      const j = await r.json() as { brands?: BrandEntry[]; total?: number };
+      const j = await r.json() as { brands?: BrandEntry[] };
       setBrands(j.brands ?? []);
-      setTotalCount(j.total ?? 0);
     } catch { /* 무시 */ }
   };
 
@@ -148,145 +108,183 @@ export default function SetupTab({ filter: externalFilter, onFilterChange, onBra
     setSubmitting(false);
   };
 
-  const inputStyle = {
-    width: "100%", fontSize: "13px", padding: "9px 12px",
-    borderRadius: "7px", border: "1px solid #e8eaed",
-    background: "#f9fafb", outline: "none", fontFamily: FF,
-    color: "#1a1a1a", boxSizing: "border-box" as const,
+  const overlineBase: React.CSSProperties = {
+    fontSize: TEXT_CAPTION_SIZE, fontWeight: 500,
+    textTransform: "uppercase", letterSpacing: TRACKING_OVERLINE,
+    fontFamily: FONT_BODY, margin: 0,
   };
-  const labelStyle = { fontSize: "11px", fontWeight: 600 as const, color: "#64676b", margin: "0 0 5px 0" };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", fontSize: "13px", padding: "9px 12px",
+    borderRadius: "7px", border: `1px solid ${COLOR_RULE}`,
+    background: "#fff", outline: "none", fontFamily: FONT_BODY,
+    color: "#1a1a1a", boxSizing: "border-box",
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: "11px", fontWeight: 600, color: "#64676b",
+    margin: "0 0 5px 0", fontFamily: FONT_BODY,
+  };
+
+  const sidebarCats = CATEGORIES.filter(c => c.id !== "all");
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "200px minmax(0,720px)", gap: "0 25vw", fontFamily: FF }}>
+    <div style={{ width: "100%", fontFamily: FONT_BODY, overflowX: "hidden" }}>
 
-      {/* ── 좌: 사이드바 ── */}
-      <div style={{ background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed" }}>
-        <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>
-          SPACE INTEL
-        </p>
-        <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>
-          브랜드<br />발굴 분류기
-        </p>
-        <p style={{ fontSize: "11px", color: "#6b7280", marginBottom: "10px", lineHeight: 1.5 }}>
-          유명세가 아니라<br />"지금 공간이 아쉬운"<br />브랜드를 거릅니다.
-        </p>
+      {/* ══════════════════════════════════════════════
+          FULL-BLEED 2-COL: SEGMENT (세이지) / BRAND REGISTRY (연한 흰)
+          margin: 0 -24px → parent padding 24px 상쇄, 화면 끝까지
+      ══════════════════════════════════════════════ */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr",
+        margin: "0 -24px",
+      }}>
 
-        {/* 하이브리드 모델 뱃지 */}
-        <div style={{ background: "#eff6ff", border: "1px solid #c7d2fe", borderRadius: "6px", padding: "8px 10px", marginBottom: "12px" }}>
-          <p style={{ fontSize: "9px", fontWeight: 700, color: "#3b4fd8", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px 0" }}>하이브리드 모델</p>
-          <p style={{ fontSize: "10px", color: "#4338ca", margin: "0 0 2px 0", lineHeight: 1.4 }}>A·B동 앵커 (3~6개월)</p>
-          <p style={{ fontSize: "10px", color: "#92400e", margin: 0, lineHeight: 1.4 }}>C동 팝업 (1~2개월)</p>
-        </div>
+        {/* ── LEFT: SEGMENT — #dfe5da 세이지 색면 ── */}
+        <div style={{ background: SAGE, padding: "44px 40px 52px 24px" }}>
 
-        {[
-          "D2C only — 유통 없이 직판",
-          "팔로워 5천~2만 (과대·과소 제외)",
-          "오프라인 쇼룸 없음 (공간 목마름)",
-          "팝업·플리마켓 이력 3~6개월",
-          "서북권 밀착 또는 인증샷 파급력",
-          "콜라보 마켓 참여 잦음",
-        ].map(f => (
-          <div key={f} style={{ display: "flex", alignItems: "flex-start", gap: "5px", marginBottom: "7px" }}>
-            <span style={{ fontSize: "10px", fontWeight: 700, color: "#c0c4cc", flexShrink: 0, marginTop: "1px" }}>◆</span>
-            <span style={{ fontSize: "11px", color: "#8f9399", lineHeight: 1.45 }}>{f}</span>
+          {/* SETUP 미니 오버라인 */}
+          <p style={{ ...overlineBase, color: "rgba(17,17,17,0.38)", marginBottom: "20px", fontSize: "11px" }}>
+            SETUP
+          </p>
+
+          {/* SEGMENT 오버라인 */}
+          <p style={{ ...overlineBase, color: "rgba(17,17,17,0.5)", marginBottom: "8px" }}>
+            SEGMENT
+          </p>
+
+          {/* 세리프 대형 헤드라인 */}
+          <h1 style={{
+            fontFamily: FONT_SERIF,
+            fontSize: "clamp(28px, 3vw, 44px)",
+            fontWeight: 700, color: COLOR_INK,
+            letterSpacing: "-0.02em", lineHeight: 1.05,
+            margin: "0 0 6px 0",
+          }}>
+            Who · Where · When
+          </h1>
+
+          {/* 한글 보조 */}
+          <p style={{ fontSize: "13px", color: "rgba(17,17,17,0.55)", fontFamily: FONT_BODY, lineHeight: 1, margin: "0 0 6px 0" }}>
+            누구 · 어디 · 언제.
+          </p>
+          <p style={{ fontSize: "12px", color: "rgba(17,17,17,0.5)", fontFamily: FONT_BODY, lineHeight: 1.7, margin: "0 0 28px 0" }}>
+            검증된 성장 곡선 + 오프라인 미충족 수요 — 두 조건을 가진 브랜드를 정밀 발굴합니다.
+          </p>
+
+          {/* ── CATEGORY ── */}
+          <div style={{ height: "1px", background: "rgba(17,17,17,0.12)", marginBottom: "18px" }} />
+          <p style={{ ...overlineBase, color: "rgba(17,17,17,0.45)", marginBottom: "10px" }}>CATEGORY</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "20px" }}>
+            {sidebarCats.map(cat => {
+              const isActive = localFilter.category === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setLocalFilter(f => ({ ...f, category: isActive ? "all" : cat.id }))}
+                  style={{
+                    display: "flex", alignItems: "center",
+                    padding: "7px 10px", borderRadius: "6px",
+                    border: "none", cursor: "pointer", textAlign: "left",
+                    background: isActive ? COLOR_INK : "rgba(17,17,17,0.06)",
+                    width: "100%",
+                  }}
+                >
+                  <p style={{
+                    fontSize: "12px", fontWeight: isActive ? 600 : 400,
+                    color: isActive ? "#fff" : COLOR_INK,
+                    fontFamily: FONT_BODY, margin: 0, lineHeight: 1,
+                  }}>
+                    {cat.label}
+                  </p>
+                </button>
+              );
+            })}
           </div>
-        ))}
 
-        <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #e8eaed" }}>
-          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "8px" }}>현황</p>
-          <p style={{ fontSize: "11px", color: "#3b4fd8", fontWeight: 700, margin: "0 0 4px 0" }}>
-            → {totalCount}개 후보 등록
-          </p>
-          <p style={{ fontSize: "10px", color: "#6272c4", margin: 0, lineHeight: 1.5 }}>
-            Diagnose 매트릭스<br />배치 준비 완료
-          </p>
-        </div>
-      </div>
+          {/* ── ZONE ── */}
+          <div style={{ height: "1px", background: "rgba(17,17,17,0.12)", marginBottom: "18px" }} />
+          <p style={{ ...overlineBase, color: "rgba(17,17,17,0.45)", marginBottom: "10px" }}>ZONE</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "20px" }}>
+            {DONGS.map(d => {
+              const isActive = localFilter.dong === d.id;
+              return (
+                <button key={d.id} onClick={() => setLocalFilter(f => ({ ...f, dong: d.id }))}
+                  style={{
+                    padding: "7px 10px", borderRadius: "6px", cursor: "pointer",
+                    border: "none",
+                    background: isActive ? COLOR_INK : "rgba(17,17,17,0.06)",
+                    fontSize: "12px", fontWeight: isActive ? 600 : 400,
+                    color: isActive ? "#fff" : COLOR_INK,
+                    textAlign: "left", fontFamily: FONT_BODY, width: "100%",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                  }}>
+                  <span>{d.label}</span>
+                  {d.note && (
+                    <span style={{ fontSize: "9px", fontWeight: 700, color: isActive ? "rgba(255,255,255,0.55)" : "rgba(17,17,17,0.35)", letterSpacing: "0.04em" }}>{d.note}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* ── 우: 메인 ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-
-        {/* 분류기 카드 */}
-        <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: "10px", padding: "24px 28px" }}>
-          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "6px" }}>
-            ⚙️ 분류기 — 조건으로 후보를 거른다
-          </p>
-          <p style={{ fontSize: "12px", color: "#4a4f57", lineHeight: 1.65, marginBottom: "20px" }}>
-            같은 100개라도 조건을 바꾸면 다른 그룹이 Discover·Diagnose로 흐릅니다.
-          </p>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "20px" }}>
-            {/* 카테고리 */}
-            <div>
-              <p style={{ fontSize: "11px", fontWeight: 600, color: "#9ca3af", margin: "0 0 8px 0", textTransform: "uppercase", letterSpacing: "0.06em" }}>카테고리</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                {CATEGORIES.map(c => (
-                  <FilterBtn key={c.id} label={c.label} active={localFilter.category === c.id}
-                    onClick={() => setLocalFilter(f => ({ ...f, category: c.id }))} />
-                ))}
-              </div>
-            </div>
-
-            {/* 동 */}
-            <div>
-              <p style={{ fontSize: "11px", fontWeight: 600, color: "#9ca3af", margin: "0 0 8px 0", textTransform: "uppercase", letterSpacing: "0.06em" }}>동</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                {DONGS.map(d => (
-                  <button key={d.id} onClick={() => setLocalFilter(f => ({ ...f, dong: d.id }))}
-                    style={{
-                      padding: "6px 10px", borderRadius: "6px", cursor: "pointer",
-                      border: `1px solid ${localFilter.dong === d.id ? "#3b4fd8" : "#e8eaed"}`,
-                      background: localFilter.dong === d.id ? "#eff6ff" : "#fafafa",
-                      color: localFilter.dong === d.id ? "#1d4ed8" : "#6b7280",
-                      fontSize: "12px", fontWeight: localFilter.dong === d.id ? 600 : 400,
-                      textAlign: "left" as const, fontFamily: FF, width: "100%",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                    }}>
-                    <span>{d.label}</span>
-                    {d.mode === "anchor" && (
-                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#1d4ed8", background: "#dbeafe", padding: "1px 5px", borderRadius: "3px" }}>앵커</span>
-                    )}
-                    {d.mode === "popup" && (
-                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: "3px" }}>팝업</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p style={{ fontSize: "9px", color: "#b0b5bc", margin: "6px 0 0 2px", lineHeight: 1.4 }}>
-                A·B동 앵커(3~6개월) / C동 팝업(1~2개월)
-              </p>
-            </div>
-
-            {/* 시즌 */}
-            <div>
-              <p style={{ fontSize: "11px", fontWeight: 600, color: "#9ca3af", margin: "0 0 8px 0", textTransform: "uppercase", letterSpacing: "0.06em" }}>시즌</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                {SEASONS.map(s => (
-                  <FilterBtn key={s.id} label={s.label} active={localFilter.season === s.id}
-                    onClick={() => setLocalFilter(f => ({ ...f, season: s.id }))} />
-                ))}
-              </div>
-            </div>
+          {/* ── SEASON ── */}
+          <div style={{ height: "1px", background: "rgba(17,17,17,0.12)", marginBottom: "18px" }} />
+          <p style={{ ...overlineBase, color: "rgba(17,17,17,0.45)", marginBottom: "10px" }}>SEASON</p>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "28px" }}>
+            {(["all","spring","summer","fall","winter"] as const).map(s => {
+              const isActive = localFilter.season === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setLocalFilter(f => ({ ...f, season: s }))}
+                  style={{
+                    padding: "5px 12px", borderRadius: "20px",
+                    border: `1px solid ${isActive ? COLOR_INK : "rgba(17,17,17,0.2)"}`,
+                    background: isActive ? COLOR_INK : "rgba(17,17,17,0.06)",
+                    color: isActive ? "#fff" : COLOR_INK,
+                    fontSize: "11px", fontWeight: isActive ? 600 : 400,
+                    fontFamily: FONT_BODY, cursor: "pointer",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {s === "all" ? "ALL" : s.toUpperCase()}
+                </button>
+              );
+            })}
           </div>
 
           <button onClick={handleApplyFilter} style={{
-            width: "100%", padding: "12px", borderRadius: "8px",
-            background: "#3b4fd8", color: "#fff", border: "none",
-            fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: FF,
+            width: "100%", padding: "13px", borderRadius: "8px",
+            background: COLOR_INK, color: "#fff", border: "none",
+            fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY,
           }}>
-            이 조건으로 분석하기 →
+            조건 적용 →
           </button>
         </div>
 
-        {/* 발굴 입력 폼 */}
-        <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: "10px", padding: "24px 28px" }}>
-          <DemoBadge note="실존 브랜드만 입력. AI가 공간 적합도·배치 동을 자동 분석합니다." />
+        {/* ── RIGHT: BRAND REGISTRY — 연한 흰 면 ── */}
+        <div style={{ background: LIGHT_BG, padding: "44px 24px 52px 40px" }}>
 
-          <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "14px", marginTop: "12px" }}>
-            ＋ 브랜드 후보 등록
+          <p style={{ ...overlineBase, color: "#9ca3af", marginBottom: "8px" }}>
+            BRAND REGISTRY
+          </p>
+          <h2 style={{
+            fontFamily: FONT_SERIF,
+            fontSize: "clamp(24px, 2.5vw, 36px)",
+            fontWeight: 700, color: COLOR_INK,
+            letterSpacing: "-0.02em", lineHeight: 1.05,
+            margin: "0 0 6px 0",
+          }}>
+            Find It. Analyze It.
+          </h2>
+          <p style={{ fontSize: "13px", color: COLOR_SUB, fontFamily: FONT_BODY, lineHeight: 1, margin: "0 0 20px 0" }}>
+            찾고 분석한다.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+          <DemoBadge note="실존 브랜드만 입력. AI가 공간 적합도·배치 동을 자동 분석합니다." />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "20px", marginBottom: "12px" }}>
             <div>
               <p style={labelStyle}>브랜드명 *</p>
               <input value={name} onChange={e => setName(e.target.value)}
@@ -308,7 +306,13 @@ export default function SetupTab({ filter: externalFilter, onFilterChange, onBra
             <div>
               <p style={labelStyle}>시즌</p>
               <select value={seasonInput} onChange={e => setSeasonInput(e.target.value)} style={inputStyle}>
-                {SEASONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                {[
+                  { id: "all",    label: "ALL"    },
+                  { id: "spring", label: "SPRING" },
+                  { id: "summer", label: "SUMMER" },
+                  { id: "fall",   label: "FALL"   },
+                  { id: "winter", label: "WINTER" },
+                ].map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div>
@@ -330,65 +334,166 @@ export default function SetupTab({ filter: externalFilter, onFilterChange, onBra
           </div>
 
           <button onClick={handleSubmit} disabled={submitting || !name.trim()} style={{
-            width: "100%", padding: "12px", borderRadius: "8px",
-            background: submitting || !name.trim() ? "#d1d5db" : "#3b4fd8",
+            width: "100%", padding: "13px", borderRadius: "8px",
+            background: submitting || !name.trim() ? "#d1d5db" : COLOR_INK,
             color: "#fff", border: "none", fontSize: "13px", fontWeight: 700,
             cursor: submitting || !name.trim() ? "not-allowed" : "pointer",
-            fontFamily: FF,
+            fontFamily: FONT_BODY,
           }}>
             {submitting ? "AI 분석 중..." : "등록 + AI 분석 →"}
           </button>
 
           {submitResult && (
             <div style={{
-              marginTop: "10px", padding: "10px 14px", borderRadius: "7px",
+              marginTop: "12px", padding: "10px 14px", borderRadius: "7px",
               background: submitResult.ok ? "#f0fdf4" : "#fef2f2",
               border: `1px solid ${submitResult.ok ? "#86efac" : "#fca5a5"}`,
-              fontSize: "12px", color: submitResult.ok ? "#15803d" : "#dc2626", lineHeight: 1.55,
+              fontSize: "12px", color: submitResult.ok ? "#15803d" : "#dc2626",
+              lineHeight: 1.55, fontFamily: FONT_BODY,
             }}>
               {submitResult.msg}
             </div>
           )}
         </div>
+      </div>
 
-        {/* 등록 목록 */}
-        {brands.length > 0 && (
-          <div style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: "10px", padding: "24px 28px" }}>
-            <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "14px" }}>
-              📋 등록 목록 ({brands.length}개)
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {brands.map(b => (
-                <div key={b.id} style={{
-                  display: "flex", alignItems: "center", gap: "12px",
-                  padding: "10px 14px", background: "#fafafa",
-                  borderRadius: "7px", border: "1px solid #f0f0f0",
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a" }}>{b.name}</span>
-                    {b.instagram_handle && (
-                      <span style={{ fontSize: "11px", color: "#9ca3af", marginLeft: "6px" }}>{b.instagram_handle}</span>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
-                    <span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "5px", background: "#f0f4ff", color: "#3b4fd8", border: "1px solid #c7d2fe", fontWeight: 600 }}>
-                      {b.category}
-                    </span>
-                    {b.dong !== "TBD" && (
-                      <span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "5px", background: "#f0fdf4", color: "#15803d", border: "1px solid #86efac", fontWeight: 600 }}>
-                        {b.dong}동
-                      </span>
-                    )}
-                    <span style={{ fontSize: "11px", color: "#9ca3af" }}>
-                      적합 {b.matrix_x} · 집객 {b.matrix_y}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* ── 전폭 구분선 ── */}
+      <div style={{ margin: "0 -24px", height: "1px", background: COLOR_RULE }} />
+
+      {/* ══════════════════════════════════════════════
+          FULL-BLEED 검정 인용 블록 (pontos "어떻게 작동하나" 검정 카드)
+      ══════════════════════════════════════════════ */}
+      <div style={{ background: COLOR_INK, margin: "0 -24px", padding: "56px 24px" }}>
+        {/* 내부 콘텐츠 — 최대 폭 제한 없이 패딩만 */}
+        <p style={{
+          ...overlineBase,
+          color: "rgba(255,255,255,0.4)",
+          marginBottom: "20px",
+        }}>
+          WHY THIS WORKS
+        </p>
+        <h2 style={{
+          fontFamily: FONT_SERIF,
+          fontSize: "clamp(28px, 3.5vw, 52px)",
+          fontWeight: 700, color: "#fff",
+          letterSpacing: "-0.02em", lineHeight: 1.05,
+          margin: "0 0 32px 0",
+          maxWidth: "640px",
+        }}>
+          "집객 자체가 광고다."
+        </h2>
+        <div style={{ width: "40px", height: "1px", background: "rgba(255,255,255,0.25)", marginBottom: "20px" }} />
+        <p style={{
+          fontSize: "13px", color: "rgba(255,255,255,0.55)",
+          fontFamily: FONT_BODY, lineHeight: 1, margin: "0 0 6px 0",
+        }}>
+          브랜드가 모이면 공간이 바뀐다. 공간이 바뀌면 브랜드가 팔린다.
+        </p>
+        <span style={{
+          fontSize: "12px", color: "rgba(255,255,255,0.4)",
+          fontFamily: FONT_BODY, letterSpacing: "0.04em", cursor: "default",
+        }}>
+          작동 방식 보기 →
+        </span>
+      </div>
+
+      {/* ── 전폭 구분선 ── */}
+      <div style={{ margin: "0 -24px", height: "1px", background: COLOR_RULE }} />
+
+      {/* ══════════════════════════════════════════════
+          PIPELINE
+      ══════════════════════════════════════════════ */}
+      {brands.length > 0 && (
+        <div style={{ paddingTop: "44px", paddingBottom: "48px" }}>
+          <p style={{ ...overlineBase, color: "#9ca3af", marginBottom: "8px" }}>PIPELINE</p>
+          <h2 style={{
+            fontFamily: FONT_SERIF,
+            fontSize: "clamp(22px, 2.5vw, 36px)",
+            fontWeight: 700, color: COLOR_INK,
+            letterSpacing: "-0.02em", lineHeight: 1.05,
+            margin: "0 0 4px 0",
+          }}>
+            Ready for Diagnosis
+          </h2>
+          <p style={{ fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY, lineHeight: 1, marginBottom: "24px" }}>
+            후보 {brands.length}개 · 매트릭스 배치 준비 완료
+          </p>
+
+          {/* 헤더 행 */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) 110px 72px 110px",
+            gap: "0 16px",
+            padding: "0 0 8px 0",
+            borderBottom: `1px solid ${COLOR_RULE}`,
+          }}>
+            {["브랜드", "카테고리", "동", "적합 · 집객"].map(h => (
+              <span key={h} style={{
+                fontSize: "10px", fontWeight: 600, color: "#9ca3af",
+                textTransform: "uppercase", letterSpacing: "0.07em",
+                fontFamily: FONT_BODY,
+              }}>{h}</span>
+            ))}
           </div>
-        )}
 
+          {brands.map(b => (
+            <div key={b.id} style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) 110px 72px 110px",
+              gap: "0 16px",
+              alignItems: "center",
+              padding: "11px 0",
+              borderBottom: `1px solid ${COLOR_RULE}`,
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <span style={{
+                  fontSize: "13px", fontWeight: 600, color: COLOR_INK,
+                  fontFamily: FONT_BODY, display: "block",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{b.name}</span>
+                {b.instagram_handle && (
+                  <span style={{ fontSize: "11px", color: "#9ca3af", fontFamily: FONT_BODY }}>{b.instagram_handle}</span>
+                )}
+              </div>
+              <span style={{ fontSize: "11px", fontWeight: 500, color: COLOR_INK, fontFamily: FONT_BODY, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {b.category}
+              </span>
+              <span style={{ fontSize: "11px", color: b.dong !== "TBD" ? "#15803d" : "#9ca3af", fontFamily: FONT_BODY }}>
+                {b.dong !== "TBD" ? `${b.dong}동` : "—"}
+              </span>
+              <span style={{ fontSize: "12px", fontWeight: 500, color: COLOR_SUB, fontFamily: FONT_BODY }}>
+                {b.matrix_x} · {b.matrix_y}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════
+          FULL-BLEED 하단 검정 밴드 (footer 바로 위)
+          margin-bottom: -48px → parent bottom padding 상쇄, footer와 연결
+      ══════════════════════════════════════════════ */}
+      <div style={{
+        background: COLOR_INK,
+        margin: `0 -24px ${brands.length > 0 ? "-48px" : "-48px"}`,
+        padding: "32px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexWrap: "wrap", gap: "12px",
+      }}>
+        <p style={{
+          fontFamily: FONT_SERIF,
+          fontSize: "clamp(16px, 2vw, 24px)",
+          fontWeight: 700, color: "#fff",
+          letterSpacing: "-0.02em", lineHeight: 1.1, margin: 0,
+        }}>
+          Aiges Pontos — First in concrete. Now in code.
+        </p>
+        <span style={{
+          fontSize: "12px", color: "rgba(255,255,255,0.45)",
+          fontFamily: FONT_BODY, letterSpacing: "0.04em",
+        }}>
+          메자닌 북가좌 · AI 입점 매칭 데모 · 2026
+        </span>
       </div>
     </div>
   );

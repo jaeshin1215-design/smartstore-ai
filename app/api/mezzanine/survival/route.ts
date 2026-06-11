@@ -1,6 +1,7 @@
 export const maxDuration = 30;
 
 import { NextResponse } from "next/server";
+import { checkInstagramAlive, checkUrlAlive } from "@/lib/survivalCheck";
 
 interface SurvivalTarget {
   url?: string;
@@ -11,38 +12,7 @@ interface SurvivalResult extends SurvivalTarget {
   url_ok: boolean;
   instagram_ok: boolean;
   alive: boolean;
-}
-
-async function checkUrl(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: AbortSignal.timeout(6000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; MezzanineBot/1.0)" },
-    });
-    return res.status < 400;
-  } catch {
-    return false;
-  }
-}
-
-async function checkInstagram(handle: string): Promise<boolean> {
-  const clean = handle.replace(/^@/, "").trim();
-  if (!clean) return false;
-  try {
-    const res = await fetch(`https://www.instagram.com/${encodeURIComponent(clean)}/`, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: AbortSignal.timeout(6000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; MezzanineBot/1.0)" },
-    });
-    // 404 = 계정 없음 또는 삭제, 200/301/302 = 생존
-    return res.status !== 404;
-  } catch {
-    // 네트워크 오류는 생존으로 처리 (엄격 차단 회피)
-    return true;
-  }
+  reason?: string;
 }
 
 export async function POST(request: Request) {
@@ -55,13 +25,27 @@ export async function POST(request: Request) {
 
     const results: SurvivalResult[] = await Promise.all(
       targets.slice(0, 20).map(async (t) => {
-        const url_ok       = t.url ? await checkUrl(t.url) : true;
-        const instagram_ok = t.instagram_handle ? await checkInstagram(t.instagram_handle) : true;
+        // URL이 인스타 URL이면 인스타 체크, 아니면 일반 HTTP
+        const url_ok = t.url
+          ? await checkUrlAlive(t.url)
+          : true;
+
+        // 별도 handle 제공 시 추가 인스타 체크
+        const instagram_ok = t.instagram_handle
+          ? await checkInstagramAlive(t.instagram_handle)
+          : true;
+
+        const alive = url_ok && instagram_ok;
         return {
           ...t,
           url_ok,
           instagram_ok,
-          alive: url_ok && instagram_ok,
+          alive,
+          reason: !url_ok
+            ? "URL 응답 없음 또는 에러"
+            : !instagram_ok
+              ? "인스타 계정 없음 (에러 페이지 감지)"
+              : undefined,
         };
       })
     );

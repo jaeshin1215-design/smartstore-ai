@@ -3,11 +3,12 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { callClaude } from "@/lib/claude";
+import { checkUrlAlive } from "@/lib/survivalCheck";
 
 interface PipelineInput {
-  urls: string[];          // 수동으로 수집한 브랜드 URL (인스타 또는 웹사이트)
+  urls: string[];
   category: string;
-  zone?: string;           // 기본값: settle_a_upper
+  zone?: string;
   season?: string;
   region?: string;
 }
@@ -17,21 +18,7 @@ interface BrandAnalysis {
   matrix_y: number;
   dong: string;
   reason: string;
-  name_hint: string;       // AI가 URL에서 추정한 브랜드 식별자 (실명 아님)
-}
-
-async function checkAlive(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: AbortSignal.timeout(6000),
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; MezzanineBot/1.0)" },
-    });
-    return res.status < 400;
-  } catch {
-    return false;
-  }
+  name_hint: string;
 }
 
 async function analyzeUrl(url: string, category: string): Promise<BrandAnalysis> {
@@ -90,8 +77,8 @@ export async function POST(request: Request) {
       const url = rawUrl.trim();
       if (!url) continue;
 
-      // 1. 생존 필터 (HTTP 200 — AI 호출 아님, 무비용)
-      const alive = await checkAlive(url);
+      // 1. 생존 필터 (인스타 본문 시그널 포함 — AI 호출 아님, 무비용)
+      const alive = await checkUrlAlive(url);
       if (!alive) {
         results.dead++;
         continue;

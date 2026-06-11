@@ -9,13 +9,13 @@ import {
 } from "@/lib/tokens";
 
 const CATS = [
-  { id: "performance", label: "공연·굿즈",   catEn: "PERFORM",  tag: "★", verified: true,  comment: "라이콘 실증" },
-  { id: "bakery_fb",   label: "F&B·베이커리", catEn: "BAKERY",   tag: "★", verified: true,  comment: "빵력장터 실증" },
-  { id: "wellness",    label: "웰니스",        catEn: "WELLNESS", tag: "★", verified: true,  comment: "MOVFLEX 실증" },
-  { id: "outdoor",     label: "캠핑·아웃도어", catEn: "OUTDOOR",  tag: "⚡", verified: true, comment: "실제 문의" },
-  { id: "fashion",     label: "패션",          catEn: "FASHION",  tag: "☆", verified: false, comment: "서울 시장 26%" },
-  { id: "ip_content",  label: "IP·콘텐츠",     catEn: "IP",       tag: "☆", verified: false, comment: "서울 시장 17%" },
-  { id: "beauty",      label: "뷰티",          catEn: "BEAUTY",   tag: "☆", verified: false, comment: "시장 근거, 미검증" },
+  { id: "performance", label: "공연·굿즈",   catEn: "PERFORM",  tag: "★", verified: true,  comment: "라이콘 실증",    headliner_only: false },
+  { id: "bakery_fb",   label: "F&B·베이커리", catEn: "BAKERY",   tag: "★", verified: true,  comment: "빵력장터 실증",  headliner_only: true  },
+  { id: "wellness",    label: "웰니스",        catEn: "WELLNESS", tag: "★", verified: true,  comment: "MOVFLEX 실증",  headliner_only: false },
+  { id: "outdoor",     label: "캠핑·아웃도어", catEn: "OUTDOOR",  tag: "⚡", verified: true, comment: "실제 문의",       headliner_only: false },
+  { id: "fashion",     label: "패션",          catEn: "FASHION",  tag: "☆", verified: false, comment: "서울 시장 26%", headliner_only: false },
+  { id: "ip_content",  label: "IP·콘텐츠",     catEn: "IP",       tag: "☆", verified: false, comment: "서울 시장 17%", headliner_only: false },
+  { id: "beauty",      label: "뷰티",          catEn: "BEAUTY",   tag: "☆", verified: false, comment: "시장 근거, 미검증", headliner_only: false },
 ] as const;
 type CatId = typeof CATS[number]["id"];
 
@@ -194,7 +194,10 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
     try {
       const res  = await fetch("/api/mezzanine/brands?status=ai_draft&analyzed=true");
       const data = await res.json() as { brands: { id: string; name: string; category: string; dong: string; gemini_reason: string; url: string }[] };
-      setDraftBrands(Array.isArray(data.brands) ? data.brands : []);
+      // F&B는 헤드라이너 전용 — 발굴 타깃에서 제외
+      const filtered = (Array.isArray(data.brands) ? data.brands : [])
+        .filter(b => b.category !== "bakery_fb");
+      setDraftBrands(filtered);
       setGateALoaded(true);
     } catch { setGateALoaded(true); }
   };
@@ -377,7 +380,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
                   border: "1px solid rgba(17,17,17,0.2)", background: "rgba(255,255,255,0.7)",
                   outline: "none", fontFamily: FONT_BODY, color: COLOR_INK,
                 }}>
-                {CATS.map(c => <option key={c.id} value={c.id}>{c.tag} {c.label}</option>)}
+                {CATS.filter(c => !c.headliner_only).map(c => <option key={c.id} value={c.id}>{c.tag} {c.label}</option>)}
               </select>
             </div>
             <div>
@@ -712,6 +715,9 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             파이프라인 실행 후 AI 분석 완료 브랜드가 여기 표시됩니다.
           </p>
         )}
+        <p style={{ fontSize: "11px", color: "#9ca3af", fontFamily: FONT_BODY, margin: "8px 0 0 0" }}>
+          F&B·베이커리는 헤드라이너 전용(집객 앵커) — 발굴 타깃 제외. Diagnose 캘린더에서 앵커로 배치됩니다.
+        </p>
       </div>
 
       {/* ── 검정 밴드 (풀블리드) ── */}
