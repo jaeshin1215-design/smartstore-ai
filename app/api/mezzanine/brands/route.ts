@@ -129,16 +129,60 @@ export async function PATCH(request: Request) {
       if (!validStatus.includes(status)) {
         return NextResponse.json({ error: "유효하지 않은 status (ai_draft|MANUAL_VERIFIED)" }, { status: 400 });
       }
-      await db.execute({ sql: "UPDATE mezzanine_brands SET status = ? WHERE id = ?", args: [status, id] });
-
-      // Gate A 확정 시 contact_events에 기록 (append-only)
+      // Gate A 확정: 사람이 실존 검증 완료 → 이제 AI 분석 실행 (토큰 낭비 0)
       if (status === "MANUAL_VERIFIED") {
+        // 현재 브랜드 데이터 조회
+        const row = await db.execute({ sql: "SELECT * FROM mezzanine_brands WHERE id = ?", args: [id] });
+        const brand = row.rows[0] as Record<string, unknown> | undefined;
+
+        let matrix_x = 50, matrix_y = 50, dong = "TBD", gemini_reason = "";
+
+        if (brand) {
+          try {
+            const url      = String(brand.url      || "");
+            const category = String(brand.category || "lifestyle");
+            const prompt   = `다음 브랜드 URL과 카테고리를 기반으로 메자닌 북가좌 입점 적합도를 분석하세요.
+
+URL: ${url || "미제공"}
+카테고리: ${category}
+공간: 메자닌 북가좌 — 서울 서대문구 증산역, 복합문화공간 350평
+- A동: 체험·이벤트형 / B동: 쇼룸·전시형 / C동: 라이프스타일·로컬형
+
+JSON만 반환:
+{"matrix_x": 1~100정수, "matrix_y": 1~100정수, "dong": "A"|"B"|"C", "reason": "판단근거 1~2문장 (실명 금지)"}
+
+알 수 없으면 matrix_x/y 50, dong TBD, reason 빈 문자열.`;
+
+            const raw   = await callClaude(prompt, 300);
+            const match = raw.match(/\{[\s\S]*?\}/);
+            if (match) {
+              const p      = JSON.parse(match[0]) as { matrix_x?: unknown; matrix_y?: unknown; dong?: unknown; reason?: unknown };
+              matrix_x     = Math.min(100, Math.max(1, Number(p.matrix_x) || 50));
+              matrix_y     = Math.min(100, Math.max(1, Number(p.matrix_y) || 50));
+              dong         = ["A", "B", "C"].includes(String(p.dong)) ? String(p.dong) : "TBD";
+              gemini_reason = String(p.reason || "");
+            }
+          } catch { /* AI 실패 시 기본값 유지 */ }
+        }
+
+        await db.execute({
+          sql: `UPDATE mezzanine_brands
+                SET status = 'MANUAL_VERIFIED', matrix_x = ?, matrix_y = ?, dong = ?, gemini_reason = ?
+                WHERE id = ?`,
+          args: [matrix_x, matrix_y, dong, gemini_reason, id],
+        });
+
+        // contact_events append (Gate A 확정 기록)
         const eventId = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
         await db.execute({
           sql: `INSERT INTO contact_events (id, brand_id, event_type, payload) VALUES (?, ?, 'gate_a_confirmed', '{}')`,
           args: [eventId, id],
         });
+
+        return NextResponse.json({ ok: true, status, matrix_x, matrix_y, dong, gemini_reason });
       }
+
+      await db.execute({ sql: "UPDATE mezzanine_brands SET status = ? WHERE id = ?", args: [status, id] });
       return NextResponse.json({ ok: true, status });
     }
 

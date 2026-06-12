@@ -662,36 +662,49 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
                 display: "flex", gap: "16px", alignItems: "flex-start",
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
                     <span style={{
                       fontSize: "10px", fontWeight: 600, padding: "2px 7px", borderRadius: "4px",
                       background: "#fef9c3", border: "1px solid #fde047", color: "#713f12",
                       fontFamily: FONT_BODY,
                     }}>
-                      AI 발굴 · 익명
+                      AI 분석 대기 · 익명
                     </span>
                     <span style={{
                       fontSize: "10px", fontWeight: 500, padding: "2px 7px", borderRadius: "4px",
                       background: "#f3f4f6", border: `1px solid ${COLOR_RULE}`, color: COLOR_INK,
                       fontFamily: FONT_BODY,
                     }}>
-                      {brand.category} · {brand.dong !== "TBD" ? `${brand.dong}동 추천` : "동 미정"}
+                      {brand.category}
                     </span>
                   </div>
-                  <p style={{ fontSize: "12px", fontWeight: 600, color: COLOR_INK, fontFamily: FONT_BODY, margin: "0 0 4px 0" }}>
-                    {brand.name}
-                  </p>
-                  {brand.gemini_reason && (
-                    <p style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY, margin: "0 0 4px 0", lineHeight: 1.5 }}>
-                      {brand.gemini_reason}
-                    </p>
-                  )}
+
+                  {/* 인스타 URL — 크게 노출, 사람이 직접 클릭해서 실존 확인 */}
                   {brand.url && (
                     <a href={brand.url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: "11px", color: "#3b82f6", fontFamily: FONT_BODY, wordBreak: "break-all" as const }}>
-                      {brand.url}
+                      style={{
+                        display: "block", fontSize: "13px", fontWeight: 700, color: COLOR_INK,
+                        fontFamily: FONT_BODY, wordBreak: "break-all" as const,
+                        marginBottom: "6px", textDecoration: "underline",
+                        textDecorationColor: "rgba(17,17,17,0.25)",
+                      }}>
+                      {brand.url} ↗
                     </a>
                   )}
+
+                  {/* 실존 확인 안내 */}
+                  <div style={{
+                    display: "flex", alignItems: "flex-start", gap: "6px",
+                    padding: "7px 10px", borderRadius: "6px",
+                    background: "#fffbeb", border: "1px solid #fde68a",
+                  }}>
+                    <span style={{ fontSize: "11px", flexShrink: 0 }}>👆</span>
+                    <p style={{ fontSize: "11px", color: "#92400e", fontFamily: FONT_BODY, margin: 0, lineHeight: 1.5 }}>
+                      링크 클릭 → 실존 확인 후 확정하세요. 서버는 인스타 계정 생사를 판별할 수 없습니다.
+                      <br />
+                      "페이지를 사용할 수 없습니다" 뜨면 확정하지 마세요.
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => handleGateA(brand.id)}
@@ -703,7 +716,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
                     fontSize: "12px", fontWeight: 700, cursor: confirmingId === brand.id ? "not-allowed" : "pointer",
                     fontFamily: FONT_BODY, flexShrink: 0, whiteSpace: "nowrap" as const,
                   }}>
-                  {confirmingId === brand.id ? "확정 중…" : "Gate A 확정 →"}
+                  {confirmingId === brand.id ? "확정 + AI 분석 중…" : "Gate A 확정 →"}
                 </button>
               </div>
             ))}
