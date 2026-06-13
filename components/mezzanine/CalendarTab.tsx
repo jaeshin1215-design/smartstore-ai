@@ -97,9 +97,9 @@ const MONTH_PHOTO: Record<number, MonthPhoto> = {
   6:  { file: "1.jpg",  series: "네이키드 소울",     description: "흑백 꽃" },
   7:  { file: "7.jpg",  series: "아프리카",          description: "사바나 · 고목" },
   8:  { file: "8.jpg",  series: "STAR",             description: "달 · 나무" },
-  9:  { file: null,     series: "포트레이트",        description: "인물 컷 확보 전" },
-  10: { file: "11.jpg", series: "뚝방길",            description: "수묵 · 흑백 건물" },
-  11: { file: "10.jpg", series: "80년대 흑백",       description: "나무 · 방랑" },
+  9:  { file: "9.png",  series: "포트레이트",        description: "영화 포스터 · 인물" },
+  10: { file: "11.png", series: "뚝방길",            description: "수묵 · 흑백 건물" },
+  11: { file: "10.png", series: "80년대 흑백",       description: "나무 · 방랑" },
   12: { file: "12.jpg", series: "겨울 성좌 · STAR",  description: "절벽 · 초승달" },
 };
 
