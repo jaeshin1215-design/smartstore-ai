@@ -543,7 +543,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             Score the Candidates.
           </h2>
           <p style={{ fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY, lineHeight: 1.65, margin: 0 }}>
-            구글에서 찾은 인스타 URL을 붙여넣으면 Fable 5가 6필터로 채점합니다.
+            구글에서 찾은 인스타 URL을 붙여넣으면 Sonnet 4.6가 6필터로 채점합니다.
             서북권 연고·최종 결 판단은 아래 수동 플래그로 직접 입력하세요.
           </p>
         </div>
@@ -595,7 +595,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             cursor: (matching || !matchUrls.trim()) ? "not-allowed" : "pointer",
             fontFamily: FONT_BODY,
           }}>
-            {matching ? "⏳ Fable 5 채점 중…" : "매칭 돌리기 →"}
+            {matching ? "⏳ Sonnet 4.6 채점 중…" : "매칭 돌리기 →"}
           </button>
           <span style={{
             fontSize: "11px", color: "rgba(17,17,17,0.45)", fontFamily: FONT_BODY,
@@ -655,7 +655,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
 
           {matchResult.candidates.length === 0 && (
             <p style={{ fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY }}>
-              Fable 5가 입력 URL에서 적합 후보를 추출하지 못했습니다. URL을 다시 확인하거나 다른 계정을 투입해 보세요.
+              Sonnet 4.6가 입력 URL에서 적합 후보를 추출하지 못했습니다. URL을 다시 확인하거나 다른 계정을 투입해 보세요.
             </p>
           )}
 

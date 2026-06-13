@@ -208,7 +208,7 @@ async function extractWithFable(items: SerpItem[], category: string, client: Ant
   ).join("\n\n");
 
   const msg = await client.messages.create({
-    model: "claude-fable-5",
+    model: "claude-sonnet-4-6",
     max_tokens: 3000,
     messages: [{
       role: "user",
