@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DemoBadge } from "@/components/DemoBadge";
 import {
   FONT_SERIF, FONT_BODY,
@@ -10,7 +10,7 @@ import {
 
 const CATS = [
   { id: "performance", label: "공연·굿즈",   catEn: "PERFORM",  tag: "★", verified: true,  comment: "라이콘 실증",    headliner_only: false },
-  { id: "bakery_fb",   label: "F&B·베이커리", catEn: "BAKERY",   tag: "★", verified: true,  comment: "빵력장터 실증",  headliner_only: true  },
+  { id: "bakery_fb",   label: "F&B·베이커리", catEn: "BAKERY",   tag: "★", verified: true,  comment: "빵력장터 실증",  headliner_only: false },
   { id: "wellness",    label: "웰니스",        catEn: "WELLNESS", tag: "★", verified: true,  comment: "MOVFLEX 실증",  headliner_only: false },
   { id: "outdoor",     label: "캠핑·아웃도어", catEn: "OUTDOOR",  tag: "⚡", verified: true, comment: "실제 문의",       headliner_only: false },
   { id: "fashion",     label: "패션",          catEn: "FASHION",  tag: "☆", verified: false, comment: "서울 시장 26%", headliner_only: false },
@@ -73,7 +73,6 @@ const STATIC_DETAIL: Record<CatId, {
   },
 };
 
-// 후보 발굴 카드 (7장 — 실증 3 + 파일럿 대기 4)
 const DISCOVER_CARDS = [
   { idx: "01", name: "봄날엔",      handle: "@bom_nalen",        catId: "wellness",    catEn: "WELLNESS",  catKo: "웰니스",        note: "MOVFLEX 연계 공간 이력", verified: true,  fieldColor: "#dfe5da" },
   { idx: "02", name: "MOVFLEX",     handle: "@movflex_official",  catId: "wellness",    catEn: "WELLNESS",  catKo: "웰니스",        note: "이 공간 실증 (2024.12)", verified: true,  fieldColor: "#dbe3ea" },
@@ -84,9 +83,62 @@ const DISCOVER_CARDS = [
   { idx: "07", name: "발굴 예정",    handle: "",                   catId: "ip_content",  catEn: "IP",        catKo: "IP·콘텐츠",     note: "파일럿 발굴 대기",        verified: false, fieldColor: "#e9e1d4" },
 ];
 
-const FOLLOWER_OPTIONS = [
+// ── Harness 매칭 타입
+interface HarnessCandidateScores {
+  followers: number;
+  result_fit: number;
+  d2c_small: number;
+  no_fb: number;
+  popup_signal: number;
+  anchor_fit: number;
+}
+
+interface HarnessCandidate {
+  name: string;
+  handle: string;
+  url: string;
+  snippet: string;
+  source_query: string;
+  scores: HarnessCandidateScores;
+  total_score: number;
+  fable_reason: string;
+  human_checks: string[];
+}
+
+interface HarnessResult {
+  mode: string;
+  category?: string;
+  candidates: HarnessCandidate[];
+  total: number;
+  scoring_max: number;
+}
+
+interface CandidateFlag {
+  seobukgwon: boolean;
+  userStatus: "후보" | "실선" | "탈락" | null;
+}
+
+// ── MATCH 카테고리 — FIND와 1:1 싱크를 위해 7개 전부
+const MATCH_CATS = [
+  { id: "wellness",    label: "웰니스 ★" },
+  { id: "bakery_fb",  label: "F&B ★" },
+  { id: "performance", label: "공연·굿즈" },
+  { id: "outdoor",    label: "아웃도어" },
+  { id: "fashion",    label: "패션" },
+  { id: "ip_content", label: "IP·콘텐츠" },
+  { id: "beauty",     label: "뷰티" },
+];
+
+const MATCH_SESSION_KEY = "mezzanine_harness_session";
+
+const FOLLOWER_OPTIONS_DEFAULT = [
   { id: "1k-5k",    label: "1천~5천" },
   { id: "5k-20k",   label: "5천~2만 ★" },
+  { id: "20k-100k", label: "2만~10만" },
+];
+const FOLLOWER_OPTIONS_FB = [
+  { id: "1k-5k",    label: "1천~5천" },
+  { id: "5k-50k",   label: "5천~5만 ★ F&B" },
   { id: "20k-100k", label: "2만~10만" },
 ];
 const POPUP_OPTIONS = [
@@ -183,10 +235,127 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
   const [confirmingId,    setConfirmingId]    = useState<string | null>(null);
   const [gateALoaded,     setGateALoaded]     = useState(false);
 
+  // ── MATCH 상태 (P1/P2)
+  const [matchCat,       setMatchCat]       = useState("wellness");
+  const [matchUrls,      setMatchUrls]      = useState("");
+  const [matching,       setMatching]       = useState(false);
+  const [matchError,     setMatchError]     = useState("");
+  const [matchResult,    setMatchResult]    = useState<HarnessResult | null>(null);
+  const [candidateFlags, setCandidateFlags] = useState<Record<string, CandidateFlag>>({});
+
+  // ── GO-① 게이트 A 등록 상태
+  const [regForms, setRegForms] = useState<Record<string, {
+    name: string; followers: string; popup_count: string; season: string; open: boolean;
+  }>>({});
+  const [regLoading, setRegLoading] = useState<Record<string, boolean>>({});
+  const [regDone,    setRegDone]    = useState<Set<string>>(new Set());
+
+  // 마운트 시 마지막 매칭 결과 복원
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(MATCH_SESSION_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const lastCat = typeof parsed._lastCat === "string" ? parsed._lastCat : "wellness";
+      const candidates = Array.isArray(parsed[lastCat]) ? (parsed[lastCat] as HarnessCandidate[]) : [];
+      if (candidates.length > 0) {
+        setMatchCat(lastCat);
+        setMatchResult({ mode: "manual_urls", candidates, total: candidates.length, scoring_max: 7 });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const overlineStyle: React.CSSProperties = {
     fontSize: TEXT_CAPTION_SIZE, fontWeight: 500,
     textTransform: "uppercase", letterSpacing: TRACKING_OVERLINE,
     color: "#9ca3af", fontFamily: FONT_BODY, margin: 0,
+  };
+
+  // ── MATCH 핸들러
+  const saveMatchSession = (cat: string, candidates: HarnessCandidate[]) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem(MATCH_SESSION_KEY) || "{}") as Record<string, unknown>;
+      existing[cat] = candidates;
+      existing._lastCat = cat;
+      localStorage.setItem(MATCH_SESSION_KEY, JSON.stringify(existing));
+    } catch { /* ignore */ }
+  };
+
+  const handleMatch = async () => {
+    const urls = matchUrls.split("\n").map(u => u.trim()).filter(Boolean);
+    if (!urls.length || matching) return;
+    setMatching(true);
+    setMatchError("");
+    setMatchResult(null);
+    setCandidateFlags({});
+    try {
+      const res = await fetch("/api/mezzanine/harness", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: matchCat, urls }),
+      });
+      const data = await res.json() as HarnessResult;
+      if (!res.ok) { setMatchError("매칭 실행 실패. 잠시 후 다시 시도하세요."); return; }
+      setMatchResult(data);
+      saveMatchSession(matchCat, data.candidates);
+    } catch {
+      setMatchError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const updateFlag = (url: string, updates: Partial<CandidateFlag>) => {
+    setCandidateFlags(prev => {
+      const current: CandidateFlag = prev[url] ?? { seobukgwon: false, userStatus: null };
+      return { ...prev, [url]: { ...current, ...updates } };
+    });
+  };
+
+  // ── GO-① 게이트 A 등록 핸들러
+  const defaultSeason = (): string => {
+    const m = new Date().getMonth() + 1;
+    if (m >= 3 && m <= 5)  return "spring";
+    if (m >= 6 && m <= 8)  return "summer";
+    if (m >= 9 && m <= 11) return "fall";
+    return "winter";
+  };
+
+  const toggleRegForm = (url: string, candidateName?: string) => {
+    setRegForms(prev => {
+      const ex = prev[url];
+      if (ex) return { ...prev, [url]: { ...ex, open: !ex.open } };
+      return { ...prev, [url]: { name: candidateName ?? "", followers: "", popup_count: "", season: defaultSeason(), open: true } };
+    });
+  };
+
+  const handleRegister = async (cand: HarnessCandidate) => {
+    const form = regForms[cand.url];
+    if (!form?.name?.trim() || regLoading[cand.url]) return;
+    setRegLoading(prev => ({ ...prev, [cand.url]: true }));
+    try {
+      const cat = matchResult?.category ?? matchCat;
+      const res = await fetch("/api/mezzanine/brands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:             form.name.trim(),
+          instagram_handle: cand.handle,
+          url:              cand.url,
+          category:         cat,
+          followers:        Number(form.followers)   || 0,
+          popup_count:      Number(form.popup_count) || 0,
+          season:           form.season || "all",
+          source_type:      "MANUAL",
+          region:           "서북권",
+        }),
+      });
+      if (res.ok) {
+        setRegDone(prev => new Set([...prev, cand.url]));
+        setRegForms(prev => ({ ...prev, [cand.url]: { ...prev[cand.url], open: false } }));
+      }
+    } catch { /* ignore */ }
+    setRegLoading(prev => ({ ...prev, [cand.url]: false }));
   };
 
   // ── Gate A 핸들러
@@ -194,7 +363,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
     try {
       const res  = await fetch("/api/mezzanine/brands?status=ai_draft&analyzed=true");
       const data = await res.json() as { brands: { id: string; name: string; category: string; dong: string; gemini_reason: string; url: string }[] };
-      // F&B는 헤드라이너 전용 — 발굴 타깃에서 제외
       const filtered = (Array.isArray(data.brands) ? data.brands : [])
         .filter(b => b.category !== "bakery_fb");
       setDraftBrands(filtered);
@@ -307,7 +475,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
     onNavigate(CTA_TARGET[selected]);
   };
 
-  // 칩 버튼 — 무채색 (인디고 X)
   const chipBtn = (label: string, active: boolean, onClick: () => void) => (
     <button onClick={onClick} style={{
       padding: "5px 10px", borderRadius: "6px",
@@ -351,6 +518,374 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
 
       <div style={{ height: "1px", background: COLOR_RULE, margin: "20px 0 24px" }} />
 
+      {/* ══ MATCH 섹션 (P1 — 주요 기능) ══ */}
+      <div style={{
+        margin: "0 0 28px 0", padding: "28px 32px",
+        background: "#f0f4f8",
+        borderRadius: "12px",
+        border: "1px solid rgba(17,17,17,0.1)",
+      }}>
+        <div style={{ marginBottom: "20px" }}>
+          <p style={{ ...overlineStyle, marginBottom: "6px" }}>MATCH · AI 매칭</p>
+          <h2 style={{
+            fontSize: "clamp(18px, 1.8vw, 24px)", fontWeight: 700, color: COLOR_INK,
+            fontFamily: FONT_SERIF, letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 4px 0",
+          }}>
+            Score the Candidates.
+          </h2>
+          <p style={{ fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY, lineHeight: 1.65, margin: 0 }}>
+            구글에서 찾은 인스타 URL을 붙여넣으면 Fable 5가 6필터로 채점합니다.
+            서북권 연고·최종 결 판단은 아래 수동 플래그로 직접 입력하세요.
+          </p>
+        </div>
+
+        {/* 카테고리 */}
+        <div style={{ marginBottom: "16px" }}>
+          <p style={{ ...overlineStyle, fontSize: "11px", color: "rgba(17,17,17,0.45)", marginBottom: "8px" }}>카테고리</p>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const }}>
+            {MATCH_CATS.map(mc => chipBtn(mc.label, matchCat === mc.id, () => setMatchCat(mc.id)))}
+          </div>
+          {/* GO-②: 불일치 경고 */}
+          {dorkCat !== matchCat && (
+            <div style={{
+              marginTop: "8px", padding: "6px 10px", borderRadius: "5px",
+              background: "#fef9c3", border: "1px solid #fde047",
+              fontSize: "11px", color: "#713f12", fontFamily: FONT_BODY,
+            }}>
+              ⚠ FIND는 <strong>{dorkCat}</strong> 기준, 채점은 <strong>{matchCat}</strong> 기준 — 불일치
+            </div>
+          )}
+        </div>
+
+        {/* URL textarea */}
+        <div style={{ marginBottom: "16px" }}>
+          <p style={{ ...overlineStyle, fontSize: "11px", color: "rgba(17,17,17,0.45)", marginBottom: "8px" }}>
+            인스타 URL (한 줄에 하나씩 · 최대 30개)
+          </p>
+          <textarea
+            value={matchUrls}
+            onChange={e => setMatchUrls(e.target.value)}
+            placeholder={"https://www.instagram.com/brand_a\nhttps://www.instagram.com/brand_b\nhttps://www.instagram.com/brand_c"}
+            rows={5}
+            style={{
+              width: "100%", fontSize: "12px", padding: "10px 12px", borderRadius: "7px",
+              border: "1px solid rgba(17,17,17,0.2)", fontFamily: "monospace",
+              resize: "vertical" as const, outline: "none", boxSizing: "border-box" as const,
+              color: COLOR_INK, background: "#fff", lineHeight: 1.6,
+            }}
+          />
+        </div>
+
+        {/* 실행 버튼 */}
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" as const }}>
+          <button onClick={handleMatch} disabled={matching || !matchUrls.trim()} style={{
+            padding: "11px 24px", borderRadius: "8px", border: "none",
+            background: (matching || !matchUrls.trim()) ? "#d1d5db" : COLOR_INK,
+            color: (matching || !matchUrls.trim()) ? "#9ca3af" : "#fff",
+            fontSize: "13px", fontWeight: 700,
+            cursor: (matching || !matchUrls.trim()) ? "not-allowed" : "pointer",
+            fontFamily: FONT_BODY,
+          }}>
+            {matching ? "⏳ Fable 5 채점 중…" : "매칭 돌리기 →"}
+          </button>
+          <span style={{
+            fontSize: "11px", color: "rgba(17,17,17,0.45)", fontFamily: FONT_BODY,
+            background: "#fff", padding: "5px 10px", borderRadius: "5px",
+            border: "1px solid rgba(17,17,17,0.12)",
+          }}>
+            🔒 서북권·최종 결 = 사람 판단
+          </span>
+        </div>
+
+        {matchError && (
+          <div style={{
+            marginTop: "12px", padding: "8px 14px", borderRadius: "6px",
+            background: "#fef2f2", border: "1px solid #fca5a5",
+            fontSize: "12px", color: "#dc2626", fontFamily: FONT_BODY,
+          }}>
+            {matchError}
+          </div>
+        )}
+      </div>
+
+      {/* ══ MATCH RESULTS (P2) ══ */}
+      {matchResult && (
+        <div style={{ margin: "0 0 32px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" as const }}>
+            <p style={{ ...overlineStyle, marginBottom: 0 }}>MATCH RESULTS</p>
+            {matchResult.candidates.length > 0 ? (
+              <span style={{
+                fontSize: "11px", fontWeight: 600, color: "#15803d",
+                background: "#dcfce7", border: "1px solid #86efac",
+                padding: "2px 8px", borderRadius: "4px", fontFamily: FONT_BODY,
+              }}>
+                {matchResult.candidates.length}건 · 최고점순
+              </span>
+            ) : (
+              <span style={{
+                fontSize: "11px", fontWeight: 600, color: "#92400e",
+                background: "#fef3c7", border: "1px solid #fde68a",
+                padding: "2px 8px", borderRadius: "4px", fontFamily: FONT_BODY,
+              }}>
+                후보 없음
+              </span>
+            )}
+            <span style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY }}>
+              최대 {matchResult.scoring_max ?? 7}점
+            </span>
+          </div>
+          {/* GO-③ 정직 라벨: 핸들명 기반 1차 추정임을 사전 고지 */}
+          <div style={{
+            marginBottom: "14px", padding: "7px 12px", borderRadius: "6px",
+            background: "#fffbeb", border: "1px solid #fde68a",
+            fontSize: "11px", color: "#92400e", fontFamily: FONT_BODY, lineHeight: 1.5,
+          }}>
+            🔍 <strong>AI 1차 분류</strong> — 인스타 핸들명·텍스트 기반 추정. 팔로워·실체 미확인.
+            실선 후보는 아래 "게이트 A 등록"으로 사람 확인 후 DB 등록하세요.
+          </div>
+
+          {matchResult.candidates.length === 0 && (
+            <p style={{ fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY }}>
+              Fable 5가 입력 URL에서 적합 후보를 추출하지 못했습니다. URL을 다시 확인하거나 다른 계정을 투입해 보세요.
+            </p>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {matchResult.candidates.map((cand, idx) => {
+              const flag     = candidateFlags[cand.url] ?? { seobukgwon: false, userStatus: null };
+              const maxScore = matchResult.scoring_max ?? 7;
+              const filled   = Math.max(0, Math.min(7, Math.round((cand.total_score / maxScore) * 7)));
+              const statusColors: Record<string, { bg: string; color: string; border: string }> = {
+                "실선": { bg: "#dbeafe", color: "#1d3ab8", border: "#93c5fd" },
+                "후보": { bg: "#dcfce7", color: "#059669", border: "#86efac" },
+                "탈락": { bg: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
+              };
+
+              return (
+                <div key={cand.url || idx} style={{
+                  background: "#fff",
+                  border: `1px solid ${
+                    flag.userStatus === "실선" ? "#93c5fd"
+                    : flag.userStatus === "탈락" ? "#fca5a5"
+                    : "rgba(17,17,17,0.12)"
+                  }`,
+                  borderRadius: "12px", padding: "18px 20px",
+                  transition: "border-color 0.15s",
+                }}>
+                  {/* 상단: 브랜드명 + 점수 */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: COLOR_INK, fontFamily: FONT_BODY, margin: "0 0 2px 0" }}>
+                        {cand.name || "미확인"}
+                        {cand.handle && (
+                          <span style={{ fontWeight: 400, color: COLOR_SUB, fontSize: "12px", marginLeft: "6px" }}>
+                            {cand.handle}
+                          </span>
+                        )}
+                      </p>
+                      <a
+                        href={cand.url} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: "11px", color: "#1d3ab8", fontFamily: FONT_BODY, textDecoration: "underline", wordBreak: "break-all" as const }}
+                      >
+                        {cand.url} ↗
+                      </a>
+                    </div>
+                    {/* 점수 배지 */}
+                    <div style={{ textAlign: "right" as const, flexShrink: 0, marginLeft: "16px" }}>
+                      <span style={{ fontSize: "20px", fontWeight: 800, color: COLOR_INK, fontFamily: FONT_SERIF }}>
+                        {cand.total_score}
+                        <span style={{ fontSize: "13px", fontWeight: 400, color: COLOR_SUB }}>/{maxScore}</span>
+                      </span>
+                      <div style={{ display: "flex", gap: "3px", marginTop: "5px", justifyContent: "flex-end" as const }}>
+                        {[1,2,3,4,5,6,7].map(i => (
+                          <span key={i} style={{
+                            width: "8px", height: "8px", borderRadius: "2px",
+                            background: i <= filled ? COLOR_INK : "#e5e7eb",
+                            display: "inline-block",
+                          }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 6필터 내역 */}
+                  <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" as const, marginBottom: "10px" }}>
+                    {([
+                      { key: "result_fit",   label: "결",      max: 2, val: cand.scores.result_fit },
+                      { key: "d2c_small",    label: "D2C",     max: 1, val: cand.scores.d2c_small },
+                      { key: "no_fb",        label: (matchResult?.category ?? matchCat) === "bakery_fb" ? "F&B우대" : "F&B제외", max: 1, val: cand.scores.no_fb },
+                      { key: "popup_signal", label: "팝업",    max: 1, val: cand.scores.popup_signal },
+                      { key: "anchor_fit",   label: "앵커",    max: 2, val: cand.scores.anchor_fit },
+                      { key: "followers",    label: "팔로워",  max: 1, val: cand.scores.followers },
+                    ] as const).map(f => (
+                      <span key={f.key} style={{
+                        fontSize: "10px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                        background: f.val > 0 ? "#f0fdf4" : "#f9fafb",
+                        border: `1px solid ${f.val > 0 ? "#86efac" : "#e5e7eb"}`,
+                        color: f.val > 0 ? "#15803d" : "#9ca3af",
+                        fontFamily: FONT_BODY,
+                      }}>
+                        {f.label} {f.val}/{f.max}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Fable 판단 근거 */}
+                  {cand.fable_reason && (
+                    <p style={{
+                      fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY,
+                      lineHeight: 1.65, margin: "0 0 12px 0",
+                      padding: "8px 12px", borderRadius: "6px", background: "#f9fafb",
+                      borderLeft: "3px solid #e5e7eb",
+                    }}>
+                      {cand.fable_reason}
+                    </p>
+                  )}
+
+                  {/* 수동 플래그: 서북권 + 상태 */}
+                  <div style={{
+                    display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" as const,
+                    paddingTop: "12px", borderTop: "1px solid #f3f4f6",
+                  }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={flag.seobukgwon}
+                        onChange={e => updateFlag(cand.url, { seobukgwon: e.target.checked })}
+                        style={{ cursor: "pointer", width: "14px", height: "14px" }}
+                      />
+                      <span style={{ fontSize: "12px", color: COLOR_INK, fontFamily: FONT_BODY }}>서북권 연고 ✓</span>
+                    </label>
+
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {(["후보", "실선", "탈락"] as const).map(s => {
+                        const sc = statusColors[s];
+                        const active = flag.userStatus === s;
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => updateFlag(cand.url, { userStatus: active ? null : s })}
+                            style={{
+                              padding: "4px 12px", borderRadius: "5px", cursor: "pointer",
+                              fontSize: "11px", fontWeight: 600, fontFamily: FONT_BODY,
+                              border: `1px solid ${active ? sc.border : "rgba(17,17,17,0.2)"}`,
+                              background: active ? sc.bg : "#fff",
+                              color: active ? sc.color : COLOR_SUB,
+                              transition: "all 0.1s",
+                            }}>
+                            {s}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* GO-① 게이트 A 등록 섹션 */}
+                  {regDone.has(cand.url) ? (
+                    <div style={{
+                      marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                      background: "#dcfce7", border: "1px solid #86efac",
+                      fontSize: "12px", color: "#15803d", fontFamily: FONT_BODY,
+                    }}>
+                      ✅ Calendar에 등록됨 — 해당 시즌 월 칸에 표시됩니다
+                    </div>
+                  ) : flag.userStatus === "실선" && (
+                    <div style={{ marginTop: "10px" }}>
+                      <button
+                        onClick={() => toggleRegForm(cand.url, cand.name || "")}
+                        style={{
+                          fontSize: "11px", fontWeight: 600, padding: "5px 12px", borderRadius: "5px",
+                          border: "1px solid #1d3ab8",
+                          background: regForms[cand.url]?.open ? "#1d3ab8" : "#fff",
+                          color: regForms[cand.url]?.open ? "#fff" : "#1d3ab8",
+                          cursor: "pointer", fontFamily: FONT_BODY,
+                        }}>
+                        {regForms[cand.url]?.open ? "▲ 등록 폼 닫기" : "게이트 A 등록 → DB"}
+                      </button>
+
+                      {regForms[cand.url]?.open && (
+                        <div style={{
+                          marginTop: "10px", padding: "14px 16px", borderRadius: "8px",
+                          background: "#f8f9ff", border: "1px solid #c7d2fe",
+                        }}>
+                          <p style={{ ...overlineStyle, fontSize: "10px", marginBottom: "10px" }}>검증 확정 · 사람 도장</p>
+                          <div style={{ display: "flex", flexDirection: "column" as const, gap: "8px" }}>
+                            <label style={{ display: "flex", flexDirection: "column" as const, gap: "3px" }}>
+                              <span style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY }}>브랜드 실명 *</span>
+                              <input
+                                type="text"
+                                value={regForms[cand.url]?.name ?? ""}
+                                onChange={e => setRegForms(prev => ({ ...prev, [cand.url]: { ...prev[cand.url], name: e.target.value } }))}
+                                placeholder="인스타 실명 브랜드명"
+                                style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "5px", border: "1px solid rgba(17,17,17,0.2)", outline: "none", fontFamily: FONT_BODY }}
+                              />
+                            </label>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <label style={{ display: "flex", flexDirection: "column" as const, gap: "3px", flex: 1 }}>
+                                <span style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY }}>팔로워 수</span>
+                                <input
+                                  type="number"
+                                  value={regForms[cand.url]?.followers ?? ""}
+                                  onChange={e => setRegForms(prev => ({ ...prev, [cand.url]: { ...prev[cand.url], followers: e.target.value } }))}
+                                  placeholder="0"
+                                  style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "5px", border: "1px solid rgba(17,17,17,0.2)", outline: "none", fontFamily: FONT_BODY }}
+                                />
+                              </label>
+                              <label style={{ display: "flex", flexDirection: "column" as const, gap: "3px", flex: 1 }}>
+                                <span style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY }}>팝업 이력 (횟수)</span>
+                                <input
+                                  type="number"
+                                  value={regForms[cand.url]?.popup_count ?? ""}
+                                  onChange={e => setRegForms(prev => ({ ...prev, [cand.url]: { ...prev[cand.url], popup_count: e.target.value } }))}
+                                  placeholder="0"
+                                  style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "5px", border: "1px solid rgba(17,17,17,0.2)", outline: "none", fontFamily: FONT_BODY }}
+                                />
+                              </label>
+                            </div>
+                            <label style={{ display: "flex", flexDirection: "column" as const, gap: "3px" }}>
+                              <span style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY }}>시즌 배정 (Calendar 월 배분 기준)</span>
+                              <select
+                                value={regForms[cand.url]?.season ?? defaultSeason()}
+                                onChange={e => setRegForms(prev => ({ ...prev, [cand.url]: { ...prev[cand.url], season: e.target.value } }))}
+                                style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "5px", border: "1px solid rgba(17,17,17,0.2)", outline: "none", fontFamily: FONT_BODY, background: "#fff" }}>
+                                <option value="spring">Spring (3~5월)</option>
+                                <option value="summer">Summer (6~8월)</option>
+                                <option value="fall">Fall (9~11월)</option>
+                                <option value="winter">Winter (12~2월)</option>
+                                <option value="all">연중 (all)</option>
+                              </select>
+                            </label>
+                          </div>
+                          <button
+                            onClick={() => handleRegister(cand)}
+                            disabled={!regForms[cand.url]?.name?.trim() || !!regLoading[cand.url]}
+                            style={{
+                              marginTop: "12px", width: "100%", padding: "10px", borderRadius: "6px", border: "none",
+                              background: (!regForms[cand.url]?.name?.trim() || regLoading[cand.url]) ? "#e5e7eb" : "#1d3ab8",
+                              color: (!regForms[cand.url]?.name?.trim() || regLoading[cand.url]) ? "#9ca3af" : "#fff",
+                              fontSize: "12px", fontWeight: 700,
+                              cursor: (!regForms[cand.url]?.name?.trim() || regLoading[cand.url]) ? "not-allowed" : "pointer",
+                              fontFamily: FONT_BODY,
+                            }}>
+                            {regLoading[cand.url] ? "Claude 분석 + DB 등록 중…" : "검증 확정 → DB 등록"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {matchResult.candidates.length > 0 && (
+            <p style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY, marginTop: "10px" }}>
+              실선 후보 → "게이트 A 등록" → DB 저장 → Calendar 해당 시즌 월에 표시
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ── 2-col 블록: FIND / ANALYSIS (풀블리드) ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0", margin: "0 -24px" }}>
 
@@ -370,11 +905,16 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             AI가 <strong>브랜드명을 생성하지 않습니다.</strong> 구글 검색식(dorking)만 만들고, 구글이 실존 인스타 URL을 반환합니다.
           </p>
 
-          {/* 검색 조건 — 5개 필드 */}
           <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "20px" }}>
             <div>
               <p style={{ ...overlineStyle, color: "rgba(17,17,17,0.45)", marginBottom: "6px", fontSize: "11px" }}>카테고리</p>
-              <select value={dorkCat} onChange={e => setDorkCat(e.target.value)}
+              <select value={dorkCat} onChange={e => {
+                  const nc = e.target.value;
+                  setDorkCat(nc);
+                  setMatchCat(nc);
+                  if (nc === "bakery_fb") setDorkFollowers("5k-50k");
+                  else if (dorkFollowers === "5k-50k") setDorkFollowers("5k-20k");
+                }}
                 style={{
                   width: "100%", fontSize: "12px", padding: "8px 10px", borderRadius: "6px",
                   border: "1px solid rgba(17,17,17,0.2)", background: "rgba(255,255,255,0.7)",
@@ -392,7 +932,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             <div>
               <p style={{ ...overlineStyle, color: "rgba(17,17,17,0.45)", marginBottom: "6px", fontSize: "11px" }}>팔로워</p>
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
-                {FOLLOWER_OPTIONS.map(f => chipBtn(f.label, dorkFollowers === f.id, () => setDorkFollowers(f.id)))}
+                {(dorkCat === "bakery_fb" ? FOLLOWER_OPTIONS_FB : FOLLOWER_OPTIONS_DEFAULT).map(f => chipBtn(f.label, dorkFollowers === f.id, () => setDorkFollowers(f.id)))}
               </div>
             </div>
             <div>
@@ -408,7 +948,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
               </div>
             </div>
           </div>
-          {/* 검색식 생성 버튼 — 무채색 #111 */}
           <button onClick={handleDork} disabled={dorking} style={{
             width: "100%", padding: "12px", borderRadius: "7px",
             background: dorking ? "rgba(17,17,17,0.3)" : COLOR_INK,
@@ -434,7 +973,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             </p>
           </div>
 
-          {/* 카테고리 선택 */}
           <select value={selected} onChange={e => handleSelectCat(e.target.value as CatId)}
             style={{
               width: "100%", fontSize: "12px", padding: "8px 10px", borderRadius: "6px",
@@ -444,21 +982,17 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             {CATS.map(c => <option key={c.id} value={c.id}>{c.tag} {c.label}</option>)}
           </select>
 
-          {/* POP-UP INTEREST 차트 */}
           <div>
             <p style={{ ...overlineStyle, marginBottom: "8px" }}>POP-UP INTEREST</p>
             <MiniBarChart bars={staticDetail.bars} labels={staticDetail.labels} />
           </div>
 
-          {/* StarFit */}
           <StarFit n={displayFit} />
 
-          {/* 설명 */}
           <p style={{ fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY, lineHeight: 1.65, margin: 0, flex: 1 }}>
             {displayDesc}
           </p>
 
-          {/* 태그 */}
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
             {displayTags.map((t, i) => (
               <span key={i} style={{
@@ -469,7 +1003,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             ))}
           </div>
 
-          {/* Live Discover 버튼 — 불가침 (COLOR_ACCENT 인디고) */}
           {isLive ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <div style={{
@@ -501,7 +1034,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             </button>
           )}
 
-          {/* Diagnose CTA */}
           <div onClick={handleCTA}
             style={{
               background: "#ebebea", borderRadius: "7px", border: `1px solid ${COLOR_RULE}`,
@@ -561,7 +1093,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
                     <p style={{ fontSize: "12px", color: "#374151", margin: "0 0 4px 0", lineHeight: 1.5, fontFamily: FONT_BODY }}>{q.desc}</p>
                     {q.tip && <p style={{ fontSize: "11px", color: COLOR_SUB, margin: 0, lineHeight: 1.4, fontFamily: FONT_BODY }}>💡 {q.tip}</p>}
                   </div>
-                  {/* 구글에서 열기 버튼 — 무채색 #111 */}
                   <a
                     href={`https://www.google.com/search?q=${encodeURIComponent(q.query)}`}
                     target="_blank" rel="noopener noreferrer"
@@ -580,7 +1111,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
             ))}
           </div>
           <p style={{ fontSize: "11px", color: "#9ca3af", marginTop: "10px", lineHeight: 1.55, fontFamily: FONT_BODY }}>
-            구글 결과에서 팔로워 수(스니펫)로 1차 필터 → 인스타 클릭 실존 확인 → Setup 탭에서 직접 등록
+            구글 결과에서 URL 복사 → 위 MATCH 섹션에 붙여넣기 → 매칭 돌리기
           </p>
         </div>
       )}
@@ -678,8 +1209,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
                       {brand.category}
                     </span>
                   </div>
-
-                  {/* 인스타 URL — 크게 노출, 사람이 직접 클릭해서 실존 확인 */}
                   {brand.url && (
                     <a href={brand.url} target="_blank" rel="noopener noreferrer"
                       style={{
@@ -691,8 +1220,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
                       {brand.url} ↗
                     </a>
                   )}
-
-                  {/* 실존 확인 안내 */}
                   <div style={{
                     display: "flex", alignItems: "flex-start", gap: "6px",
                     padding: "7px 10px", borderRadius: "6px",
@@ -763,7 +1290,7 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
       </div>
       <div style={{ height: "1px", background: COLOR_RULE, margin: "0 -24px" }} />
 
-      {/* ── 후보 발굴 카드 그리드 (항상 노출) ── */}
+      {/* ── 후보 발굴 카드 그리드 ── */}
       <div style={{ paddingTop: "36px" }} />
       <p style={{ ...overlineStyle, marginBottom: "16px" }}>CANDIDATE</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
@@ -777,7 +1304,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
               transition: "border-color 0.12s",
             }}
           >
-            {/* 컬러필드 */}
             <div style={{
               height: "100px",
               background: card.fieldColor,
@@ -814,7 +1340,6 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
               )}
             </div>
 
-            {/* 텍스트 영역 */}
             <div style={{ padding: "14px 16px 18px", background: "#fff" }}>
               <p style={{
                 fontSize: "13px", fontWeight: card.verified ? 700 : 500,
