@@ -294,12 +294,21 @@ export default function DiscoverTab({ onSelectCategory, onNavigate, initialCateg
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: matchCat, urls }),
       });
-      const data = await res.json() as HarnessResult;
-      if (!res.ok) { setMatchError("매칭 실행 실패. 잠시 후 다시 시도하세요."); return; }
+      const data = await res.json() as HarnessResult & { error?: string; error_code?: string };
+      if (!res.ok) {
+        const code = data.error_code ?? "";
+        const msg = code === "auth_error"  ? "API 키 인증 오류. Anthropic 콘솔 확인 필요."
+                  : code === "quota_error" ? "API 크레딧 부족. console.anthropic.com 충전 필요."
+                  : code === "model_error" ? "모델 오류. 잠시 후 다시 시도하세요."
+                  : data.error            ? data.error.slice(0, 120)
+                  : "매칭 실행 실패. 잠시 후 다시 시도하세요.";
+        setMatchError(msg);
+        return;
+      }
       setMatchResult(data);
       saveMatchSession(matchCat, data.candidates);
     } catch {
-      setMatchError("네트워크 오류가 발생했습니다.");
+      setMatchError("네트워크 오류. API 응답이 JSON이 아닙니다 — Vercel 로그를 확인하세요.");
     } finally {
       setMatching(false);
     }
