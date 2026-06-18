@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import MatrixBox, { getProductColor, MEZZANINE_CONFIG, SELLFIT_CONFIG } from "./MatrixBox";
 import PolicyFilter from "./PolicyFilter";
 import { DemoBadge } from "./DemoBadge";
+import {
+  FONT_BODY as TOKEN_FONT_BODY,
+  COLOR_INK, COLOR_SUB, COLOR_RULE,
+  TEXT_CAPTION_SIZE, TRACKING_OVERLINE,
+} from "@/lib/tokens";
 
 const STORE_KEY_MAP = {
   sellfit:   "sellfit_store_id",
@@ -70,10 +75,13 @@ export default function DiagnosisTab({
   const [viewsOpen, setViewsOpen] = useState(false);
   const [activeView, setActiveView] = useState<"all" | "quick_wins" | "major_projects" | "fill_ins" | "thankless_tasks">("all");
   const [scaleDots, setScaleDots] = useState(false);
-  const [showLabels, setShowLabels] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [showPartially, setShowPartially] = useState(true);
   const viewsRef = useRef<HTMLDivElement | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const categoryRef = useRef<HTMLDivElement | null>(null);
 
   // Drawer Panel States
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -84,6 +92,7 @@ export default function DiagnosisTab({
   const [decisions, setDecisions] = useState<Record<string, string>>({});
   const [offerDrafts, setOfferDrafts] = useState<Record<string, OfferDraft>>({});
   const [offerLoading, setOfferLoading] = useState(false);
+  const [offerErrors, setOfferErrors] = useState<Record<string, string>>({});
 
   // Live matrix states (mezzanine mode only)
   const [isLive, setIsLive] = useState(false);
@@ -161,6 +170,9 @@ export default function DiagnosisTab({
       if (viewsRef.current && !viewsRef.current.contains(event.target as Node)) {
         setViewsOpen(false);
       }
+      if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
+        setCategoryOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -183,7 +195,9 @@ export default function DiagnosisTab({
 
   const handleGenerateOffer = async () => {
     if (!selectedProduct || !selectedProductId || offerLoading) return;
+    const pid = selectedProductId;
     setOfferLoading(true);
+    setOfferErrors(prev => ({ ...prev, [pid]: "" }));
     try {
       const res = await fetch("/api/offer", {
         method: "POST",
@@ -195,16 +209,27 @@ export default function DiagnosisTab({
           purchasePrice: selectedProduct.purchase_price,
           matrixX: selectedProduct.matrix_x ?? 50,
           matrixY: selectedProduct.matrix_y ?? 50,
-          decision: decisions[selectedProductId] || "",
+          decision: decisions[pid] || "",
           mode,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (!data.error) setOfferDrafts(prev => ({ ...prev, [selectedProductId]: data }));
+      const data = await res.json().catch(() => ({})) as { error_type?: string; error?: string } & Partial<OfferDraft>;
+      if (res.ok && !data.error_type && data.hook) {
+        setOfferDrafts(prev => ({ ...prev, [pid]: data as OfferDraft }));
+      } else {
+        const isRateLimit = res.status === 429 || data.error_type === "rate_limit";
+        setOfferErrors(prev => ({
+          ...prev,
+          [pid]: isRateLimit
+            ? "AI 분석이 잠시 바쁩니다. 30~60초 후 다시 시도해 주세요."
+            : "초안 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        }));
       }
-    } catch { /* 실패해도 진행 */ }
-    finally { setOfferLoading(false); }
+    } catch {
+      setOfferErrors(prev => ({ ...prev, [pid]: "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." }));
+    } finally {
+      setOfferLoading(false);
+    }
   };
 
   const handleAddComment = () => {
@@ -318,7 +343,7 @@ export default function DiagnosisTab({
             }
           }}
           style={{
-            padding: "12px 28px", background: "#3b4fd8", color: "white",
+            padding: "12px 28px", background: "#111111", color: "white",
             border: "none", borderRadius: "8px", fontSize: "14px",
             fontWeight: 700, cursor: "pointer", fontFamily: "'Pretendard', sans-serif",
           }}
@@ -343,7 +368,7 @@ export default function DiagnosisTab({
     : allProducts;
 
   /* 사분면 필터 */
-  const filteredProducts = activeView === "all" ? displayProducts : displayProducts.filter(p => {
+  const quadrantFiltered = activeView === "all" ? displayProducts : displayProducts.filter(p => {
     const mx = p.matrix_x ?? 50;
     const my = p.matrix_y ?? 50;
     if (activeView === "quick_wins")      return mx < 50 && my >= 50;
@@ -352,6 +377,11 @@ export default function DiagnosisTab({
     if (activeView === "thankless_tasks") return mx >= 50 && my < 50;
     return true;
   });
+  /* 카테고리 필터 */
+  const uniqueCategories = Array.from(new Set(allProducts.map(p => p.category))).sort();
+  const filteredProducts = categoryFilter === "all"
+    ? quadrantFiltered
+    : quadrantFiltered.filter(p => p.category === categoryFilter);
 
   /* highlightCategory 있으면 좌측 리스트에서 해당 카테고리 제품 상단 정렬 */
   const sortedProducts = highlightCategory
@@ -384,23 +414,44 @@ export default function DiagnosisTab({
   };
 
   return (
+    <div style={{ fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif" }}>
+
     <div style={{
       display: "flex",
-      gap: "24px",
+      gap: "16px",
       width: "100%",
-      height: "calc(100vh - 180px)",
-      minHeight: "560px",
-      fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+      height: "calc(100vh - 240px)",
+      minHeight: "520px",
       alignItems: "stretch"
     }}>
       {/* ── Left Sidebar (Ideas / Products List) ── */}
       <div style={{
-        width: "260px",
+        width: "200px",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0
       }}>
         {/* Header row */}
+        <div style={{ marginBottom: "10px" }}>
+          <p style={{
+            fontSize: "10px", fontWeight: 500,
+            textTransform: "uppercase" as const, letterSpacing: "0.08em",
+            color: "#9ca3af", fontFamily: TOKEN_FONT_BODY, margin: "0 0 8px 0",
+          }}>
+            DIAGNOSIS
+          </p>
+          <p style={{
+            fontFamily: TOKEN_FONT_BODY,
+            fontSize: "14px", fontWeight: 700,
+            color: COLOR_INK, letterSpacing: "-0.01em",
+            lineHeight: 1.4, margin: "0 0 6px 0",
+          }}>
+            {mode === "mezzanine" ? "적합성 × 집객력." : "내 라인업을 진단한다."}
+          </p>
+          <p style={{ fontSize: "13px", color: COLOR_SUB, lineHeight: 1.5, margin: 0, fontFamily: TOKEN_FONT_BODY }}>
+            {mode === "mezzanine" ? "매트릭스로 입점 후보를 진단합니다." : "수요×마진으로 상품을 줄 세우고 키울지 내릴지 정한다."}
+          </p>
+        </div>
         <div style={{
           display: "flex",
           justifyContent: "space-between",
@@ -412,7 +463,7 @@ export default function DiagnosisTab({
             fontWeight: 600,
             color: "#0d0d0e"
           }}>
-            Ideas ({products.length})
+            {mode === "mezzanine" ? `Brands (${allProducts.length})` : `Ideas (${products.length})`}
           </span>
           <span style={{
             fontSize: "11px",
@@ -433,7 +484,7 @@ export default function DiagnosisTab({
           gap: "8px",
           paddingRight: "4px"
         }}>
-          {sortedProducts.map((p) => {
+          {sortedProducts.map((p, idx) => {
             const isSelected = p.id === selectedProductId;
             const isHovered = p.id === hoverProductId;
             const isHighlighted = !!(highlightCategory && p.category === highlightCategory);
@@ -470,28 +521,92 @@ export default function DiagnosisTab({
                 }}
               >
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: dotColor, display: "inline-block", flexShrink: 0 }} />
-                <span style={{ fontSize: "13px", fontWeight: isSelected ? 600 : 400, color: isActive ? dotColor : "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, transition: "color 0.15s ease" }}>
-                  {p.name}
-                </span>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                  {mode === "mezzanine" && (
+                    <p style={{
+                      fontSize: "9px", fontWeight: 500,
+                      textTransform: "uppercase" as const, letterSpacing: TRACKING_OVERLINE,
+                      color: "#b0b5bc", fontFamily: TOKEN_FONT_BODY, margin: 0, lineHeight: 1,
+                    }}>
+                      MATCH · {(idx + 1).toString().padStart(2, "0")}
+                    </p>
+                  )}
+                  <span style={{ fontSize: "13px", fontWeight: isSelected ? 600 : 400, color: isActive ? dotColor : "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "color 0.15s ease" }}>
+                    {p.name}
+                  </span>
+                </div>
                 <i className="ti ti-dots-horizontal" style={{ fontSize: "12px", color: "#9ca3af", opacity: isActive ? 1 : 0 }} />
               </div>
             );
           })}
         </div>
+
+        {/* ── LEGEND (mezzanine 전용) ── */}
+        {mode === "mezzanine" && (
+          <div style={{
+            marginTop: "12px", paddingTop: "10px",
+            borderTop: `1px solid ${COLOR_RULE}`, flexShrink: 0,
+          }}>
+            <p style={{
+              fontSize: TEXT_CAPTION_SIZE, fontWeight: 500,
+              textTransform: "uppercase" as const, letterSpacing: TRACKING_OVERLINE,
+              color: "#9ca3af", fontFamily: TOKEN_FONT_BODY, margin: "0 0 8px 0",
+            }}>
+              LEGEND
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+              {[
+                { label: "핵심 앵커",  sub: "적합↑ · 집객↑", color: "#22c55e" },
+                { label: "집객 지원",  sub: "적합↓ · 집객↑", color: "#f59e0b" },
+                { label: "틈새 타깃", sub: "적합↑ · 집객↓", color: "#60a5fa" },
+                { label: "보류",       sub: "적합↓ · 집객↓", color: "#d1d5db" },
+              ].map(q => (
+                <div key={q.label} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                  <span style={{
+                    width: "8px", height: "8px", borderRadius: "2px",
+                    background: q.color, flexShrink: 0, display: "inline-block",
+                  }} />
+                  <span style={{ fontSize: "11px", color: COLOR_INK, fontFamily: TOKEN_FONT_BODY, fontWeight: 500 }}>
+                    {q.label}
+                  </span>
+                  <span style={{ fontSize: "10px", color: COLOR_SUB, fontFamily: TOKEN_FONT_BODY }}>
+                    {q.sub}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Right Panel (Matrix Graph Area & Drawer Overlay) ── */}
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        background: "#ffffff",
-        border: "1px solid #dededi",
-        borderRadius: "5px",
-        boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-        position: "relative",
-        overflow: "hidden"
-      }}>
+      {/* ── Right Column (Hero + Matrix Card) ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ maxWidth: "1232px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "16px", height: "100%" }}>
+
+        {/* Hero */}
+        <div style={{ paddingBottom: "20px", borderBottom: "1px solid #e8eaed" }}>
+          <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", margin: "0 0 8px" }}>DIAGNOSE</p>
+          <h1 style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-0.02em", color: "#0d0d0e", margin: "0 0 6px" }}>
+            {mode === "mezzanine" ? "Fit × Draw." : "Diagnose Your Lineup."}
+          </h1>
+          <p style={{ fontSize: "14px", color: "#4b5563", margin: 0, lineHeight: 1.6 }}>
+            {mode === "mezzanine" ? "적합성 × 집객력으로 입점 후보를 진단합니다." : "수요×마진으로 상품을 줄 세우고 키울지 내릴지 정한다."}
+          </p>
+        </div>
+
+        {/* Matrix Card */}
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          background: "#ffffff",
+          border: "1px solid #dededi",
+          borderRadius: "5px",
+          boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+          position: "relative",
+          overflow: "hidden"
+        }}>
+
         {/* Graph Header Row */}
         <div style={{
           display: "flex",
@@ -628,6 +743,53 @@ export default function DiagnosisTab({
               )}
             </div>
 
+            {/* 카테고리 필터 */}
+            {mode === "sellfit" && (
+              <div style={{ position: "relative" }} ref={categoryRef}>
+                <div
+                  onClick={() => setCategoryOpen(v => !v)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "6px",
+                    padding: "6px 12px", border: "1px solid #e8eaed",
+                    borderRadius: "5px", cursor: "pointer",
+                    fontSize: "13px", color: "#4a4f57", fontWeight: 500,
+                    background: categoryFilter !== "all" ? "#fff5f7" : "#ffffff",
+                  }}>
+                  <i className="ti ti-tag" style={{ fontSize: "11px", color: categoryFilter !== "all" ? "#ef567c" : "#8f9399" }} />
+                  <span style={{ color: categoryFilter !== "all" ? "#ef567c" : undefined }}>
+                    {categoryFilter === "all" ? "All categories" : categoryFilter}
+                  </span>
+                  {categoryFilter !== "all" && (
+                    <span onClick={e => { e.stopPropagation(); setCategoryFilter("all"); }} style={{ fontSize: "11px", color: "#ef567c", marginLeft: "2px" }}>✕</span>
+                  )}
+                  <i className="ti ti-chevron-down" style={{ fontSize: "10px", marginLeft: "2px" }} />
+                </div>
+                {categoryOpen && (
+                  <div style={{
+                    position: "absolute", top: "32px", left: 0,
+                    background: "white", border: "1px solid #e8eaed",
+                    borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                    padding: "4px 0", minWidth: "160px", zIndex: 50,
+                  }}>
+                    <div onClick={() => { setCategoryFilter("all"); setCategoryOpen(false); }}
+                      style={{ padding: "7px 14px", fontSize: "12px", cursor: "pointer", color: categoryFilter === "all" ? "#ef567c" : "#4a4f57", fontWeight: categoryFilter === "all" ? 600 : 400, display: "flex", justifyContent: "space-between" }}
+                      className="hover:bg-[#f9fafb]">
+                      <span>All categories</span>
+                      {categoryFilter === "all" && <i className="ti ti-check" style={{ fontSize: "10px", color: "#ef567c" }} />}
+                    </div>
+                    {uniqueCategories.map(cat => (
+                      <div key={cat} onClick={() => { setCategoryFilter(cat); setCategoryOpen(false); }}
+                        style={{ padding: "7px 14px", fontSize: "12px", cursor: "pointer", color: categoryFilter === cat ? "#ef567c" : "#4a4f57", fontWeight: categoryFilter === cat ? 600 : 400, display: "flex", justifyContent: "space-between" }}
+                        className="hover:bg-[#f9fafb]">
+                        <span>{cat}</span>
+                        {categoryFilter === cat && <i className="ti ti-check" style={{ fontSize: "10px", color: "#ef567c" }} />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <span style={{ fontSize: "12px", color: "#8f9399" }}>
               Showing {filteredProducts.length} prioritized Ideas
             </span>
@@ -716,6 +878,30 @@ export default function DiagnosisTab({
               )
             )}
 
+            {mode === "sellfit" && storeId && (
+              <button
+                onClick={async (e) => {
+                  const btn = e.currentTarget;
+                  btn.disabled = true;
+                  btn.textContent = "⏳...";
+                  try {
+                    await fetch("/api/db/seed", { method: "POST" });
+                    window.location.reload();
+                  } catch {
+                    btn.disabled = false;
+                    btn.textContent = "데모 리셋";
+                  }
+                }}
+                style={{
+                  background: "#ffffff", border: "1px solid #dededi",
+                  borderRadius: "5px", padding: "5px 10px",
+                  fontSize: "11px", color: "#64676b", fontWeight: 500,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                데모 리셋
+              </button>
+            )}
             <button style={{
               background: "#ffffff",
               border: "1px solid #dededi",
@@ -1100,7 +1286,7 @@ export default function DiagnosisTab({
                         style={{
                           marginTop: "10px", width: "100%",
                           padding: "9px 14px", borderRadius: "6px",
-                          background: "#3b4fd8", color: "#fff",
+                          background: "#111111", color: "#fff",
                           border: "none", fontSize: "12px", fontWeight: 600,
                           cursor: "pointer", fontFamily: "inherit",
                           display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
@@ -1151,6 +1337,12 @@ export default function DiagnosisTab({
                             ? "AI 초안 → 담당자가 현장 감각으로 다듬기. 승인 시 Aiges Pontos 기획 파트너 명의로 발송."
                             : "AI 초안 → 빈 대표·이다슬이 현장 감각으로 다듬기"}
                         </p>
+
+                        {offerErrors[pid] && (
+                          <div style={{ padding: "10px 14px", borderRadius: "7px", background: "#fef9c3", border: "1px solid #fde68a", fontSize: "12px", color: "#92400e", marginBottom: "12px" }}>
+                            {offerErrors[pid]}
+                          </div>
+                        )}
 
                         {offer ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -1214,7 +1406,7 @@ export default function DiagnosisTab({
                             href="https://www.instagram.com/"
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", background: "#3b4fd8", color: "white", fontSize: "13px", fontWeight: 700, textDecoration: "none", borderRadius: "8px", boxSizing: "border-box", marginBottom: "8px" }}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", background: "#111111", color: "white", fontSize: "13px", fontWeight: 700, textDecoration: "none", borderRadius: "8px", boxSizing: "border-box", marginBottom: "8px" }}
                           >
                             📲 인스타 → 방문 전환 →
                           </a>
@@ -1266,7 +1458,10 @@ export default function DiagnosisTab({
             </div>
           )}
         </div>
-      </div>
+      </div>{/* /Matrix Card */}
+      </div>{/* /Right Column inner (maxWidth:1232px) */}
+      </div>{/* /Right Column outer (flex:1) */}
+    </div>
     </div>
   );
 }

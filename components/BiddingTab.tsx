@@ -131,23 +131,23 @@ export default function BiddingTab() {
     : { background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#15803d" };
 
   return (
-    <div className="lg:grid" style={{ gridTemplateColumns: "200px minmax(0, 720px)", gap: "0 25vw" }}>
+    <div style={{ display: "flex", gap: "40px", alignItems: "flex-start" }}>
 
       {/* ── LEFT: Hero sidebar ── */}
-      <div className="mb-6 lg:mb-0" style={{ background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed" }}>
+      <div className="mb-6 lg:mb-0" style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed" }}>
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>
           AD STRATEGY
         </p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>
           광고 대행사 없이, AI가 대신
         </p>
-        <p style={{ fontSize: "11px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>
           적은 예산으로 상단 노출
         </p>
         {["소규모 예산 최적화", "AI 추정 입찰가 제안", "단계별 광고 로드맵"].map(f => (
           <div key={f} style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px" }}>
             <span style={{ fontSize: "10px", color: "#c0c4cc", flexShrink: 0 }}>✓</span>
-            <span style={{ fontSize: "11px", color: "#8f9399" }}>{f}</span>
+            <span style={{ fontSize: "13px", color: "#8f9399" }}>{f}</span>
           </div>
         ))}
 
@@ -170,12 +170,14 @@ export default function BiddingTab() {
       </div>
 
       {/* ── RIGHT: Card ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ maxWidth: "1232px", margin: "0 auto" }}>
       <div style={CARD} className="p-5">
         {/* Card header */}
         <div className="mb-5">
           <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "#9ca3af" }}>전략 생성</p>
-          <h2 className="font-bold text-base" style={{ color: "#1a1a1a" }}>키워드 입찰 전략</h2>
-          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>상품 정보를 입력하면 AI가 최적 전략을 만듭니다</p>
+          <h2 className="font-bold text-xl" style={{ color: "#111827" }}>키워드 입찰 전략</h2>
+          <p className="text-sm mt-0.5" style={{ color: "#6b7280" }}>상품 정보를 입력하면 AI가 최적 전략을 만듭니다</p>
         </div>
 
         {/* Form */}
@@ -323,10 +325,10 @@ export default function BiddingTab() {
                     )}
                     {kw.bid_command && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "#f7f8fa", border: "1px solid #e8eaed" }}>
-                        <p className="text-xs font-medium" style={{ color: "#4a4f57" }}>👉 {kw.bid_command}</p>
+                        <p className="text-sm font-medium" style={{ color: "#4a4f57" }}>👉 {kw.bid_command}</p>
                       </div>
                     )}
-                    <p className="text-xs mt-2" style={{ color: "#9ca3af" }}>{kw.reason}</p>
+                    <p className="text-sm mt-2 leading-[1.75]" style={{ color: "#4b5563" }}>{kw.reason}</p>
                   </div>
                 ))}
               </div>
@@ -346,7 +348,7 @@ export default function BiddingTab() {
                     <p className="font-extrabold text-2xl" style={{ color: "#1a1a1a" }}>{result.budget_allocation.medium_keywords}%</p>
                   </div>
                 </div>
-                <p className="text-xs" style={{ color: "#6b7280" }}>{result.budget_allocation.reason}</p>
+                <p className="text-sm leading-[1.75]" style={{ color: "#4b5563" }}>{result.budget_allocation.reason}</p>
               </div>
             )}
 
@@ -363,7 +365,7 @@ export default function BiddingTab() {
                     <div key={i} className="flex gap-2.5 rounded-lg p-2.5" style={{ background: "white", border: "1px solid #f0f1f3" }}>
                       <span className="text-[10px] font-medium px-2 py-1 rounded-md flex-shrink-0 h-fit"
                         style={p.chip}>{p.label}</span>
-                      <p className="text-xs" style={{ color: "#4a4f57" }}>{p.content}</p>
+                      <p className="text-sm leading-[1.75]" style={{ color: "#4b5563" }}>{p.content}</p>
                     </div>
                   ))}
                 </div>
@@ -386,7 +388,7 @@ export default function BiddingTab() {
                   {result.tips.map((tip, i) => (
                     <div key={i} className="flex gap-2 items-start">
                       <span className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>•</span>
-                      <p className="text-sm" style={{ color: "#374151" }}>{tip}</p>
+                      <p className="text-sm leading-[1.75]" style={{ color: "#4b5563" }}>{tip}</p>
                     </div>
                   ))}
                 </div>
@@ -396,6 +398,8 @@ export default function BiddingTab() {
             <PolicyFilter text={[...(result.keywords?.map(k => k.keyword) ?? []), ...(result.tips ?? [])].join(" ")} />
           </div>
         )}
+      </div>
+      </div>
       </div>
     </div>
   );

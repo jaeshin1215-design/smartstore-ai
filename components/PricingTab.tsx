@@ -134,23 +134,23 @@ export default function PricingTab() {
   };
 
   return (
-    <div className="lg:grid" style={{ gridTemplateColumns: "200px minmax(0, 720px)", gap: "0 25vw" }}>
+    <div style={{ display: "flex", gap: "40px", alignItems: "flex-start" }}>
 
       {/* ── LEFT: Hero sidebar ── */}
-      <div className="mb-6 lg:mb-0" style={{ background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed" }}>
+      <div className="mb-6 lg:mb-0" style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed" }}>
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>
           PRICE OPTIMIZER
         </p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>
           얼마에 팔아야 남지?
         </p>
-        <p style={{ fontSize: "11px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>
           매입가 → AI 마진 전략
         </p>
         {["수수료·배송비 자동 계산", "경쟁사 가격 비교 분석", "마진율 최적화 전략"].map(f => (
           <div key={f} style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px" }}>
             <span style={{ fontSize: "10px", color: "#c0c4cc", flexShrink: 0 }}>✓</span>
-            <span style={{ fontSize: "11px", color: "#8f9399" }}>{f}</span>
+            <span style={{ fontSize: "13px", color: "#8f9399" }}>{f}</span>
           </div>
         ))}
 
@@ -176,12 +176,14 @@ export default function PricingTab() {
       </div>
 
       {/* ── RIGHT: Card ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ maxWidth: "1232px", margin: "0 auto" }}>
       <div style={CARD} className="p-5">
         {/* Card header */}
         <div className="mb-5">
           <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "#9ca3af" }}>가격 분석</p>
-          <h2 className="font-bold text-base" style={{ color: "#1a1a1a" }}>최적 판매가 계산</h2>
-          <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>매입가 입력 → AI가 마진 전략 분석</p>
+          <h2 className="font-bold text-xl" style={{ color: "#111827" }}>최적 판매가 계산</h2>
+          <p className="text-sm mt-0.5" style={{ color: "#6b7280" }}>매입가 입력 → AI가 마진 전략 분석</p>
         </div>
 
         {/* Form */}
@@ -413,7 +415,7 @@ export default function PricingTab() {
             {/* Strategy */}
             <div className="rounded-xl p-4" style={{ background: "#f9fafb", border: "1px solid #e8eaed" }}>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#9ca3af" }}>가격 전략</p>
-              <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>{result.strategy}</p>
+              <p className="text-sm leading-[1.75]" style={{ color: "#4b5563" }}>{result.strategy}</p>
             </div>
 
             {/* Tips */}
@@ -425,7 +427,7 @@ export default function PricingTab() {
                     <div key={i} className="flex gap-2.5 items-start">
                       <span className="w-5 h-5 rounded-full text-[10px] font-medium flex items-center justify-center flex-shrink-0 mt-0.5"
                         style={{ background: "#f0f1f3", color: "#64676b" }}>{i + 1}</span>
-                      <p className="text-sm" style={{ color: "#374151" }}>{tip}</p>
+                      <p className="text-sm leading-[1.75]" style={{ color: "#4b5563" }}>{tip}</p>
                     </div>
                   ))}
                 </div>
@@ -442,6 +444,8 @@ export default function PricingTab() {
             <PolicyFilter text={[result.strategy, ...(result.tips ?? [])].join(" ")} />
           </div>
         )}
+      </div>
+      </div>
       </div>
     </div>
   );
