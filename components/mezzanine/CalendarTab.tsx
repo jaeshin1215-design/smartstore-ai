@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { DemoBadge } from "@/components/DemoBadge";
@@ -342,14 +342,14 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
               border: `1px solid ${COLOR_RULE}`, borderRadius: "6px",
               background: "#fff", cursor: "pointer",
               padding: "6px 14px", fontFamily: FONT_BODY,
-              fontSize: "14px", color: COLOR_SUB,
+              fontSize: "12px", color: COLOR_SUB,
             }}
           >
             ← 캘린더로
           </button>
           <div style={{ textAlign: "right" }}>
             <p style={{
-              fontFamily: FONT_BODY, fontSize: "13px",
+              fontFamily: FONT_BODY, fontSize: "11px",
               letterSpacing: "0.18em", color: "#9ca3af",
               textTransform: "uppercase", margin: "0 0 3px",
             }}>
@@ -357,14 +357,14 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
               <p style={{
-                fontFamily: FONT_BODY, fontSize: "13px",
+                fontFamily: FONT_BODY, fontSize: "10px",
                 letterSpacing: "0.08em", color: "#bdbdbd",
                 margin: 0, textTransform: "uppercase",
               }}>
                 {String(month).padStart(2, "0")} / 12 · 운영 해부도
               </p>
               <span style={{
-                fontSize: "12px", fontWeight: 500,
+                fontSize: "9px", fontWeight: 500,
                 padding: "2px 8px", borderRadius: "4px",
                 background: "#fef9c3", color: "#92400e",
                 border: "1px solid #fde68a",
@@ -410,7 +410,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                     <polyline points="21 15 16 10 5 21"/>
                   </svg>
                   <p style={{
-                    fontSize: "13px", color: "rgba(17,17,17,0.3)",
+                    fontSize: "10px", color: "rgba(17,17,17,0.3)",
                     fontFamily: FONT_BODY, margin: 0,
                     textAlign: "center", lineHeight: 1.6,
                   }}>
@@ -421,13 +421,13 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
             </div>
             {/* 캡션 */}
             <div style={{ marginTop: "12px" }}>
-              <p style={{ fontFamily: FONT_SERIF, fontSize: "14px", fontWeight: 400, color: COLOR_INK, margin: "0 0 1px" }}>
+              <p style={{ fontFamily: FONT_SERIF, fontSize: "12px", fontWeight: 400, color: COLOR_INK, margin: "0 0 1px" }}>
                 Kim Jung Man
               </p>
-              <p style={{ fontFamily: FONT_SERIF, fontSize: "14px", fontStyle: "italic", fontWeight: 400, color: COLOR_INK, margin: "0 0 5px" }}>
+              <p style={{ fontFamily: FONT_SERIF, fontSize: "12px", fontStyle: "italic", fontWeight: 400, color: COLOR_INK, margin: "0 0 5px" }}>
                 {photo.series}
               </p>
-              <p style={{ fontFamily: FONT_BODY, fontSize: "13px", color: "#9ca3af", margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontFamily: FONT_BODY, fontSize: "11px", color: "#9ca3af", margin: 0, lineHeight: 1.5 }}>
                 {photo.description} · 무드 레퍼런스
               </p>
             </div>
@@ -436,7 +436,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
           {/* 우: 앵커 텍스트 위계 */}
           <div style={{ paddingTop: "6px" }}>
             <p style={{
-              fontFamily: FONT_BODY, fontSize: "13px",
+              fontFamily: FONT_BODY, fontSize: "10px",
               letterSpacing: "0.15em", textTransform: "uppercase",
               color: "#9ca3af", margin: "0 0 16px",
             }}>
@@ -474,13 +474,13 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                 <line x1="12" y1="8" x2="12" y2="12"/>
                 <line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
-              <span style={{ fontFamily: FONT_BODY, fontSize: "13px", color: "#3b82f6", letterSpacing: "0.02em" }}>
+              <span style={{ fontFamily: FONT_BODY, fontSize: "11px", color: "#3b82f6", letterSpacing: "0.02em" }}>
                 무드 레퍼런스 · 비전 예시
               </span>
             </div>
             <span style={{
               display: "inline-block", fontFamily: FONT_BODY,
-              fontSize: "12px", fontWeight: 500,
+              fontSize: "9px", fontWeight: 500,
               padding: "2px 8px", borderRadius: "4px",
               background: "#f3f4f6", color: "#6b7280",
               border: "1px solid #d1d5db", letterSpacing: "0.04em",
@@ -504,7 +504,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                     return (
                       <div key={brand.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{
-                          fontSize: "10px", fontWeight: 500, padding: "2px 6px", borderRadius: "3px",
+                          fontSize: "8px", fontWeight: 500, padding: "2px 6px", borderRadius: "3px",
                           background: lbl.bg, color: lbl.color, border: `1px solid ${lbl.border}`,
                           fontFamily: FONT_BODY, flexShrink: 0,
                         }}>{lbl.text}</span>
@@ -517,7 +517,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                     );
                   })}
                   {sc?.fb && (
-                    <p style={{ fontSize: "13px", color: "#9ca3af", fontFamily: FONT_BODY, margin: "4px 0 0", lineHeight: 1.55 }}>
+                    <p style={{ fontSize: "11px", color: "#9ca3af", fontFamily: FONT_BODY, margin: "4px 0 0", lineHeight: 1.55 }}>
                       {sc.fb}
                     </p>
                   )}
@@ -539,11 +539,11 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                     return (
                       <div key={brand.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{
-                          fontSize: "10px", fontWeight: 500, padding: "2px 6px", borderRadius: "3px",
+                          fontSize: "8px", fontWeight: 500, padding: "2px 6px", borderRadius: "3px",
                           background: lbl.bg, color: lbl.color, border: `1px solid ${lbl.border}`,
                           fontFamily: FONT_BODY, flexShrink: 0,
                         }}>{lbl.text}</span>
-                        <span style={{ fontSize: "14px", color: COLOR_INK, fontFamily: FONT_BODY }}>
+                        <span style={{ fontSize: "12px", color: COLOR_INK, fontFamily: FONT_BODY }}>
                           {brand.status === "MANUAL_VERIFIED" && brand.name
                             ? brand.name
                             : `${CATEGORY_KR[brand.category] ?? brand.category} 후보`}
@@ -553,12 +553,12 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                   })}
                 </div>
               ) : (
-                <p style={{ fontSize: "14px", color: "#9ca3af", fontFamily: FONT_BODY, margin: 0 }}>
+                <p style={{ fontSize: "12px", color: "#9ca3af", fontFamily: FONT_BODY, margin: 0 }}>
                   {sc?.target ?? "발굴 대기"}
                 </p>
               )}
               {sc?.target && targets.length === 0 && (
-                <p style={{ fontSize: "13px", color: "#9ca3af", fontFamily: FONT_BODY, margin: "8px 0 0", lineHeight: 1.55 }}>
+                <p style={{ fontSize: "11px", color: "#9ca3af", fontFamily: FONT_BODY, margin: "8px 0 0", lineHeight: 1.55 }}>
                   목표 구성 · {sc.target}
                 </p>
               )}
@@ -605,7 +605,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "24px" }}>
             <p style={{ ...overlineStyle, margin: 0 }}>정산 구조 개요</p>
             <span style={{
-              fontSize: "12px", fontWeight: 500,
+              fontSize: "9px", fontWeight: 500,
               padding: "2px 8px", borderRadius: "4px",
               background: "#fef9c3", color: "#92400e",
               border: "1px solid #fde68a",
@@ -624,12 +624,12 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                 border: "0.5px solid rgba(17,17,17,0.15)",
                 borderRadius: "6px", padding: "16px 20px",
               }}>
-                <p style={{ fontFamily: FONT_BODY, fontSize: "13px", color: "#9ca3af", margin: "0 0 6px" }}>{c.label}</p>
+                <p style={{ fontFamily: FONT_BODY, fontSize: "11px", color: "#9ca3af", margin: "0 0 6px" }}>{c.label}</p>
                 <p style={{
                   fontFamily: FONT_SERIF, fontSize: "18px", fontWeight: 400,
                   color: COLOR_INK, margin: 0, letterSpacing: "-0.01em",
                 }}>{c.value}</p>
-                {c.sub && <p style={{ fontFamily: FONT_BODY, fontSize: "13px", color: COLOR_SUB, margin: "3px 0 0" }}>{c.sub}</p>}
+                {c.sub && <p style={{ fontFamily: FONT_BODY, fontSize: "11px", color: COLOR_SUB, margin: "3px 0 0" }}>{c.sub}</p>}
               </div>
             ))}
           </div>
@@ -642,18 +642,18 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
               { n: 4, label: "유료 체험 클래스", note: "" },
             ] as { n: number; label: string; note: string }[]).map(r => (
               <div key={r.n} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontFamily: FONT_BODY, fontSize: "13px", color: "#bdbdbd", minWidth: "40px" }}>
+                <span style={{ fontFamily: FONT_BODY, fontSize: "10px", color: "#bdbdbd", minWidth: "40px" }}>
                   수익원 {r.n}
                 </span>
                 <span style={{ fontFamily: FONT_BODY, fontSize: "13px", color: COLOR_INK }}>{r.label}</span>
                 {r.note && (
-                  <span style={{ fontFamily: FONT_BODY, fontSize: "13px", color: "#9ca3af" }}>— {r.note}</span>
+                  <span style={{ fontFamily: FONT_BODY, fontSize: "10px", color: "#9ca3af" }}>— {r.note}</span>
                 )}
               </div>
             ))}
           </div>
           <p style={{
-            fontFamily: FONT_SERIF, fontSize: "13px",
+            fontFamily: FONT_SERIF, fontSize: "11px",
             fontStyle: "italic", color: "#9ca3af", margin: 0,
           }}>
             * 조정 가능한 기준 안
@@ -687,7 +687,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
               width: "100%", padding: "10px 0",
               border: `1px solid ${COLOR_RULE}`, borderRadius: "6px",
               background: "#fff", cursor: "pointer",
-              fontSize: "14px", color: COLOR_SUB, fontFamily: FONT_BODY,
+              fontSize: "12px", color: COLOR_SUB, fontFamily: FONT_BODY,
               letterSpacing: "0.06em",
             }}
           >
@@ -720,7 +720,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
           </h1>
           {/* 한글 보조 */}
           <p style={{
-            fontSize: "14px", color: COLOR_SUB,
+            fontSize: "12px", color: COLOR_SUB,
             fontFamily: FONT_BODY, lineHeight: 1, marginBottom: "12px",
           }}>
             내 공간의 1년.
@@ -728,7 +728,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
 
           {/* 본문 설명 (한글 유지) */}
           <p style={{
-            fontSize: "14px", color: COLOR_SUB,
+            fontSize: "12px", color: COLOR_SUB,
             fontFamily: FONT_BODY, lineHeight: 1.75, margin: 0,
           }}>
             헤드라이너가 사람을 모으고,<br />
@@ -759,7 +759,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                     }}
                   >
                     <p style={{
-                      fontSize: "14px", fontWeight: isActive ? 600 : 400,
+                      fontSize: "12px", fontWeight: isActive ? 600 : 400,
                       color: isActive ? "#fff" : COLOR_INK,
                       fontFamily: FONT_BODY, margin: 0, lineHeight: 1,
                     }}>
@@ -792,7 +792,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                   border: `1px solid ${filter.season === s ? COLOR_INK : COLOR_RULE}`,
                   background: filter.season === s ? COLOR_INK : "#fff",
                   color: filter.season === s ? "#fff" : COLOR_SUB,
-                  fontSize: "14px", fontWeight: filter.season === s ? 600 : 400,
+                  fontSize: "12px", fontWeight: filter.season === s ? 600 : 400,
                   fontFamily: FONT_BODY, cursor: "pointer",
                   letterSpacing: "0.06em",
                   transition: "all 0.12s",
@@ -802,7 +802,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
               </button>
             ))}
             {loading && (
-              <span style={{ fontSize: "13px", color: COLOR_SUB, fontFamily: FONT_BODY }}>
+              <span style={{ fontSize: "11px", color: COLOR_SUB, fontFamily: FONT_BODY }}>
                 재배치 중…
               </span>
             )}
@@ -818,7 +818,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
               <p style={{ ...overlineStyle, marginBottom: "10px" }}>
                 미배정 후보 대기열 · MATCH SESSION
               </p>
-              <p style={{ fontSize: "13px", color: "#9ca3af", fontFamily: FONT_BODY, marginBottom: "12px" }}>
+              <p style={{ fontSize: "11px", color: "#9ca3af", fontFamily: FONT_BODY, marginBottom: "12px" }}>
                 아래 후보는 AI 1차 분류 결과입니다. Discover → "게이트 A 등록" 후 해당 시즌 월 칸에 확정 표시됩니다.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -831,10 +831,10 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                       border: `1px dashed ${style.border}`,
                       background: style.bg,
                     }}>
-                      <span style={{ fontSize: "13px", fontWeight: 600, color: style.color, fontFamily: FONT_BODY }}>
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: style.color, fontFamily: FONT_BODY }}>
                         {style.label}
                       </span>
-                      <span style={{ fontSize: "13px", color: style.color, opacity: 0.8, fontFamily: FONT_BODY }}>
+                      <span style={{ fontSize: "11px", color: style.color, opacity: 0.8, fontFamily: FONT_BODY }}>
                         {count}건
                       </span>
                     </div>
@@ -901,7 +901,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                       {/* 한글 보조 */}
                       <p style={{
                         fontFamily: FONT_BODY,
-                        fontSize: "13px", color: "rgba(17,17,17,0.45)",
+                        fontSize: "11px", color: "rgba(17,17,17,0.45)",
                         margin: "5px 0 0", letterSpacing: "0.02em",
                       }}>
                         {MONTH_KR[month - 1]}
@@ -909,7 +909,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                       {/* 시즌 라벨 (영문) */}
                       <p style={{
                         fontFamily: FONT_BODY,
-                        fontSize: "13px", fontWeight: 500,
+                        fontSize: "10px", fontWeight: 500,
                         color: "rgba(17,17,17,0.35)",
                         margin: "4px 0 0", letterSpacing: "0.08em",
                         textTransform: "uppercase",
@@ -945,13 +945,13 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                           return (
                             <div key={brand.id} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                               <span style={{
-                                fontSize: "10px", fontWeight: 600, padding: "1px 5px", borderRadius: "3px",
+                                fontSize: "8px", fontWeight: 600, padding: "1px 5px", borderRadius: "3px",
                                 background: lbl.bg, color: lbl.color, border: `1px solid ${lbl.border}`,
                                 fontFamily: FONT_BODY, flexShrink: 0,
                               }}>
                                 {lbl.text}
                               </span>
-                              <span style={{ fontSize: "14px", color: showName ? COLOR_INK : COLOR_SUB, fontWeight: showName ? 600 : 400, fontFamily: FONT_BODY, lineHeight: 1 }}>
+                              <span style={{ fontSize: "12px", color: showName ? COLOR_INK : COLOR_SUB, fontWeight: showName ? 600 : 400, fontFamily: FONT_BODY, lineHeight: 1 }}>
                                 {showName ? brand.name : `${CATEGORY_KR[brand.category] ?? brand.category} 후보`}
                               </span>
                             </div>
@@ -966,7 +966,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                         marginTop: "10px", paddingTop: "8px",
                         borderTop: "1px dashed #d1d5db",
                       }}>
-                        <p style={{ ...overlineStyle, fontSize: "12px", marginBottom: "5px", color: "#9ca3af" }}>
+                        <p style={{ ...overlineStyle, fontSize: "9px", marginBottom: "5px", color: "#9ca3af" }}>
                           MATCH SESSION · 미확정
                         </p>
                         <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
@@ -975,14 +975,14 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                             return (
                               <div key={cat} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                                 <span style={{
-                                  fontSize: "10px", fontWeight: 600, padding: "1px 5px", borderRadius: "3px",
+                                  fontSize: "8px", fontWeight: 600, padding: "1px 5px", borderRadius: "3px",
                                   background: style.bg, color: style.color,
                                   border: `1px dashed ${style.border}`,
                                   fontFamily: FONT_BODY,
                                 }}>
                                   {style.label}
                                 </span>
-                                <span style={{ fontSize: "13px", color: "#9ca3af", fontFamily: FONT_BODY }}>
+                                <span style={{ fontSize: "11px", color: "#9ca3af", fontFamily: FONT_BODY }}>
                                   {count}건 · 미등록
                                 </span>
                               </div>
@@ -995,7 +995,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                     {/* DISCOVER → */}
                     <div style={{ marginTop: "12px", textAlign: "right" }}>
                       <span style={{
-                        fontSize: "13px", color: "#d1d5db",
+                        fontSize: "11px", color: "#d1d5db",
                         fontFamily: FONT_BODY, letterSpacing: "0.06em",
                       }}>
                         DISCOVER →
