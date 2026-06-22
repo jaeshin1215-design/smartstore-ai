@@ -313,7 +313,7 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
     };
 
     return (
-      <div style={{ width: "100%", maxWidth: "860px" }}>
+      <div style={{ width: "100%" }}>
 
         {/* ── 1. 네비 + 월 라벨 ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "36px" }}>
@@ -357,13 +357,72 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
           </div>
         </div>
 
-        {/* ── 2. 도록 히어로 — 좌 사진 3:4 / 우 앵커 텍스트 ── */}
+        {/* ── 2. 히어로 — 시즌 컬러 배경, 좌 텍스트 / 우 사진 ── */}
         <div style={{
-          display: "grid", gridTemplateColumns: "260px 1fr",
+          display: "grid", gridTemplateColumns: "1fr 260px",
           gap: "2.5rem", alignItems: "start",
+          background: SEASON_BG[mSeason],
+          borderRadius: "8px",
+          padding: "28px 36px",
+          marginBottom: "32px",
         }}>
 
-          {/* 좌: 사진 슬롯 + 캡션 */}
+          {/* 좌: 앵커 텍스트 위계 */}
+          <div style={{ paddingTop: "6px" }}>
+            <p style={{
+              fontFamily: FONT_BODY, fontSize: "10px",
+              letterSpacing: "0.15em", textTransform: "uppercase",
+              color: "rgba(17,17,17,0.4)", margin: "0 0 16px",
+            }}>
+              Anchor Direction
+            </p>
+            <h2 style={{
+              fontFamily: FONT_SERIF, fontSize: "clamp(28px, 3vw, 44px)",
+              fontWeight: 700, color: COLOR_INK,
+              letterSpacing: "-0.02em", lineHeight: 1.15,
+              margin: "0 0 10px",
+            }}>
+              {sc?.anchor ?? "—"}
+            </h2>
+            <p style={{
+              fontFamily: FONT_SERIF, fontSize: "17px",
+              fontStyle: "italic", fontWeight: 400,
+              color: COLOR_SUB, margin: "0 0 22px", lineHeight: 1.35,
+            }}>
+              {sc?.theme ?? "—"}
+            </p>
+            {sc?.killer && (
+              <p style={{
+                fontFamily: FONT_BODY, fontSize: "14px", color: COLOR_INK,
+                margin: "0 0 28px", lineHeight: 1.75,
+              }}>
+                {sc.killer}
+              </p>
+            )}
+            {/* 무드 배지 */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                stroke="#3b82f6" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span style={{ fontFamily: FONT_BODY, fontSize: "11px", color: "#3b82f6", letterSpacing: "0.02em" }}>
+                무드 레퍼런스 · 비전 예시
+              </span>
+            </div>
+            <span style={{
+              display: "inline-block", fontFamily: FONT_BODY,
+              fontSize: "9px", fontWeight: 500,
+              padding: "2px 8px", borderRadius: "4px",
+              background: "#f3f4f6", color: "#6b7280",
+              border: "1px solid #d1d5db", letterSpacing: "0.04em",
+            }}>
+              섭외 미확정
+            </span>
+          </div>
+
+          {/* 우: 사진 슬롯 + 캡션 */}
           <div>
             <div style={{
               aspectRatio: "3 / 4",
@@ -412,62 +471,6 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
                 {photo.description} · 무드 레퍼런스
               </p>
             </div>
-          </div>
-
-          {/* 우: 앵커 텍스트 위계 */}
-          <div style={{ paddingTop: "6px" }}>
-            <p style={{
-              fontFamily: FONT_BODY, fontSize: "10px",
-              letterSpacing: "0.15em", textTransform: "uppercase",
-              color: "#9ca3af", margin: "0 0 16px",
-            }}>
-              Anchor Direction
-            </p>
-            <h2 style={{
-              fontFamily: FONT_SERIF, fontSize: "clamp(22px, 2.5vw, 30px)",
-              fontWeight: 400, color: COLOR_INK,
-              letterSpacing: "-0.02em", lineHeight: 1.15,
-              margin: "0 0 10px",
-            }}>
-              {sc?.anchor ?? "—"}
-            </h2>
-            <p style={{
-              fontFamily: FONT_SERIF, fontSize: "17px",
-              fontStyle: "italic", fontWeight: 400,
-              color: COLOR_SUB, margin: "0 0 22px", lineHeight: 1.35,
-            }}>
-              {sc?.theme ?? "—"}
-            </p>
-            {sc?.killer && (
-              <p style={{
-                fontFamily: FONT_BODY, fontSize: "14px", color: COLOR_INK,
-                margin: "0 0 28px", lineHeight: 1.75,
-                maxWidth: "38ch",
-              }}>
-                {sc.killer}
-              </p>
-            )}
-            {/* 무드 배지 */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                stroke="#3b82f6" strokeWidth="2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              <span style={{ fontFamily: FONT_BODY, fontSize: "11px", color: "#3b82f6", letterSpacing: "0.02em" }}>
-                무드 레퍼런스 · 비전 예시
-              </span>
-            </div>
-            <span style={{
-              display: "inline-block", fontFamily: FONT_BODY,
-              fontSize: "9px", fontWeight: 500,
-              padding: "2px 8px", borderRadius: "4px",
-              background: "#f3f4f6", color: "#6b7280",
-              border: "1px solid #d1d5db", letterSpacing: "0.04em",
-            }}>
-              섭외 미확정
-            </span>
           </div>
         </div>
 
