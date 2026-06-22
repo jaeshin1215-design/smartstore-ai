@@ -359,11 +359,11 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
 
         {/* ── 2. 히어로 — 시즌 컬러 배경, 좌 텍스트 / 우 사진 ── */}
         <div style={{
-          display: "grid", gridTemplateColumns: "1fr 320px",
+          display: "grid", gridTemplateColumns: "1fr 480px",
           gap: "1.5rem", alignItems: "start",
           background: SEASON_BG[mSeason],
           borderRadius: "8px",
-          padding: "24px 28px",
+          padding: "24px 56px 24px 28px",
           marginBottom: "28px",
         }}>
 
