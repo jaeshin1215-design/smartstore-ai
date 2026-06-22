@@ -92,7 +92,11 @@ export async function POST(req: NextRequest) {
       }
     }
     return NextResponse.json({ error: "파싱 실패" }, { status: 500 });
-  } catch {
-    return NextResponse.json({ error: "생성 실패" }, { status: 500 });
+  } catch (e) {
+    const isRateLimit = String(e).includes("GEMINI_RATE_LIMIT");
+    return NextResponse.json(
+      { error_type: isRateLimit ? "rate_limit" : "server_error" },
+      { status: isRateLimit ? 429 : 500 }
+    );
   }
 }

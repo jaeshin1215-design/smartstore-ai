@@ -5,240 +5,265 @@ export async function POST() {
   try {
     const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
     const storeId = "demo-store-001";
+    const BASE_URL = "https://smartstore.naver.com/easy-story";
 
-    // 1. 기존 데모 스토어 삭제 후 재삽입 (Idempotent 보장)
-    await db.execute({
-      sql: "DELETE FROM sellfit_stores WHERE id = ?",
-      args: [storeId]
-    });
+    // 1. 스토어 덮어쓰기
+    await db.execute({ sql: "DELETE FROM sellfit_stores WHERE id = ?", args: [storeId] });
     await db.execute({
       sql: "INSERT INTO sellfit_stores (id, name, email, kakao) VALUES (?, ?, ?, ?)",
-      args: [storeId, "데모 윈디 스토어", "demo@sellfit.kr", "01000000000"]
+      args: [storeId, "이지스토리 데모", "demo@sellfit.kr", "01000000000"],
     });
 
-    // 2. 기존 데모 상품 삭제 후 재삽입
-    // 2. 기존 데모 상품 삭제 후 재삽입
-    await db.execute({
-      sql: "DELETE FROM sellfit_products WHERE store_id = ?",
-      args: [storeId]
-    });
+    // 2. 이전 시드 잔재 포함 전체 삭제 (es-p-* 구형 + es-P-* 신형)
+    await db.execute({ sql: "DELETE FROM sellfit_daily_metrics WHERE product_id LIKE 'es-%'", args: [] });
+    await db.execute({ sql: "DELETE FROM sellfit_products WHERE store_id = ?", args: [storeId] });
 
-    const seedProducts = [
-      {
-        id: "demo-p-001",
-        name: "데모 이지백 압축팩 10L",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "압축팩",
-        category: "압축팩",
-        price: 12900,
-        is_own: 1,
-        purchase_price: 3500,
-        is_price_confirmed: 1,
-        matrix_x: 32,
-        matrix_y: 78
-      },
-      {
-        id: "demo-p-002",
-        name: "이지스토리 프리미엄 다리미판",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "다리미판",
-        category: "다리미판",
-        price: 29800,
-        is_own: 1,
-        purchase_price: 6000,
-        is_price_confirmed: 1,
-        matrix_x: 72,
-        matrix_y: 82
-      },
-      {
-        id: "demo-p-003",
-        name: "이지스토리 감성 도자기 화분",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "화분",
-        category: "화분",
-        price: 18500,
-        is_own: 1,
-        purchase_price: 9500,
-        is_price_confirmed: 1,
-        matrix_x: 22,
-        matrix_y: 28
-      },
-      {
-        id: "demo-p-004",
-        name: "이지스토리 두꺼운 유아매트",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "유아매트",
-        category: "유아매트",
-        price: 89000,
-        is_own: 1,
-        purchase_price: 52000,
-        is_price_confirmed: 1,
-        matrix_x: 82,
-        matrix_y: 18
-      },
-      {
-        id: "demo-p-005",
-        name: "경쟁사 파워 압축팩",
-        url: "https://smartstore.naver.com/comp",
-        keyword: "압축팩",
-        category: "압축팩",
-        price: 11500,
-        is_own: 0,
-        purchase_price: 0,
-        is_price_confirmed: 0,
-        matrix_x: 36,
-        matrix_y: 32
-      },
-      {
-        id: "demo-p-006",
-        name: "[후보] 휴대용 미니 건조기",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "건조기",
-        category: "가전",
-        price: 149000,
-        is_own: 2,
-        purchase_price: 45000,
-        is_price_confirmed: 0,
-        matrix_x: 86,
-        matrix_y: 70
-      },
-      {
-        id: "demo-p-007",
-        name: "[후보] 자동 급수 스마트 화분",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "화분",
-        category: "화분",
-        price: 24000,
-        is_own: 2,
-        purchase_price: 16000,
-        is_price_confirmed: 0,
-        matrix_x: 18,
-        matrix_y: 22
-      },
-      {
-        id: "demo-p-008",
-        name: "[후보] 초경량 접이식 다리미판",
-        url: "https://smartstore.naver.com/demo",
-        keyword: "다리미판",
-        category: "다리미판",
-        price: 34000,
-        is_own: 2,
-        purchase_price: 24000,
-        is_price_confirmed: 0,
-        matrix_x: 66,
-        matrix_y: 38
-      }
+    // 3. easystory 140개 상품 (P001-P140, Wendy 가정값 데이터셋)
+    // 컬럼: [id, name, keyword, category, price, matrix_x, matrix_y]
+    // purchase_price = round(price * (1 - matrix_y/100))
+    const prods: [string, string, string, string, number, number, number][] = [
+      // ── 수납·정리함 P001-P062 ─────────────────────────────────────────
+      ["es-P001","시스맥스 멀티박스 12단","수납함","수납·정리함",48900,67,80],
+      ["es-P002","시스맥스 시스템서랍 2단 책상정리함","수납함","수납·정리함",13900,64,46],
+      ["es-P003","시스맥스 시스템서랍","수납함","수납·정리함",23900,61,58],
+      ["es-P004","마이홈 포로타 정리함","수납함","수납·정리함",6900,75,32],
+      ["es-P005","리템 루버스 슬라이드 리빙박스 정리함","수납함","수납·정리함",14900,47,40],
+      ["es-P006","리템 슬라이드 다보탑 리빙박스","수납함","수납·정리함",23900,46,58],
+      ["es-P007","후맥스 스토리지 리빙박스","수납함","수납·정리함",9900,48,40],
+      ["es-P008","슈맥스 콜라스 리빙박스 정리함","수납함","수납·정리함",3500,49,26],
+      ["es-P009","빌로 미니 소품함","수납함","수납·정리함",6500,65,26],
+      ["es-P010","빌로 베스킷","수납함","수납·정리함",7900,50,40],
+      ["es-P011","포로 핸들수납","수납함","수납·정리함",7900,58,40],
+      ["es-P012","데스크 수납 케이스 서류함","수납함","수납·정리함",14900,64,40],
+      ["es-P013","다목적 시스템 서류보관함","수납함","수납·정리함",26000,47,58],
+      ["es-P014","냅스 멀티박스 반찬보관 정리함","수납함","수납·정리함",32000,57,58],
+      ["es-P015","미니 다용도 3칸 미니서랍","수납함","수납·정리함",15000,57,40],
+      ["es-P016","포포타 비타 미니 소품 정리함","수납함","수납·정리함",4200,64,26],
+      ["es-P017","마이홈 회전 소품 정리대","수납함","수납·정리함",4900,59,26],
+      ["es-P018","시스맥스 회전 소품 정리함","수납함","수납·정리함",5900,61,26],
+      ["es-P019","마이홈 스탠드 트레이","수납함","수납·정리함",6900,53,26],
+      ["es-P020","콜라보 데스크 오거나이저","수납함","수납·정리함",9800,62,40],
+      ["es-P021","가담다 흥프거치 3단 슬라이저","수납함","수납·정리함",11900,45,40],
+      ["es-P022","프리미엄 우드독서대 거치대","수납함","수납·정리함",12900,48,40],
+      ["es-P023","벽면수납 자석 월포켓 1호","수납함","수납·정리함",4900,62,26],
+      ["es-P024","충분원룸 자석 벽선반","수납함","수납·정리함",35900,53,58],
+      ["es-P025","마이홈 케이블 정리함","수납함","수납·정리함",6900,65,26],
+      ["es-P026","시스맥스 멀티박스 12단 2단","수납함","수납·정리함",52500,55,74],
+      ["es-P027","시스맥스 시스템서랍 2단 책상정리함 3단","수납함","수납·정리함",11900,48,40],
+      ["es-P028","시스맥스 시스템서랍 대형","수납함","수납·정리함",22600,54,58],
+      ["es-P029","마이홈 포로타 정리함 중형","수납함","수납·정리함",6400,58,26],
+      ["es-P030","리템 루버스 슬라이드 리빙박스 소형","수납함","수납·정리함",16500,50,40],
+      ["es-P031","리템 슬라이드 다보탑 리빙박스 화이트","수납함","수납·정리함",25900,59,58],
+      ["es-P032","후맥스 스토리지 리빙박스 그레이","수납함","수납·정리함",11500,45,40],
+      ["es-P033","슈맥스 콜라스 리빙박스 정리함 슬림형","수납함","수납·정리함",3000,53,26],
+      ["es-P034","빌로 미니 소품함 와이드","수납함","수납·정리함",6400,61,26],
+      ["es-P035","빌로 베스킷 깊은형","수납함","수납·정리함",6700,50,26],
+      ["es-P036","포로 핸들수납 2개입","수납함","수납·정리함",7300,61,40],
+      ["es-P037","데스크 수납 케이스 서류함 3개입","수납함","수납·정리함",15300,48,40],
+      ["es-P038","다목적 시스템 서류보관함 2단","수납함","수납·정리함",22300,65,58],
+      ["es-P039","냅스 멀티박스 반찬보관 정리함 3단","수납함","수납·정리함",29400,54,58],
+      ["es-P040","미니 다용도 3칸 미니서랍 대형","수납함","수납·정리함",16100,65,40],
+      ["es-P041","포포타 비타 미니 소품 정리함 중형","수납함","수납·정리함",4300,61,26],
+      ["es-P042","마이홈 회전 소품 정리대 소형","수납함","수납·정리함",4500,64,26],
+      ["es-P043","시스맥스 회전 소품 정리함 화이트","수납함","수납·정리함",6200,51,26],
+      ["es-P044","마이홈 스탠드 트레이 그레이","수납함","수납·정리함",7800,49,40],
+      ["es-P045","콜라보 데스크 오거나이저 슬림형","수납함","수납·정리함",8300,56,40],
+      ["es-P046","가담다 흥프거치 3단 슬라이저 와이드","수납함","수납·정리함",13400,50,40],
+      ["es-P047","프리미엄 우드독서대 거치대 깊은형","수납함","수납·정리함",14100,62,40],
+      ["es-P048","벽면수납 자석 월포켓 1호 2개입","수납함","수납·정리함",4700,61,26],
+      ["es-P049","충분원룸 자석 벽선반 3개입","수납함","수납·정리함",32400,45,58],
+      ["es-P050","마이홈 케이블 정리함 2단","수납함","수납·정리함",8100,64,40],
+      ["es-P051","시스맥스 멀티박스 12단 3단","수납함","수납·정리함",47300,55,74],
+      ["es-P052","시스맥스 시스템서랍 2단 책상정리함 대형","수납함","수납·정리함",12200,60,40],
+      ["es-P053","시스맥스 시스템서랍 중형","수납함","수납·정리함",21100,45,58],
+      ["es-P054","마이홈 포로타 정리함 소형","수납함","수납·정리함",7900,48,40],
+      ["es-P055","리템 루버스 슬라이드 리빙박스 화이트","수납함","수납·정리함",15800,56,40],
+      ["es-P056","리템 슬라이드 다보탑 리빙박스 그레이","수납함","수납·정리함",27000,54,58],
+      ["es-P057","후맥스 스토리지 리빙박스 슬림형","수납함","수납·정리함",10900,52,40],
+      ["es-P058","슈맥스 콜라스 리빙박스 정리함 와이드","수납함","수납·정리함",3600,46,26],
+      ["es-P059","빌로 미니 소품함 깊은형","수납함","수납·정리함",7700,52,40],
+      ["es-P060","빌로 베스킷 2개입","수납함","수납·정리함",7700,63,40],
+      ["es-P061","포로 핸들수납 3개입","수납함","수납·정리함",8200,47,40],
+      ["es-P062","데스크 수납 케이스 서류함 2단","수납함","수납·정리함",16900,47,40],
+      // ── 카카오IP P063-P092 ────────────────────────────────────────────
+      ["es-P063","카카오프렌즈 마우스패드","카카오굿즈","카카오IP",34900,43,58],
+      ["es-P064","카카오프렌즈 침대 주머니","카카오굿즈","카카오IP",7900,30,40],
+      ["es-P065","리틀카카오프렌즈 드리머 5점 세트","카카오굿즈","카카오IP",39900,45,58],
+      ["es-P066","카카오프렌즈 데스크매트","카카오굿즈","카카오IP",8250,32,40],
+      ["es-P067","카카오프렌즈 도어스토퍼","카카오굿즈","카카오IP",10900,32,40],
+      ["es-P068","카카오프렌즈 L홀더 굿즈","카카오굿즈","카카오IP",800,43,5],
+      ["es-P069","카카오프렌즈 3색 볼펜","카카오굿즈","카카오IP",1600,45,5],
+      ["es-P070","카카오프렌즈 인덱스 점착메모지","카카오굿즈","카카오IP",1200,33,5],
+      ["es-P071","카카오프렌즈 A5 노트","카카오굿즈","카카오IP",1900,36,5],
+      ["es-P072","카카오프렌즈 가을 신상 굿즈 캘린더","카카오굿즈","카카오IP",16900,44,40],
+      ["es-P073","춘식이 2026 데코 탁상 캘린더","카카오굿즈","카카오IP",6500,47,26],
+      ["es-P074","준이의 아동 방한장갑 기모","카카오굿즈","카카오IP",11900,41,40],
+      ["es-P075","준이의 아동 방한장갑 도톰","카카오굿즈","카카오IP",14500,34,40],
+      ["es-P076","준이의 보냉 토트백","카카오굿즈","카카오IP",17900,45,40],
+      ["es-P077","카카오프렌즈 마우스패드 라이언","카카오굿즈","카카오IP",37200,34,58],
+      ["es-P078","카카오프렌즈 침대 주머니 춘식이","카카오굿즈","카카오IP",9000,37,40],
+      ["es-P079","리틀카카오프렌즈 드리머 5점 어피치","카카오굿즈","카카오IP",41900,40,74],
+      ["es-P080","카카오프렌즈 데스크매트 무지","카카오굿즈","카카오IP",9000,48,40],
+      ["es-P081","카카오프렌즈 도어스토퍼 네오","카카오굿즈","카카오IP",9400,39,40],
+      ["es-P082","카카오프렌즈 L홀더 굿즈 프로도","카카오굿즈","카카오IP",700,42,5],
+      ["es-P083","카카오프렌즈 3색 볼펜 제이지","카카오굿즈","카카오IP",1500,44,5],
+      ["es-P084","카카오프렌즈 인덱스 점착메모지 튜브","카카오굿즈","카카오IP",1000,42,5],
+      ["es-P085","카카오프렌즈 A5 노트 라이언","카카오굿즈","카카오IP",1700,31,5],
+      ["es-P086","카카오프렌즈 가을 신상 굿즈 캘린더 춘식이","카카오굿즈","카카오IP",14900,35,40],
+      ["es-P087","춘식이 2026 데코 탁상 캘린더 어피치","카카오굿즈","카카오IP",6100,35,26],
+      ["es-P088","준이의 아동 방한장갑 기모 무지","카카오굿즈","카카오IP",12700,30,40],
+      ["es-P089","준이의 아동 방한장갑 도톰 네오","카카오굿즈","카카오IP",14100,38,40],
+      ["es-P090","준이의 보냉 토트백 프로도","카카오굿즈","카카오IP",17500,28,40],
+      ["es-P091","카카오프렌즈 마우스패드 제이지","카카오굿즈","카카오IP",32200,46,58],
+      ["es-P092","카카오프렌즈 침대 주머니 튜브","카카오굿즈","카카오IP",7400,45,40],
+      // ── 밀폐용기 P093-P108 ───────────────────────────────────────────
+      ["es-P093","리템 냉장고 소품용기 3호 3개","밀폐용기","밀폐용기",6900,39,26],
+      ["es-P094","리템 냉장고 소품용기 4호 3개","밀폐용기","밀폐용기",8500,50,40],
+      ["es-P095","리템 냉장고 소품용기 5호 3개","밀폐용기","밀폐용기",8900,39,40],
+      ["es-P096","리템 냉장고 소품용기 9호 2개","밀폐용기","밀폐용기",10500,32,40],
+      ["es-P097","데호리스 냉장고 소품용기 1호 300ml","밀폐용기","밀폐용기",4900,34,26],
+      ["es-P098","냉장고 멀티트레이 소형","밀폐용기","밀폐용기",8900,52,40],
+      ["es-P099","냉장고 핸들 트레이 정렬","밀폐용기","밀폐용기",4500,33,26],
+      ["es-P100","아이보이 캐비닛 반찬 칸막이","밀폐용기","밀폐용기",17000,39,40],
+      ["es-P101","한손 주방 냉장 멀티오픈 정리","밀폐용기","밀폐용기",21900,34,58],
+      ["es-P102","리템 냉장고 소품용기 3호 1호","밀폐용기","밀폐용기",8100,33,40],
+      ["es-P103","리템 냉장고 소품용기 4호 2호","밀폐용기","밀폐용기",9100,42,40],
+      ["es-P104","리템 냉장고 소품용기 5호 6호","밀폐용기","밀폐용기",9400,34,40],
+      ["es-P105","리템 냉장고 소품용기 9호 7호","밀폐용기","밀폐용기",9500,48,40],
+      ["es-P106","데호리스 냉장고 소품용기 300ml 8호","밀폐용기","밀폐용기",5400,39,26],
+      ["es-P107","냉장고 멀티트레이 소형 2개입","밀폐용기","밀폐용기",8000,40,40],
+      ["es-P108","냉장고 핸들 트레이 정렬 4개입","밀폐용기","밀폐용기",4400,47,26],
+      // ── 빨래건조대 P109-P123 ─────────────────────────────────────────
+      ["es-P109","KNo 이동식 빨래건조대 2단","빨래건조대","빨래건조대",72900,61,88],
+      ["es-P110","KNo 이동식 빨래건조대 3단","빨래건조대","빨래건조대",59900,72,88],
+      ["es-P111","KNo 스탠드 빨래건조대 일반형","빨래건조대","빨래건조대",23000,44,66],
+      ["es-P112","국내산 튼튼 소형 빨래건조대","빨래건조대","빨래건조대",19900,58,48],
+      ["es-P113","국내산 튼튼 중형 빨래건조대","빨래건조대","빨래건조대",21900,58,66],
+      ["es-P114","국내산 튼튼 대형 빨래건조대","빨래건조대","빨래건조대",23900,55,66],
+      ["es-P115","가담다 베란다 접이식 빨래건조대","빨래건조대","빨래건조대",34900,47,66],
+      ["es-P116","KNo 이동식 빨래건조대 2단 접이식","빨래건조대","빨래건조대",87200,55,82],
+      ["es-P117","KNo 이동식 빨래건조대 3단 벽걸이형","빨래건조대","빨래건조대",64300,53,82],
+      ["es-P118","KNo 스탠드 빨래건조대 창문형","빨래건조대","빨래건조대",24000,46,66],
+      ["es-P119","국내산 튼튼 소형 빨래건조대 2단형","빨래건조대","빨래건조대",21600,43,66],
+      ["es-P120","국내산 튼튼 중형 빨래건조대 대형","빨래건조대","빨래건조대",25000,43,66],
+      ["es-P121","국내산 튼튼 대형 빨래건조대 소형","빨래건조대","빨래건조대",26800,53,66],
+      ["es-P122","가담다 베란다 접이식 빨래건조대 스테인리스","빨래건조대","빨래건조대",32400,51,66],
+      ["es-P123","KNo 이동식 빨래건조대 2단 접이식 B형","빨래건조대","빨래건조대",62700,53,82],
+      // ── 휴지통 P124-P134 ─────────────────────────────────────────────
+      ["es-P124","가담다 원터치 휴지통 20L 사각","휴지통","휴지통·분리수거",11900,58,46],
+      ["es-P125","가담다 기능 티슈 카바","휴지통","휴지통·분리수거",12900,44,40],
+      ["es-P126","가담다 화장실 미니 라운드 휴지통","휴지통","휴지통·분리수거",7900,31,40],
+      ["es-P127","가담다 화장실 미니 사각 휴지통","휴지통","휴지통·분리수거",8900,50,40],
+      ["es-P128","마이홈 슬라이드 휴지통 24L","휴지통","휴지통·분리수거",8900,50,40],
+      ["es-P129","마이홈 미니 휴지통 3L","휴지통","휴지통·분리수거",6900,33,26],
+      ["es-P130","우드 패절 휴지통 L","휴지통","휴지통·분리수거",29900,31,58],
+      ["es-P131","포포 납작휴지통","휴지통","휴지통·분리수거",1600,42,12],
+      ["es-P132","가담다 원터치 휴지통 10L","휴지통","휴지통·분리수거",11400,40,40],
+      ["es-P133","가담다 기능 티슈 카바 15L","휴지통","휴지통·분리수거",12100,33,40],
+      ["es-P134","가담다 화장실 미니 라운드 휴지통 20L","휴지통","휴지통·분리수거",7200,37,40],
+      // ── 분리수거 P135-P137 ───────────────────────────────────────────
+      ["es-P135","폴라 2단 분리수거 스탠드","분리수거통","휴지통·분리수거",31900,28,58],
+      ["es-P136","분리수거통 재활용 봉투 스탠드 30L","분리수거통","휴지통·분리수거",4900,28,26],
+      ["es-P137","폴라 2단 분리수거 스탠드 2분류","분리수거통","휴지통·분리수거",37600,39,58],
+      // ── 다리미판 P138-P140 ───────────────────────────────────────────
+      ["es-P138","가담다 스탠드 다리미판 프리미엄 블랙","다리미판","다리미판",38900,67,72],
+      ["es-P139","가담다 스탠드 다리미판 프리미엄 카바 세트","다리미판","다리미판",64800,57,88],
+      ["es-P140","가담다 접이식 스탠드 다리미판","다리미판","다리미판",22900,51,66],
     ];
 
-    for (const p of seedProducts) {
+    for (const [id, name, keyword, category, price, mx, my] of prods) {
+      const pp = Math.round(price * (1 - my / 100));
       await db.execute({
-        sql: `INSERT INTO sellfit_products 
-              (id, store_id, name, url, keyword, category, price, is_own, purchase_price, is_price_confirmed, matrix_x, matrix_y) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          p.id,
-          storeId,
-          p.name,
-          p.url,
-          p.keyword,
-          p.category,
-          p.price,
-          p.is_own,
-          p.purchase_price,
-          p.is_price_confirmed,
-          p.matrix_x,
-          p.matrix_y
-        ]
+        sql: `INSERT INTO sellfit_products
+              (id, store_id, name, url, keyword, category, price, is_own, purchase_price, is_price_confirmed, matrix_x, matrix_y)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, 1, ?, ?)`,
+        args: [id, storeId, name, BASE_URL, keyword, category, price, pp, mx, my],
       });
     }
 
-    // 3. 데모 데일리 메트릭스 적재
-    const pIds = seedProducts.map(p => p.id);
-    await db.execute({
-      sql: `DELETE FROM sellfit_daily_metrics WHERE product_id IN (${pIds.map(() => "?").join(", ")})`,
-      args: pIds
-    });
-
-    for (let i = 0; i < seedProducts.length; i++) {
-      const p = seedProducts[i];
+    // 4. 데모 데일리 메트릭스 (140개)
+    for (let i = 0; i < prods.length; i++) {
+      const [id, , , , price, mx] = prods[i];
       await db.execute({
-        sql: `INSERT INTO sellfit_daily_metrics (id, product_id, price, review_count, rating, search_volume, cpc, competitors) 
+        sql: `INSERT INTO sellfit_daily_metrics (id, product_id, price, review_count, rating, search_volume, cpc, competitors)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [`demo-m-${i + 1}`, p.id, p.price, 120 + i * 20, 4.5 + (i % 5) * 0.1, 12500, 320, 4500]
+        args: [
+          `es-m-${i + 1}`, id, price,
+          50 + Math.round(mx * 8 + (i % 7) * 15),
+          4.1 + (i % 5) * 0.15,
+          Math.round(mx * 180),
+          200 + Math.round(mx * 5) + (i % 12) * 20,
+          1500 + Math.round(mx * 80),
+        ],
       });
     }
 
-    // 4. 모의 데일리 진단 결과 적재
+    // 5. 모의 데일리 진단 결과
     await db.execute({
       sql: "DELETE FROM sellfit_daily_reports WHERE store_id = ? AND report_date = ?",
-      args: [storeId, today]
+      args: [storeId, today],
     });
 
-    const reportId = "demo-rep-001";
-    const riskScore = 85; // 다소 높음 표시
-
-    // 모의 full_analysis
     const mockFullAnalysis = [
       {
-        product: "데모 이지백 압축팩 10L",
-        category: "압축팩",
+        product: "KNo 이동식 빨래건조대 3단",
+        category: "빨래건조대",
         analysis: {
-          diagnosis_summary: "경쟁사 대비 장당 단가가 12% 높아 단품 저항 발생 중. SEO 밸브식 속성 누락으로 탐색 노출 15% 손실.",
+          diagnosis_summary: "효자 상품. 마진율 88%, 검색 수요 72. 빨래건조대 카테고리 내 1위 상품.",
           price_analysis: {
-            finding: "자사 장당 단가 1,290원 vs 경쟁사 1,150원",
-            comparison: "+12.1%",
-            action: "밸브식 4장 묶음 구성을 신설하여 번들당 장당 단가를 1,080원으로 낮추어 단가 우위를 점할 것을 제안합니다.",
-            copy_target_tab: "price"
+            finding: "경쟁사 평균 대비 판매가 +5% 프리미엄 유지 중",
+            comparison: "+5%",
+            action: "프리미엄 포지션 유지. 리뷰 키워드(이동식·3단·스테인리스) 상세페이지 강화.",
+            copy_target_tab: "price",
           },
           seo_miss: {
-            missing_attributes: ["밸브식", "이중밀폐", "PE강화필름"],
+            missing_attributes: ["이동식", "3단", "스테인리스"],
             recommended_names: [
-              "이지백 밸브식 이중밀폐 압축팩 10L 이불용 패딩 옷 보관백",
-              "이지백 강밀폐 밸브식 이불 압축팩 대용량 옷 정리 정리팩"
+              "KNo 이동식 빨래건조대 3단 스테인리스 접이식 실내외 겸용",
+              "KNo 3단 이동식 빨래건조대 스테인리스 바퀴 높이조절",
             ],
-            copy_target_tab: "seo"
+            copy_target_tab: "seo",
           },
           hooking_copy: [
-            "두꺼운 겨울 이불이 0.12mm로 줄어드는 마법, 2중 밸브 밀폐 보장",
-            "한 번 압축하면 다음 계절까지 절대 되부풀지 않는 이중 밸브백"
+            "바퀴 달린 3단 이동식 — 세탁실에서 거실까지 한 번에",
+            "스테인리스 3단 구조로 이불도 한 번에 — KNo 이동식 건조대",
           ],
           review_defense: [
             {
-              negative_keyword: "부풀음",
-              defense_copy: "2중 스크류 밸브식 잠금 설계로 공기 투입을 원천 차단하여 부풀음 현상을 100% 방지합니다."
-            }
+              negative_keyword: "흔들림",
+              defense_copy: "4점 고정 바퀴 + 스테인리스 프레임으로 무거운 이불도 안정적으로 건조됩니다.",
+            },
           ],
           priority_routing: {
             first: {
-              issue: "SEO 노출용 '밸브식' 속성 키워드가 상품명에서 전면 누락되어 유입 손실 발생 중",
-              score: 95,
+              issue: "이동식·스테인리스 키워드 상품명 미포함으로 탐색 유입 손실",
+              score: 91,
               target_tab: "seo",
-              context_payload: { keyword: "압축팩" }
+              context_payload: { keyword: "빨래건조대" },
             },
             second: {
-              issue: "경쟁사 대비 장당 절대 단가가 140원 높아 장바구니 전환 허들 발생",
-              score: 82,
+              issue: "리뷰 흔들림 키워드 방어 미흡",
+              score: 74,
               target_tab: "price",
-              context_payload: {}
-            }
-          }
-        }
-      }
+              context_payload: {},
+            },
+          },
+        },
+      },
     ];
 
-    const summaryStr = "경쟁사 대비 장당 단가가 12% 높아 단품 저항 발생 중. SEO 밸브식 속성 누락으로 탐색 노출 15% 손실.";
+    const summaryStr =
+      "효자 상품: 빨래건조대(KNo 2·3단) 마진 82~88%, 다리미판(가담다 프리미엄) 72~88% 안정. " +
+      "드롭 후보: 카카오 저가 소품(L홀더·볼펜·메모지) 마진 5% — 번들 전환 또는 정리 권고.";
 
     await db.execute({
-      sql: `INSERT INTO sellfit_daily_reports 
-            (id, store_id, report_date, risk_score, summary, 
-             recommended_title_1, recommended_title_2, recommended_title_3, 
-             hooking_copy, review_rebuttal, status, defended_amount, actions_completed, full_analysis) 
+      sql: `INSERT INTO sellfit_daily_reports
+            (id, store_id, report_date, risk_score, summary,
+             recommended_title_1, recommended_title_2, recommended_title_3,
+             hooking_copy, review_rebuttal, status, defended_amount, actions_completed, full_analysis)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', 0, 0, ?)`,
       args: [
-        reportId,
-        storeId,
-        today,
-        riskScore,
+        "es-rep-001", storeId, today, 74,
         JSON.stringify({ brief: summaryStr, full: mockFullAnalysis }),
         mockFullAnalysis[0].analysis.seo_miss.recommended_names[0],
         mockFullAnalysis[0].analysis.seo_miss.recommended_names[1],
@@ -246,32 +271,31 @@ export async function POST() {
         mockFullAnalysis[0].analysis.hooking_copy[0],
         mockFullAnalysis[0].analysis.review_defense[0].defense_copy,
         JSON.stringify(mockFullAnalysis),
-      ]
+      ],
     });
 
-    // 5. 최근 7일 모의 히스토리도 적재 (이력 그래프가 예쁘게 나오도록)
-    // 과거 2일분 리포트 추가 적재
-    const d1 = new Date(Date.now() + 9 * 3600000 - 1 * 24 * 3600000).toISOString().slice(0, 10);
-    const d2 = new Date(Date.now() + 9 * 3600000 - 2 * 24 * 3600000).toISOString().slice(0, 10);
-
+    // 이력 리포트 2일분
+    const d1 = new Date(Date.now() + 9 * 3600000 - 86400000).toISOString().slice(0, 10);
+    const d2 = new Date(Date.now() + 9 * 3600000 - 172800000).toISOString().slice(0, 10);
     await db.execute({
       sql: "DELETE FROM sellfit_daily_reports WHERE store_id = ? AND report_date IN (?, ?)",
-      args: [storeId, d1, d2]
+      args: [storeId, d1, d2],
     });
-
     await db.execute({
-      sql: `INSERT INTO sellfit_daily_reports (id, store_id, report_date, risk_score, summary, defended_amount, actions_completed, status) 
+      sql: `INSERT INTO sellfit_daily_reports (id, store_id, report_date, risk_score, summary, defended_amount, actions_completed, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'ready')`,
-      args: ["demo-rep-old1", storeId, d1, 65, JSON.stringify({ brief: "가격 및 썸네일 진입 완료", full: [] }), 2500, 1]
+      args: ["es-rep-old1", storeId, d1, 68, JSON.stringify({ brief: "빨래건조대 SEO 보강 완료. 카카오 저가 소품 드롭 검토 중.", full: [] }), 5200, 3],
     });
-
     await db.execute({
-      sql: `INSERT INTO sellfit_daily_reports (id, store_id, report_date, risk_score, summary, defended_amount, actions_completed, status) 
+      sql: `INSERT INTO sellfit_daily_reports (id, store_id, report_date, risk_score, summary, defended_amount, actions_completed, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'ready')`,
-      args: ["demo-rep-old2", storeId, d2, 45, JSON.stringify({ brief: "초기 마이그레이션 및 SEO 보강", full: [] }), 1200, 1]
+      args: ["es-rep-old2", storeId, d2, 61, JSON.stringify({ brief: "수납·정리함 매트릭스 재배치. 영업이익률 +1.8%p 목표.", full: [] }), 3100, 2],
     });
 
-    return NextResponse.json({ ok: true, message: "데모 데이터 Seeding 완료" });
+    return NextResponse.json({
+      ok: true,
+      message: `이지스토리 데모 ${prods.length}개 상품 Seeding 완료 (${today})`,
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

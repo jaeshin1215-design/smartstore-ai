@@ -14,10 +14,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ products: result.rows });
 }
 
-// 상품 등록
+// 상품 등록 (Discover 채널확정 포함)
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { store_id, name, url, keyword, category, price, is_own } = body;
+  const { store_id, name, url, keyword, category, price, purchase_price, is_own, matrix_x, matrix_y } = body;
 
   if (!store_id || !name || !keyword || !category) {
     return NextResponse.json({ error: "필수 항목 누락" }, { status: 400 });
@@ -25,10 +25,14 @@ export async function POST(req: NextRequest) {
 
   const id = randomUUID();
   await db.execute({
-    sql: `INSERT INTO sellfit_products (id, store_id, name, url, keyword, category, price, is_own)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO sellfit_products (id, store_id, name, url, keyword, category, price, purchase_price, is_own, matrix_x, matrix_y)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [id, store_id, name, url || null, keyword, category,
-           price ? Number(price) : null, is_own ? 1 : 0],
+           price ? Number(price) : null,
+           purchase_price ? Number(purchase_price) : null,
+           is_own ? 1 : 0,
+           matrix_x != null ? Number(matrix_x) : null,
+           matrix_y != null ? Number(matrix_y) : null],
   });
 
   return NextResponse.json({ ok: true, id });

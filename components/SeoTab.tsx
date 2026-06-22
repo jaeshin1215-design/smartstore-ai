@@ -254,7 +254,7 @@ export default function SeoTab({ initialKeyword }: { initialKeyword?: string }) 
 
   return (
     /* ── 2-column: LEFT heading+bullets+score | CENTER form+results ── */
-    <div className="lg:grid" style={{ gridTemplateColumns: "200px minmax(0, 720px)", gap: "0 25vw" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "200px minmax(0, 1fr)", gap: "0 40px" }}>
 
       {/* ════ LEFT: Section heading + feature bullets + score ════ */}
       <div style={{ background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px" }}>

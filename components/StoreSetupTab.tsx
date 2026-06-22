@@ -207,12 +207,30 @@ export default function StoreSetupTab() {
   }
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", width: "100%" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 500, color: "#1a1b1e", marginBottom: 6 }}>
-          내 스토어 설정
-        </h2>
-        <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.6 }}>
+    <div style={{ width: "100%", display: "flex", gap: "40px", alignItems: "flex-start" }}>
+
+      {/* LEFT: sticky sidebar */}
+      <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
+        <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>SETUP</p>
+        <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>한 번만 등록하면 끝</p>
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>자사·경쟁사 상품 등록</p>
+        {["상품 등록", "경쟁사 추적", "매출 입력"].map(f => (
+          <div key={f} style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px" }}>
+            <span style={{ fontSize: "10px", color: "#c0c4cc", flexShrink: 0 }}>✓</span>
+            <span style={{ fontSize: "13px", color: "#8f9399" }}>{f}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* RIGHT: main content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ maxWidth: "1232px", margin: "0 auto" }}>
+      <div style={{ paddingBottom: "24px", marginBottom: "24px", borderBottom: "1px solid #e8eaed" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: "#0d0d0e", marginBottom: 6, letterSpacing: "-0.02em" }}>
+          Set It Once.
+        </h1>
+        <p style={{ fontSize: 14, color: "#4b5563", lineHeight: 1.6, margin: "0 0 8px" }}>한 번만 등록하면 끝.</p>
+        <p style={{ fontSize: 14, color: "#4b5563", lineHeight: 1.6, margin: 0 }}>
           자사 상품 + 경쟁사 상품을 한 번만 등록하면 — AI가 밤새 추적합니다.
         </p>
       </div>
@@ -350,6 +368,7 @@ export default function StoreSetupTab() {
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 16 }}>
                 등록된 상품 ({ownProducts.length}개 자사 · {compProducts.length}개 경쟁사)
               </div>
+              <div style={{ maxHeight: "360px", overflowY: "auto", paddingRight: "4px" }}>
 
               {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }].map(group => (
                 group.list.length > 0 && (
@@ -416,6 +435,7 @@ export default function StoreSetupTab() {
                   )}
                 </div>
               )}
+              </div>{/* /scroll wrapper */}
             </div>
           )}
           {/* 매출 수동 입력 */}
@@ -459,5 +479,7 @@ export default function StoreSetupTab() {
         </>
       )}
     </div>
+      </div>{/* /centering wrapper */}
+  </div>
   );
 }

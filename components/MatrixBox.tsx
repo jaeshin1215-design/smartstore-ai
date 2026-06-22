@@ -356,8 +356,8 @@ export default function MatrixBox({
           </g>
 
           {/* A-0. X/Y 축 경계선 */}
-          <line x1={PX} y1={PY} x2={PX} y2={PY + PLOT_H} stroke="#e8eaed" strokeWidth="1" style={{ pointerEvents: "none" }} />
-          <line x1={PX} y1={PY + PLOT_H} x2={PX + PLOT_W} y2={PY + PLOT_H} stroke="#e8eaed" strokeWidth="1" style={{ pointerEvents: "none" }} />
+          <line x1={PX} y1={PY} x2={PX} y2={PY + PLOT_H} stroke="#b0b5be" strokeWidth="1.5" style={{ pointerEvents: "none" }} />
+          <line x1={PX} y1={PY + PLOT_H} x2={PX + PLOT_W} y2={PY + PLOT_H} stroke="#b0b5be" strokeWidth="1.5" style={{ pointerEvents: "none" }} />
 
           {/* A. 사분면 라벨 */}
           <g style={{ pointerEvents: "none", userSelect: "none" }}>
@@ -367,11 +367,11 @@ export default function MatrixBox({
             <text x={PX + 3 * PLOT_W / 4} y={PY + 3 * PLOT_H / 4} textAnchor="middle" alignmentBaseline="middle" fontSize="13" fontWeight="400" fill="#c8ccd4" fontFamily="'Pretendard', sans-serif">{config.quadrants.bottomRight}</text>
           </g>
 
-          {/* B. 사분면 경계선 — Frill 실측: 얇은 실선 #e2e8f0 */}
+          {/* B. 사분면 경계선 */}
           <line x1={PX + PLOT_W / 2} y1={PY} x2={PX + PLOT_W / 2} y2={PY + PLOT_H}
-            stroke="#d1d5db" strokeWidth="1" strokeDasharray="5 4" style={{ pointerEvents: "none" }} />
+            stroke="#b8bcc4" strokeWidth="1.5" strokeDasharray="6 4" style={{ pointerEvents: "none" }} />
           <line x1={PX} y1={PY + PLOT_H / 2} x2={PX + PLOT_W} y2={PY + PLOT_H / 2}
-            stroke="#d1d5db" strokeWidth="1" strokeDasharray="5 4" style={{ pointerEvents: "none" }} />
+            stroke="#b8bcc4" strokeWidth="1.5" strokeDasharray="6 4" style={{ pointerEvents: "none" }} />
 
           {/* C. 격자 — Frill 실측: 매우 연한 실선 */}
           {showGrid && gridSteps.map(step => {
@@ -454,7 +454,24 @@ export default function MatrixBox({
                   )}
                   <circle cx={cx} cy={cy} r="18" fill="transparent" />
 
-                  {showLabels && renderNameLines(p.name, cx, ly, labelPosition, textFill)}
+                  {/* 일반 라벨: showLabels=ON + 미호버 상태에서만 */}
+                  {showLabels && !isHovered && renderNameLines(p.name, cx, ly, labelPosition, textFill)}
+
+                  {/* 호버 툴팁: 항상 (showLabels 무관) — 상품명 + 마진·수요 */}
+                  {isHovered && (
+                    <g style={{ pointerEvents: "none" }}>
+                      <rect x={cx - 62} y={cy - 56} width="124" height="46" rx="5"
+                        fill="white" stroke={dotColor} strokeWidth="1.2" />
+                      <text x={cx} y={cy - 40} textAnchor="middle" fill="#111111" fontSize="10" fontWeight="700"
+                        style={{ pointerEvents:"none", userSelect:"none", fontFamily:"'Pretendard', sans-serif" }}>
+                        {p.name.length > 14 ? p.name.slice(0, 14) + "…" : p.name}
+                      </text>
+                      <text x={cx} y={cy - 24} textAnchor="middle" fill={dotColor} fontSize="9" fontWeight="600"
+                        style={{ pointerEvents:"none", userSelect:"none", fontFamily:"'Pretendard', sans-serif" }}>
+                        마진 {my} · 수요 {mx}
+                      </text>
+                    </g>
+                  )}
                 </g>
               );
             });

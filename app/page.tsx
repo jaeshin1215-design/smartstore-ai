@@ -1,38 +1,38 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import SeoTab from "@/components/SeoTab";
 import BiddingTab from "@/components/BiddingTab";
 import CustomerTab from "@/components/CustomerTab";
 import PricingTab from "@/components/PricingTab";
-import TrendTab, { preloadHotKeywords } from "@/components/TrendTab";
+import DiscoverTab from "@/components/DiscoverTab";
 import StoreSetupTab from "@/components/StoreSetupTab";
 import DiagnosisTab from "@/components/DiagnosisTab";
 import FeedbackButton from "@/components/FeedbackButton";
 import TrialModal from "@/components/TrialModal";
+import SellFitFooter from "@/components/SellFitFooter";
+import CalendarTab from "@/components/CalendarTab";
+import ProfitSimulatorTab from "@/components/ProfitSimulatorTab";
 
 const TABS = [
-  { id: "discover",  icon: "ti ti-compass", label: "Discover" },
-  { id: "optimize",  icon: "ti ti-adjustments", label: "Optimize" },
-  { id: "inbox",     icon: "ti ti-inbox", label: "Inbox" },
-  { id: "diagnosis", icon: "ti ti-layout-grid", label: "Diagnose" },
-  { id: "setup",     icon: "ti ti-settings", label: "Setup" },
+  { id: "calendar",  icon: "ti ti-calendar-month", label: "Calendar"  },
+  { id: "diagnosis", icon: "ti ti-layout-grid",   label: "Diagnose"  },
+  { id: "optimize",  icon: "ti ti-adjustments",   label: "Optimize"  },
+  { id: "inbox",     icon: "ti ti-inbox",          label: "Inbox"     },
+  { id: "discover",  icon: "ti ti-compass",       label: "Discover"  },
+  { id: "setup",     icon: "ti ti-settings",       label: "Setup"     },
 ];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("discover");
-  const [seoKeyword, setSeoKeyword] = useState("");
+  const [activeTab, setActiveTab] = useState("calendar");
   const [trialOpen, setTrialOpen] = useState(false);
   const [onboardingProgress, setOnboardingProgress] = useState(1);
 
   useEffect(() => {
-    preloadHotKeywords();
     const isRegistered = localStorage.getItem("product_registered") === "true";
     setOnboardingProgress(isRegistered ? 1 : 0);
   }, []);
 
-  const handleSeoNavigate = (keyword: string) => {
-    setSeoKeyword(keyword);
+  const handleSeoNavigate = (_keyword?: string) => {
     setActiveTab("discover");
   };
 
@@ -150,22 +150,16 @@ export default function Home() {
 
 
       {/* ── Main content ── */}
-      <main className="px-6 py-6">
-        {activeTab === "discover" && (
-          <div className="space-y-16" style={{ fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
-            <TrendTab onSeoNavigate={handleSeoNavigate} />
-            <div style={{ borderTop: "1px solid #e8eaed", paddingTop: "3rem", marginTop: "1rem" }}>
-              <SeoTab initialKeyword={seoKeyword} />
-            </div>
-          </div>
-        )}
+      <main className="w-full px-6 py-6">
+        {activeTab === "discover" && <DiscoverTab />}
 
 
 
         {activeTab === "optimize" && (
-          <div className="space-y-16" style={{ fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
-            <PricingTab />
-            <div style={{ borderTop: "1px solid #dededi", paddingTop: "3.5rem" }}>
+          <div style={{ fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
+            <ProfitSimulatorTab />
+            <div style={{ borderTop: "1px solid #dededi", paddingTop: "3.5rem", marginTop: "4rem", display: "flex", flexDirection: "column", gap: "32px" }}>
+              <PricingTab />
               {onboardingProgress === 0 ? (
                 <div className="max-w-lg mx-auto text-center py-16 px-8 bg-white rounded border border-[#dededi] shadow-md select-none font-['Pretendard']" style={{ borderRadius: 5 }}>
                   <span className="text-4xl mb-4 block animate-bounce">💡</span>
@@ -231,7 +225,10 @@ export default function Home() {
         {activeTab === "inbox"     && <CustomerTab />}
         {activeTab === "setup"     && <StoreSetupTab />}
         {activeTab === "diagnosis" && <DiagnosisTab onSeoNavigate={handleSeoNavigate} />}
+        {activeTab === "calendar"  && <CalendarTab />}
       </main>
+
+      <SellFitFooter />
 
       {/* ── Bottom notice bar ── */}
       <footer

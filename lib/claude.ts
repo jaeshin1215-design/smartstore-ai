@@ -16,6 +16,10 @@ export function createGeminiStream(prompt: string, maxTokens = 2000): ReadableSt
           }),
         });
         if (!res.ok) {
+          if (res.status === 429) {
+            controller.error(new Error("GEMINI_RATE_LIMIT"));
+            return;
+          }
           const err = await res.json().catch(() => ({}));
           controller.error(new Error(`Gemini ${res.status}: ${(err as { error?: { message?: string } }).error?.message ?? "error"}`));
           return;
@@ -48,33 +52,17 @@ export function createGeminiStream(prompt: string, maxTokens = 2000): ReadableSt
   });
 }
 
-export async function callClaude(prompt: string, maxTokens = 2000, useGrounding = false): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
+import Anthropic from "@anthropic-ai/sdk";
 
-  const body: Record<string, unknown> = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: Math.min(maxTokens * 4, 8192),
-      // grounding과 thinkingConfig 동시 사용 불가 — grounding 켜면 thinking 제외
-      ...(useGrounding ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
-    },
-  };
-  if (useGrounding) {
-    body.tools = [{ google_search: {} }];
-  }
+export async function callClaude(prompt: string, maxTokens = 2000): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) throw new Error(`Gemini API ${res.status}: ${data.error?.message}`);
-  // grounding 시 parts가 여러 개일 수 있음 — 모두 합침
-  const parts = (data.candidates?.[0]?.content?.parts ?? []) as Array<{ text?: string }>;
-  return parts.map(p => p.text ?? "").join("");
+  const msg = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: Math.min(maxTokens, 8192),
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const block = msg.content.find((b) => b.type === "text");
+  return block && block.type === "text" ? block.text : "";
 }

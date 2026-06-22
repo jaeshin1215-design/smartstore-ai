@@ -23,7 +23,7 @@ interface AnnoItem {
 }
 
 /* ── Mockup: 오른쪽 UI 카드 (Frill 스크린샷 포지션) ── */
-function InboxMockup({ type }: { type: "inquiry" | "positive" | "negative" }) {
+function InboxMockup({ type, large }: { type: "inquiry" | "positive" | "negative"; large?: boolean }) {
   const accent = type === "positive" ? "#15803d" : type === "negative" ? "#dc2626" : "#1d4ed8";
   const accentBg = type === "positive" ? "#dcfce7" : type === "negative" ? "#fee2e2" : "#dbeafe";
   const label = type === "positive" ? "리뷰 (긍정)" : type === "negative" ? "리뷰 (부정)" : "고객 문의";
@@ -38,9 +38,9 @@ function InboxMockup({ type }: { type: "inquiry" | "positive" | "negative" }) {
       background: "rgba(255,255,255,0.82)",
       borderRadius: "14px",
       boxShadow: "0 8px 32px rgba(30,20,60,0.13)",
-      padding: "18px 20px",
-      minWidth: "240px",
-      maxWidth: "280px",
+      padding: large ? "22px 26px" : "18px 20px",
+      minWidth: large ? "300px" : "240px",
+      maxWidth: large ? "360px" : "280px",
       backdropFilter: "blur(6px)",
     }}>
       {/* Header */}
@@ -96,42 +96,39 @@ function GradientBox({ big, sub, ko, mockupType }: {
     <div style={{
       borderRadius: "16px",
       background: "linear-gradient(135deg, #ccd9f0 0%, #ecd4e3 100%)",
-      padding: "52px 56px",
+      padding: "48px 52px",
       marginBottom: "28px",
       display: "flex",
       alignItems: "center",
-      gap: "48px",
-      minHeight: "280px",
+      gap: "40px",
+      minHeight: "260px",
     }}>
-      {/* Left: Frill-style copy */}
+      {/* Left: copy */}
       <div style={{ flex: 1 }}>
-        {/* Big headline — Frill "A Better Way To Collect Feedback" 크기 */}
         <p style={{
-          fontSize: "42px", fontWeight: 900, color: darkColor,
-          lineHeight: 1.15, margin: "0 0 18px 0",
+          fontSize: "44px", fontWeight: 900, color: darkColor,
+          lineHeight: 1.1, margin: "0 0 16px 0",
           letterSpacing: "-0.03em",
         }}>
           {big}
         </p>
-        {/* English sub */}
         <p style={{
           fontSize: "14px", fontWeight: 500, color: "#6b7280",
           lineHeight: 1.6, margin: "0 0 10px 0",
         }}>
           {sub}
         </p>
-        {/* Korean 한 줄 */}
         <p style={{
-          fontSize: "13px", fontWeight: 600, color: "#6b7280",
+          fontSize: "14px", fontWeight: 600, color: "#6b7280",
           lineHeight: 1.5, margin: 0,
         }}>
           {ko}
         </p>
       </div>
 
-      {/* Right: UI mockup */}
+      {/* Right: UI mockup (크게) */}
       <div style={{ flexShrink: 0 }}>
-        <InboxMockup type={mockupType} />
+        <InboxMockup type={mockupType} large />
       </div>
     </div>
   );
@@ -202,14 +199,33 @@ export default function CustomerTab() {
     setCounts(p => ({ ...p, [id]: { ...(p[id] || {}), [emoji]: ((p[id] || {})[emoji] || 0) + 1 } }));
 
   return (
-    <div style={{ width: "100%", fontFamily: FF, background: "#fff" }}>
-      <div style={{ maxWidth: "800px", margin: "0 auto", paddingBottom: "80px" }}>
+    <div style={{ width: "100%", fontFamily: FF, display: "flex", gap: "40px", alignItems: "flex-start" }}>
+
+      {/* LEFT: sticky sidebar */}
+      <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
+        <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>INBOX</p>
+        <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>고객 목소리, 한곳에서</p>
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>문의·리뷰·배송 자동 분류</p>
+        {["고객 문의", "리뷰 대응", "배송 알림"].map(f => (
+          <div key={f} style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px" }}>
+            <span style={{ fontSize: "10px", color: "#c0c4cc", flexShrink: 0 }}>✓</span>
+            <span style={{ fontSize: "13px", color: "#8f9399" }}>{f}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* RIGHT: main content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ maxWidth: "1232px", margin: "0 auto", paddingBottom: "80px" }}>
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#111827", margin: 0, letterSpacing: "-0.01em" }}>
-            Inbox
-          </h1>
+          <div>
+            <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#111827", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+              Hear Every Voice.
+            </h1>
+            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>고객의 목소리를 한 곳에서 — 문의·리뷰·배송 알림 자동 분류</p>
+          </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{
               fontSize: "13px", fontWeight: 500, padding: "8px 18px", borderRadius: "7px",
@@ -251,9 +267,9 @@ export default function CustomerTab() {
 
                 {/* Left meta */}
                 <div style={{ width: "100px", flexShrink: 0, textAlign: "right", paddingTop: "4px" }}>
-                  <p style={{ fontSize: "12px", color: "#6b7280", fontWeight: 500, margin: "0 0 8px 0" }}>{item.date}</p>
-                  <p style={{ fontSize: "11px", color: "#9ca3af", margin: "0 0 2px 0" }}>{item.views} view</p>
-                  <p style={{ fontSize: "11px", color: "#9ca3af", margin: 0 }}>{item.impressions} impression</p>
+                  <p style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500, margin: "0 0 8px 0" }}>{item.date}</p>
+                  <p style={{ fontSize: "13px", color: "#9ca3af", margin: "0 0 2px 0" }}>{item.views} view</p>
+                  <p style={{ fontSize: "13px", color: "#9ca3af", margin: 0 }}>{item.impressions} impression</p>
                 </div>
 
                 {/* Right content */}
@@ -313,6 +329,7 @@ export default function CustomerTab() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
