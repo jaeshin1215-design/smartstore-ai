@@ -359,12 +359,12 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
 
         {/* ── 2. 히어로 — 시즌 컬러 배경, 좌 텍스트 / 우 사진 ── */}
         <div style={{
-          display: "grid", gridTemplateColumns: "1fr 260px",
-          gap: "2.5rem", alignItems: "start",
+          display: "grid", gridTemplateColumns: "1fr 320px",
+          gap: "1.5rem", alignItems: "start",
           background: SEASON_BG[mSeason],
           borderRadius: "8px",
-          padding: "28px 36px",
-          marginBottom: "32px",
+          padding: "24px 28px",
+          marginBottom: "28px",
         }}>
 
           {/* 좌: 앵커 텍스트 위계 */}
@@ -377,10 +377,10 @@ export default function CalendarTab({ filter, onNavigate, onFilterChange }: Cale
               Anchor Direction
             </p>
             <h2 style={{
-              fontFamily: FONT_SERIF, fontSize: "clamp(28px, 3vw, 44px)",
+              fontFamily: FONT_SERIF, fontSize: "clamp(36px, 4.5vw, 60px)",
               fontWeight: 700, color: COLOR_INK,
-              letterSpacing: "-0.02em", lineHeight: 1.15,
-              margin: "0 0 10px",
+              letterSpacing: "-0.02em", lineHeight: 1.1,
+              margin: "0 0 12px",
             }}>
               {sc?.anchor ?? "—"}
             </h2>
