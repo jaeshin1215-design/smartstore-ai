@@ -11,6 +11,8 @@ interface Product {
   keyword: string;
   category: string;
   price: number;
+  purchase_price: number;
+  shipping_cost: number;
   is_own: number;
 }
 
@@ -62,6 +64,8 @@ export default function StoreSetupTab() {
   const [pCategory, setPCategory] = useState("압축팩");
   const [pPrice, setPPrice] = useState("");
   const [pUrl, setPUrl] = useState("");
+  const [pPurchasePrice, setPPurchasePrice] = useState("");
+  const [pShippingCost, setPShippingCost] = useState("");
   const [pIsOwn, setPIsOwn] = useState(true);
   const [addingProduct, setAddingProduct] = useState(false);
   const [collecting, setCollecting] = useState(false);
@@ -74,8 +78,9 @@ export default function StoreSetupTab() {
   async function initAndLoad() {
     setLoading(true);
     try {
-      // DB 초기화
+      // DB 초기화 → 마이그레이션 (idempotent: 컬럼 이미 있으면 무시)
       await fetch("/api/db/init", { method: "POST" });
+      await fetch("/api/db/migrate", { method: "POST" });
       setDbReady(true);
 
       // 로컬에 저장된 스토어 ID 확인
@@ -127,12 +132,13 @@ export default function StoreSetupTab() {
         body: JSON.stringify({
           store_id: store.id, name: pName, url: pUrl,
           keyword: pKeyword, category: pCategory,
-          price: pPrice, is_own: pIsOwn,
+          price: pPrice, purchase_price: pPurchasePrice,
+          shipping_cost: pShippingCost, is_own: pIsOwn,
         }),
       });
       await loadProducts(store.id);
-      setPName(""); setPKeyword(""); setPPrice(""); setPUrl("");
-      setPCategory("압축팩"); setPIsOwn(true);
+      setPName(""); setPKeyword(""); setPPrice(""); setPPurchasePrice("");
+      setPShippingCost(""); setPUrl(""); setPCategory("압축팩"); setPIsOwn(true);
     } catch (e) { console.error(e); }
     setAddingProduct(false);
   }
@@ -343,6 +349,20 @@ export default function StoreSetupTab() {
                 </div>
               </div>
 
+              {/* 매입가 + 배송비 — 5/14 미팅 1순위: 상품 데이터 마스터 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <span style={S.label}>매입가 (원) *</span>
+                  <input style={S.input} type="number" placeholder="예) 7200"
+                    value={pPurchasePrice} onChange={e => setPPurchasePrice(e.target.value)} />
+                </div>
+                <div>
+                  <span style={S.label}>배송비 (원)</span>
+                  <input style={S.input} type="number" placeholder="예) 2500"
+                    value={pShippingCost} onChange={e => setPShippingCost(e.target.value)} />
+                </div>
+              </div>
+
               <div>
                 <span style={S.label}>스마트스토어 URL (선택)</span>
                 <input style={S.input} placeholder="https://smartstore.naver.com/..."
@@ -385,7 +405,9 @@ export default function StoreSetupTab() {
                           <span style={{ fontSize: 14, fontWeight: 600, color: "#0f2a1e" }}>{p.name}</span>
                           <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>
                             {p.category} · {p.keyword}
-                            {p.price ? ` · ${Number(p.price).toLocaleString()}원` : ""}
+                            {p.price ? ` · 판매가 ${Number(p.price).toLocaleString()}원` : ""}
+                            {p.purchase_price ? ` · 매입가 ${Number(p.purchase_price).toLocaleString()}원` : ""}
+                            {p.shipping_cost ? ` · 배송비 ${Number(p.shipping_cost).toLocaleString()}원` : ""}
                           </span>
                         </div>
                         <button onClick={() => handleDeleteProduct(p.id)}
