@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -7,19 +9,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "상품명을 입력해주세요." }, { status: 400 });
   }
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "anthropic/claude-3-haiku",
-      max_tokens: 4000,
-      messages: [
-        {
-          role: "user",
-          content: `당신은 스마트스토어 전문 마케터 겸 카피라이터입니다.
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    return NextResponse.json({ error: "GEMINI_API_KEY 미설정" }, { status: 500 });
+  }
+
+  const prompt = `당신은 스마트스토어 전문 마케터 겸 카피라이터입니다.
 아래 상품의 모든 마케팅 콘텐츠를 한 번에 만들어주세요.
 
 상품명: ${productName}
@@ -29,7 +24,7 @@ export async function POST(req: NextRequest) {
 판매가: ${price || "미입력"}
 차별점: ${uniquePoint || "미입력"}
 
-다음 JSON 형식으로만 응답하세요:
+다음 JSON 스키마를 엄격히 따라 응답하세요:
 {
   "marketing_copies": [
     { "type": "임팩트형", "copy": "짧고 강렬한 마케팅 문구 (20자 이내)", "sub": "부제 문구" },
@@ -77,18 +72,37 @@ export async function POST(req: NextRequest) {
     "font_suggestion": "추천 폰트 스타일",
     "layout_tip": "레이아웃 팁"
   }
-}`,
+}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
         },
-      ],
-    }),
-  });
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return NextResponse.json(
+      { error: (err as { error?: { message?: string } }).error?.message ?? "Gemini 호출 실패" },
+      { status: 500 }
+    );
+  }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "{}";
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
   try {
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(text);
     return NextResponse.json({ result: parsed });
   } catch {
     return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
