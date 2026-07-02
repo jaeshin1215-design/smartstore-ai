@@ -1,40 +1,33 @@
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { productName, category, features, targetCustomer, price, uniquePoint, competitorUrl } = await req.json();
+  const { productName, category, features, targetCustomer, price, uniquePoint } = await req.json();
 
   if (!productName) {
     return NextResponse.json({ error: "상품명을 입력해주세요." }, { status: 400 });
   }
 
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    return NextResponse.json({ error: "GEMINI_API_KEY 미설정" }, { status: 500 });
+  }
+
   const now = new Date();
   const month = now.getMonth() + 1;
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "anthropic/claude-3-haiku",
-      max_tokens: 4000,
-      messages: [
-        {
-          role: "user",
-          content: `당신은 스마트스토어 상세페이지 전문 기획자입니다. 대형 이커머스(쿠팡, 스마트스토어 상위권)의 상세페이지 이미지 전략을 분석하고, 이 상품이 경쟁사보다 훨씬 뛰어난 상세페이지를 만들 수 있도록 이미지 기획안을 작성해주세요.
+  const prompt = `당신은 스마트스토어 상세페이지 전문 기획자입니다. 대형 이커머스(쿠팡, 스마트스토어 상위권)의 상세페이지 이미지 전략을 분석하고, 이 상품이 경쟁사보다 훨씬 뛰어난 상세페이지를 만들 수 있도록 이미지 기획안을 작성해주세요.
 
 현재 월: ${month}월
-
 상품명: ${productName}
 카테고리: ${category || "미입력"}
 주요 특징: ${features || "미입력"}
 타겟 고객: ${targetCustomer || "미입력"}
 판매가: ${price || "미입력"}
 차별점: ${uniquePoint || "미입력"}
-참고 경쟁사 URL: ${competitorUrl || "없음"}
 
-다음 JSON 형식으로만 응답하세요. 각 이미지는 실제 촬영 또는 제작 가능한 수준으로 구체적으로 작성하세요:
+다음 JSON 스키마를 엄격히 따라 응답하세요. 각 이미지는 실제 촬영 또는 제작 가능한 수준으로 구체적으로 작성하세요:
 {
   "strategy": "이 상품 상세페이지의 전체 이미지 전략 한 줄 요약",
   "competitor_weakness": "경쟁사 상세페이지의 일반적인 약점 (이 카테고리 기준)",
@@ -53,24 +46,13 @@ export async function POST(req: NextRequest) {
           "props": "함께 배치할 소품/연출 요소",
           "text_overlay": "이미지에 넣을 텍스트 문구 (없으면 빈 문자열)",
           "why_better": "이 방식이 경쟁사보다 나은 이유",
-          "ai_prompt": "AI 이미지 생성용 영문 프롬프트 - Midjourney/DALL-E 스타일로 구체적이고 상세하게. 예: professional product photography of organic aronia powder in white ceramic bowl, dark purple berries scattered around, white background, soft studio lighting, 8k resolution, high detail, commercial photography"
+          "ai_prompt": "AI 이미지 생성용 영문 프롬프트 - Midjourney/DALL-E 스타일로 구체적이고 상세하게"
         }
       ]
     }
   ],
-  "total_images": 전체 이미지 수(숫자),
-  "shooting_tips": [
-    "촬영 팁 1 (스마트폰으로도 가능한 실용적인 팁)",
-    "촬영 팁 2",
-    "촬영 팁 3"
-  ],
-  "mobile_optimization": [
-    "모바일 최적화 팁 1",
-    "모바일 최적화 팁 2"
-  ],
-  "free_tools": [
-    { "tool": "도구명", "purpose": "용도", "url_hint": "검색 키워드" }
-  ]
+  "total_images": 0,
+  "shooting_tips": ["촬영 팁 1", "촬영 팁 2", "촬영 팁 3"]
 }
 
 섹션은 다음 순서로 구성하세요:
@@ -81,20 +63,39 @@ export async function POST(req: NextRequest) {
 5. 사용 전/후 또는 비교 이미지
 6. 사용법/활용 라이프스타일
 7. 패키지/용량 상세
-8. 구매 유도 CTA`,
+8. 구매 유도 CTA`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
         },
-      ],
-    }),
-  });
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return NextResponse.json(
+      { error: (err as { error?: { message?: string } }).error?.message ?? "Gemini 호출 실패" },
+      { status: 500 }
+    );
+  }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "{}";
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
   try {
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(text);
     return NextResponse.json({ result: parsed });
   } catch {
-    return NextResponse.json({ error: "결과 파싱 실패", raw: text }, { status: 500 });
+    return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
   }
 }
