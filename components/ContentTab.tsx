@@ -68,18 +68,6 @@ function buildPrompt(img: ImageItem, productName: string): string {
   return parts.join(", ");
 }
 
-function getRefKeywords(type: string, sectionName: string): string {
-  const t = type + sectionName;
-  if (t.includes("라이프스타일")) return "lifestyle,healthy,kitchen,food";
-  if (t.includes("클로즈업") || t.includes("성분")) return "food,ingredient,organic,closeup";
-  if (t.includes("패키지") || t.includes("포장")) return "packaging,product,minimal,box";
-  if (t.includes("비교")) return "health,wellness,beauty,natural";
-  if (t.includes("인증") || t.includes("신뢰")) return "organic,natural,green,trust";
-  if (t.includes("CTA") || t.includes("구매")) return "shopping,ecommerce,product,store";
-  if (t.includes("Hero") || t.includes("첫 화면")) return "product,photography,clean,studio";
-  if (t.includes("문제") || t.includes("공감")) return "stress,tired,health,wellness";
-  return "product,photography,studio,clean";
-}
 
 export default function ContentTab() {
   const [productName, setProductName] = useState("");
@@ -374,9 +362,6 @@ export default function ContentTab() {
                         {isOpen && (
                           <div className="divide-y divide-gray-100">
                             {section.images?.map((img) => {
-                              const seed = section.order * 100 + img.index;
-                              const kw = getRefKeywords(img.type, section.name);
-                              const refImgUrl = `https://loremflickr.com/480/300/${kw}?lock=${seed}`;
                               const prompt = buildPrompt(img, productName);
                               const promptKey = `prompt-${section.order}-${img.index}`;
 
@@ -421,20 +406,6 @@ export default function ContentTab() {
                                     </div>
                                   )}
 
-                                  {/* 분위기 참고 이미지 */}
-                                  <div className="mb-3">
-                                    <p className="text-xs text-gray-400 mb-1">📷 분위기 참고 이미지 (실제 촬영 참고용)</p>
-                                    <div className="rounded-xl overflow-hidden bg-gray-100" style={{ height: 160 }}>
-                                      <img
-                                        src={refImgUrl}
-                                        alt={img.type}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${seed}/480/300`;
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
 
                                   {/* AI 프롬프트 + 생성 버튼 */}
                                   <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
