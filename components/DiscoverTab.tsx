@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import SeoTab from "@/components/SeoTab";
+import TrendTab from "@/components/TrendTab";
 
 // ── Color system ──────────────────────────────────────────────────────────────
 const PINK = { main: "#D4537E", mid: "#E89CB8", light: "#FBEAF0", text: "#993556" };
@@ -46,9 +47,12 @@ const SEASONALITY = { CV_EVERGREEN_THRESHOLD:0.15, SCORE_SURGE:88, SCORE_RISING:
 const CHANNEL_RULES: Array<{re:RegExp;score:number;reason:string}> = [
   {re:/화장품|스킨케어|마스크팩|에센스|세럼|선크림|로션|토너/, score:85, reason:"뷰티 — 스마트스토어 상위 매출"},
   {re:/청소|세제|생활용품|주방|조리|냄비|프라이팬/, score:80, reason:"생활용품 — 재구매율 높음"},
+  {re:/물놀이|수영|튜브|물총|아쿠아|해수욕|비치|워터파크|수영복|래쉬가드/, score:80, reason:"물놀이 — 여름 시즌 집중 수요"},
+  {re:/캠핑|텐트|등산|아웃도어|트레킹|백팩|타프|랜턴|버너|코펠|해먹/, score:78, reason:"캠핑·아웃도어 — 봄·여름 시즌 수요"},
   {re:/핫팩|손난로|방한|귀마개|목도리/, score:78, reason:"방한 소품 — 시즌 수요 명확"},
-  {re:/패딩|점퍼|자켓|코트|가디건|니트|옷|의류/, score:70, reason:"의류 — 반품률 관리 필요"},
+  {re:/다리미판|다리미|압축팩|유아매트|화분|다육/, score:76, reason:"이지스토리 핵심 카테고리 — 채널 검증됨"},
   {re:/전기장판|온수매트|전기히터|난방/, score:75, reason:"계절 가전 — 시즌 집중 매출"},
+  {re:/패딩|점퍼|자켓|코트|가디건|니트|옷|의류/, score:70, reason:"의류 — 반품률 관리 필요"},
   {re:/신발|운동화|샌들|슬리퍼/, score:60, reason:"신발 — 사이즈 반품 주의"},
   {re:/가방|지갑|벨트|액세서리/, score:65, reason:"잡화 — 이미지 품질 중요"},
   {re:/다이어트|건강식품|영양제|프로틴/, score:62, reason:"건강식품 — 재구매 유도"},
@@ -124,7 +128,7 @@ function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function DiscoverTab() {
+export default function DiscoverTab({ onNavigateToContent }: { onNavigateToContent?: (keyword: string) => void } = {}) {
   const [track,setTrack]=useState<"steady"|"season">("steady");
   const [mode,setMode]=useState<"auto"|"manual">("auto");
   const [hotKeywords,setHotKeywords]=useState<HotKeyword[]>([]);
@@ -140,6 +144,8 @@ export default function DiscoverTab() {
   const [scoreLoading,setScoreLoading]=useState(false);
   const [gridCards,setGridCards]=useState<GridCard[]>([]);
   const [seoTarget,setSeoTarget]=useState<string|null>(null);
+  const [showTrendModal,setShowTrendModal]=useState(false);
+  const [trendModalKw,setTrendModalKw]=useState("");
   const [showRegForm,setShowRegForm]=useState(false);
   const [regChannel,setRegChannel]=useState(CHANNELS[0]);
   const [regMonth,setRegMonth]=useState(MONTHS[0]);
@@ -402,9 +408,12 @@ export default function DiscoverTab() {
                           <button onClick={gateHold} style={{ flex:1, height:"36px", background:"#EFEFF1", color:"#6b7280", border:"1px solid #e5e7eb", borderRadius:"8px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>보류 ✕</button>
                         </div>
                       )}
+                      {scoring&&!showRegForm&&(
+                        <button onClick={()=>{setTrendModalKw(selected?.keyword||"");setShowTrendModal(true);}} style={{ width:"100%", height:"34px", marginTop:"8px", background:"#f9fafb", color:"#4a4f57", border:"1px solid #e5e7eb", borderRadius:"8px", fontSize:"12px", fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"5px" }}>🔍 트렌드 상세 분석 →</button>
+                      )}
                       {selected?.status==="실증"&&!showRegForm&&(
                         <div style={{ marginTop:"12px", display:"flex", flexDirection:"column", gap:"8px" }}>
-                          <button onClick={()=>setSeoTarget(selected.name)} style={{ width:"100%", height:"36px", background:PINK.light, color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"8px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>✏️ 상품명 최적화 →</button>
+                          <button onClick={()=>{ onNavigateToContent ? onNavigateToContent(selected.name) : setSeoTarget(selected.name); }} style={{ width:"100%", height:"36px", background:PINK.light, color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"8px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>✏️ 상품명 최적화 → Content</button>
                           {track==="season"&&<div style={{ padding:"10px 14px", background:PINK.light, borderRadius:"8px", fontSize:"12px", color:PINK.text }}>📅 시즌 상품 — Calendar에서 시즌 일정 관리</div>}
                         </div>
                       )}
@@ -499,7 +508,7 @@ export default function DiscoverTab() {
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px" }}>
                         <span style={{ fontSize:"11px", fontWeight:700, padding:"3px 9px", borderRadius:"4px", background:st.bg, color:st.color }}>{card.status}</span>
                         {card.status==="실증"&&(
-                          <button onClick={e=>{e.stopPropagation();setSeoTarget(card.name);}} style={{ fontSize:"11px", padding:"3px 9px", background:"rgba(255,255,255,0.8)", color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"4px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>SEO →</button>
+                          <button onClick={e=>{e.stopPropagation(); onNavigateToContent ? onNavigateToContent(card.name) : setSeoTarget(card.name);}} style={{ fontSize:"11px", padding:"3px 9px", background:"rgba(255,255,255,0.8)", color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"4px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Content →</button>
                         )}
                       </div>
                       <p style={{ fontSize:"16px", fontWeight:800, color:"#111", margin:"0 0 4px", lineHeight:1.2, letterSpacing:"-0.01em" }}>{card.name.length>28?card.name.slice(0,28)+"…":card.name}</p>
@@ -515,6 +524,30 @@ export default function DiscoverTab() {
         </div>{/* /Right column inner 1232px */}
         </div>{/* /Right column flex:1 */}
       </div>{/* /Sidebar+Content flex */}
+
+      {/* ② 트렌드 상세 분석 모달 */}
+      {showTrendModal&&(
+        <div
+          style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center" }}
+          onClick={()=>setShowTrendModal(false)}
+        >
+          <div
+            style={{ background:"#fff", borderRadius:"14px", width:"min(900px,95vw)", maxHeight:"88vh", overflow:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.18)" }}
+            onClick={e=>e.stopPropagation()}
+          >
+            <div style={{ padding:"16px 24px", borderBottom:"1px solid #e8eaed", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:"#fff", zIndex:1 }}>
+              <div>
+                <p style={{ fontSize:"11px", fontWeight:600, color:PINK.main, letterSpacing:"0.06em", textTransform:"uppercase", margin:"0 0 2px" }}>트렌드 상세 분석</p>
+                <p style={{ fontSize:"15px", fontWeight:700, color:"#111", margin:0 }}>{trendModalKw}</p>
+              </div>
+              <button onClick={()=>setShowTrendModal(false)} style={{ width:"32px", height:"32px", background:"#f1f5f9", border:"none", borderRadius:"8px", fontSize:"16px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}>✕</button>
+            </div>
+            <div style={{ padding:"24px" }}>
+              <TrendTab initialKeyword={trendModalKw} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

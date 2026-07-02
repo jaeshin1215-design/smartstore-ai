@@ -66,7 +66,7 @@ export default function StoreSetupTab() {
   const [pUrl, setPUrl] = useState("");
   const [pPurchasePrice, setPPurchasePrice] = useState("");
   const [pShippingCost, setPShippingCost] = useState("");
-  const [pIsOwn, setPIsOwn] = useState(true);
+  const [pIsOwn, setPIsOwn] = useState(1); // 1=자사, 0=경쟁사, 2=소싱·위탁후보
   const [addingProduct, setAddingProduct] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [collectResult, setCollectResult] = useState<{product: string; searchVolume: number; cpc: number; competitors: number}[] | null>(null);
@@ -138,7 +138,7 @@ export default function StoreSetupTab() {
       });
       await loadProducts(store.id);
       setPName(""); setPKeyword(""); setPPrice(""); setPPurchasePrice("");
-      setPShippingCost(""); setPUrl(""); setPCategory("압축팩"); setPIsOwn(true);
+      setPShippingCost(""); setPUrl(""); setPCategory("압축팩"); setPIsOwn(1);
     } catch (e) { console.error(e); }
     setAddingProduct(false);
   }
@@ -304,19 +304,19 @@ export default function StoreSetupTab() {
               상품 등록
             </div>
 
-            {/* 자사/경쟁사 토글 */}
+            {/* 자사/경쟁사/소싱·위탁후보 토글 */}
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              {[true, false].map(own => (
-                <button key={String(own)}
-                  onClick={() => setPIsOwn(own)}
+              {([1, 0, 2] as const).map(val => (
+                <button key={val}
+                  onClick={() => setPIsOwn(val)}
                   style={{
                     padding: "8px 20px", borderRadius: 20, border: "1px solid",
                     fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    borderColor: pIsOwn === own ? "#0f2a1e" : "#e0ede9",
-                    background: pIsOwn === own ? "#0f2a1e" : "#fff",
-                    color: pIsOwn === own ? "#fff" : "#6b7280",
+                    borderColor: pIsOwn === val ? "#0f2a1e" : "#e0ede9",
+                    background: pIsOwn === val ? "#0f2a1e" : "#fff",
+                    color: pIsOwn === val ? "#fff" : "#6b7280",
                   }}>
-                  {own ? "자사 상품" : "경쟁사 상품"}
+                  {val === 1 ? "자사 상품" : val === 0 ? "경쟁사 상품" : "소싱·위탁후보"}
                 </button>
               ))}
             </div>

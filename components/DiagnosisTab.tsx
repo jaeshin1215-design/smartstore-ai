@@ -138,9 +138,17 @@ export default function DiagnosisTab({
     try {
       const res = await fetch(`/api/products?store_id=${sid}`);
       const json = await res.json();
-      const list = json.products || [];
+      const raw: Product[] = json.products || [];
+      // ⑤ purchase_price 기반 matrix_y 실시간 계산 (Y축=마진율%, 상품별 독립 — min/max 정규화 없음)
+      const list = raw.map(p => {
+        if (p.price > 0 && p.purchase_price > 0 && (p.matrix_y === null || p.matrix_y === undefined)) {
+          const marginY = Math.round(((p.price - p.purchase_price) / p.price) * 100);
+          return { ...p, matrix_y: Math.max(0, Math.min(100, marginY)) };
+        }
+        return p;
+      });
       setProducts(list);
-      
+
       // Default selection to first product if available
       if (list.length > 0 && !selectedProductId) {
         setSelectedProductId(list[0].id);

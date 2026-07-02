@@ -435,7 +435,7 @@ export default function MatrixBox({
                     <circle cx={cx} cy={cy} r={r + 6} fill={dotColor} fillOpacity="0.15" />
                   )}
 
-                  {/* ★ 이력(filled) | + 등록 후보(filled+dark stroke) | ○ 엔진 후보(hollow) */}
+                  {/* ★ 자사(filled) | ⊕ MANUAL(filled+dark) | ◌ 소싱후보(dashed) | ○ 경쟁사(hollow) */}
                   {isLegacy ? (
                     <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
                       fill={dotColor} stroke="white" strokeWidth="1.5"
@@ -444,6 +444,11 @@ export default function MatrixBox({
                   ) : isManual ? (
                     <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
                       fill={dotColor} stroke="#1a1a1a" strokeWidth="2.5"
+                      style={{ transition: "r 0.1s ease" }}
+                    />
+                  ) : p.is_own === 2 ? (
+                    <circle cx={cx} cy={cy} r={isHovered ? r + 1 : r}
+                      fill="white" stroke={dotColor} strokeWidth="2" strokeDasharray="3 2"
                       style={{ transition: "r 0.1s ease" }}
                     />
                   ) : (

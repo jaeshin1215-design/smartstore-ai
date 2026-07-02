@@ -163,8 +163,8 @@ function Growth({ v }: { v: number }) {
   );
 }
 
-export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: string) => void }) {
-  const [keyword, setKeyword] = useState("");
+export default function TrendTab({ onSeoNavigate, initialKeyword }: { onSeoNavigate?: (keyword: string) => void; initialKeyword?: string }) {
+  const [keyword, setKeyword] = useState(initialKeyword || "");
   const [result, setResult] = useState<TrendResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiStreaming, setAiStreaming] = useState(false);
@@ -199,6 +199,12 @@ export default function TrendTab({ onSeoNavigate }: { onSeoNavigate?: (keyword: 
   }, []);
 
   useEffect(() => { loadHotKeywords(); }, [loadHotKeywords]);
+
+  // initialKeyword가 있으면 마운트 직후 자동 검색
+  useEffect(() => {
+    if (initialKeyword) handleSearch(initialKeyword);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearch = useCallback(async (kw?: string) => {
     const target = (kw ?? keyword).trim();

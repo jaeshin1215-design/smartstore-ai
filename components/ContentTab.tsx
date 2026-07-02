@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
+
+const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
 interface MarketingCopy { type: string; copy: string; sub: string; }
 interface ThumbnailSet { main: string; sub: string; badge: string; }
@@ -68,9 +70,12 @@ function buildPrompt(img: ImageItem, productName: string): string {
   return parts.join(", ");
 }
 
+export default function ContentTab({ initialKeyword }: { initialKeyword?: string } = {}) {
+  const [productName, setProductName] = useState(initialKeyword || "");
 
-export default function ContentTab() {
-  const [productName, setProductName] = useState("");
+  useEffect(() => {
+    if (initialKeyword) setProductName(initialKeyword);
+  }, [initialKeyword]);
   const [category, setCategory] = useState("");
   const [features, setFeatures] = useState("");
   const [targetCustomer, setTargetCustomer] = useState("");
@@ -122,42 +127,46 @@ export default function ContentTab() {
   };
 
   const CopyBtn = ({ text, id }: { text: string; id: string }) => (
-    <button onClick={() => copy(text, id)}
-      className="text-xs px-2 py-1 rounded-lg font-semibold cursor-pointer flex-shrink-0"
-      style={{ background: copied === id ? "#e8f9f0" : "#e8f0fe", color: copied === id ? "#2d9653" : "#4361ee" }}>
-      {copied === id ? "✓" : "📋"}
+    <button onClick={() => copy(text, id)} style={{
+      fontSize: "12px", fontWeight: 600, padding: "4px 10px", borderRadius: "6px",
+      border: "1px solid #e5e7eb", background: copied === id ? "#f0fdf4" : "#fff",
+      color: copied === id ? "#15803d" : "#6b7280", cursor: "pointer", fontFamily: FF, flexShrink: 0,
+    }}>
+      {copied === id ? "✓ 복사됨" : "📋 복사"}
     </button>
   );
 
-  const tabs = [
-    { id: "marketing", label: "📣 카피" },
-    { id: "thumbnail", label: "🖼️ 썸네일" },
-    { id: "detail", label: "📄 상세페이지" },
-    { id: "imageplan", label: "📸 이미지 기획" },
-    { id: "blog", label: "📝 블로그" },
-    { id: "instagram", label: "📱 인스타" },
-    { id: "kakao", label: "💬 카카오" },
-    { id: "canva", label: "🎨 Canva" },
+  const TABS = [
+    { id: "marketing", label: "카피" },
+    { id: "thumbnail", label: "썸네일" },
+    { id: "detail", label: "상세페이지" },
+    { id: "imageplan", label: "이미지 기획" },
+    { id: "blog", label: "블로그" },
+    { id: "instagram", label: "인스타" },
+    { id: "kakao", label: "카카오" },
+    { id: "canva", label: "Canva" },
+  ];
+
+  const SIDEBAR_ITEMS = [
+    { label: "카피", id: "marketing" },
+    { label: "썸네일", id: "thumbnail" },
+    { label: "상세페이지", id: "detail" },
+    { label: "이미지 기획", id: "imageplan" },
+    { label: "블로그", id: "blog" },
+    { label: "인스타", id: "instagram" },
+    { label: "카카오", id: "kakao" },
+    { label: "Canva", id: "canva" },
   ];
 
   return (
-    <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
+    <div style={{ width: "100%", fontFamily: FF, display: "flex", gap: "40px", alignItems: "flex-start" }}>
 
-      {/* 사이드바 */}
+      {/* 사이드바 — Inbox 동일 토큰 */}
       <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>CONTENT</p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>콘텐츠를,<br />한 번에</p>
         <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>상품명 입력 → AI 마케팅 카피·블로그·인스타·상세페이지</p>
-        {[
-          { label: "카피", id: "marketing" },
-          { label: "썸네일", id: "thumbnail" },
-          { label: "상세페이지", id: "detail" },
-          { label: "이미지 기획", id: "imageplan" },
-          { label: "블로그", id: "blog" },
-          { label: "인스타", id: "instagram" },
-          { label: "카카오", id: "kakao" },
-          { label: "Canva", id: "canva" },
-        ].map((f) => {
+        {SIDEBAR_ITEMS.map((f) => {
           const isActive = activeSection === f.id && !!result;
           return (
             <div key={f.id}
@@ -170,443 +179,442 @@ export default function ContentTab() {
         })}
       </div>
 
-      {/* 메인 콘텐츠 */}
+      {/* 메인 콘텐츠 — Inbox 동일 토큰 */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-xl font-bold" style={{ color: "#1a1a2e" }}>🚀 All in One 콘텐츠</h2>
-          <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: "#e74c3c" }}>NEW</span>
-        </div>
-        <p className="text-gray-400 text-sm mb-6">상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지·이미지 기획 한 번에 완성!</p>
+        <div style={{ maxWidth: "840px", margin: "0 auto", paddingBottom: "80px" }}>
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>상품명 <span className="text-red-400">*</span></label>
-          <input type="text" value={productName} onChange={(e) => setProductName(e.target.value)}
-            placeholder="예) 국산 유기농 아로니아 분말 500g"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 transition-colors" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>카테고리</label>
-            <input type="text" value={category} onChange={(e) => setCategory(e.target.value)}
-              placeholder="예) 식품 > 건강식품"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>판매가</label>
-            <input type="text" value={price} onChange={(e) => setPrice(e.target.value)}
-              placeholder="예) 19,900원"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>주요 특징</label>
-          <input type="text" value={features} onChange={(e) => setFeatures(e.target.value)}
-            placeholder="예) 유기농 인증, 국산 원료, 당일 발송, 무농약"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>타겟 고객</label>
-          <input type="text" value={targetCustomer} onChange={(e) => setTargetCustomer(e.target.value)}
-            placeholder="예) 건강 관리하는 30~50대 여성"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold mb-1.5" style={{ color: "#1a1a2e" }}>경쟁사 대비 차별점</label>
-          <input type="text" value={uniquePoint} onChange={(e) => setUniquePoint(e.target.value)}
-            placeholder="예) 타사 대비 안토시아닌 함량 3배, 소분 포장"
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400" />
-        </div>
-        <button onClick={handleSubmit} disabled={loading || !productName}
-          className="w-full py-4 rounded-xl font-bold text-white text-sm disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              모든 콘텐츠 생성 중... (약 15~20초)
-            </span>
-          ) : "🚀 모든 콘텐츠 한 번에 생성하기"}
-        </button>
-      </div>
-
-      {(result || imagePlan) && (
-        <div className="mt-6">
-          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-            {tabs.map((s) => (
-              <button key={s.id} onClick={() => setActiveSection(s.id)}
-                className="whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all"
-                style={activeSection === s.id
-                  ? { background: "linear-gradient(135deg, #667eea, #764ba2)", color: "white" }
-                  : { background: "#f0f0ff", color: "#667eea" }}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          {/* 마케팅 카피 */}
-          {activeSection === "marketing" && result?.marketing_copies && (
-            <div className="space-y-3">
-              <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>마케팅 카피 3종</p>
-              {result.marketing_copies.map((c, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full"
-                      style={{ background: i === 0 ? "#e74c3c" : i === 1 ? "#667eea" : "#2ecc71" }}>{c.type}</span>
-                    <CopyBtn text={`${c.copy}\n${c.sub}`} id={`copy-${i}`} />
-                  </div>
-                  <p className="font-bold text-base mb-1" style={{ color: "#1a1a2e" }}>{c.copy}</p>
-                  <p className="text-sm text-gray-500">{c.sub}</p>
-                </div>
-              ))}
-              <PolicyFilter text={result.marketing_copies.map((c) => `${c.copy} ${c.sub}`).join(" ")} />
+          {/* 헤더 */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+            <div>
+              <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#111827", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+                All in One 콘텐츠
+              </h1>
+              <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
+                상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지·이미지 기획 한 번에 완성
+              </p>
             </div>
-          )}
+          </div>
 
-          {/* 썸네일 */}
-          {activeSection === "thumbnail" && result?.thumbnail_sets && (
-            <div className="space-y-3">
-              <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>썸네일 문구 세트 3종</p>
-              {result.thumbnail_sets.map((t, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-gray-400">세트 {i + 1}</span>
-                    <CopyBtn text={`메인: ${t.main}\n서브: ${t.sub}\n뱃지: ${t.badge}`} id={`thumb-${i}`} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 w-10">메인</span>
-                      <span className="font-bold text-base" style={{ color: "#1a1a2e" }}>{t.main}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 w-10">서브</span>
-                      <span className="text-sm text-gray-600">{t.sub}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 w-10">뱃지</span>
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#fff0f0", color: "#e74c3c" }}>{t.badge}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: "32px" }} />
+
+          {/* 입력 폼 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "24px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                상품명 <span style={{ color: "#ef567c" }}>*</span>
+              </label>
+              <input type="text" value={productName} onChange={(e) => setProductName(e.target.value)}
+                placeholder="예) 국산 유기농 아로니아 분말 500g"
+                style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
             </div>
-          )}
-
-          {/* 상세페이지 */}
-          {activeSection === "detail" && result?.detail_page && (
-            <div className="space-y-3">
-              <div className="flex justify-end">
-                <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제] ${result.detail_page.problem}\n\n[해결] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>카테고리</label>
+                <input type="text" value={category} onChange={(e) => setCategory(e.target.value)}
+                  placeholder="예) 식품 > 건강식품"
+                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
               </div>
-              {[
-                { label: "⚡ 후킹 문구", value: result.detail_page.hook, bg: "linear-gradient(135deg, #667eea, #764ba2)", color: "white" },
-                { label: "😓 문제 공감", value: result.detail_page.problem, bg: "#fee2e2", color: "#b91c1c" },
-                { label: "✅ 해결책", value: result.detail_page.solution, bg: "#dbeafe", color: "#1d4ed8" },
-                { label: "🏆 신뢰 증거", value: result.detail_page.trust, bg: "#d1fae5", color: "#065f46" },
-                { label: "🔥 긴급성", value: result.detail_page.urgency, bg: "#ffedd5", color: "#c2410c" },
-                { label: "🛒 구매 유도", value: result.detail_page.cta, bg: "linear-gradient(135deg, #f093fb, #f5576c)", color: "white" },
-              ].map((item, i) => (
-                <div key={i} className="rounded-xl p-4" style={{ background: item.bg }}>
-                  <p className="text-xs font-bold mb-1" style={{ color: item.color, opacity: 0.8 }}>{item.label}</p>
-                  <p className="text-sm font-semibold" style={{ color: item.color }}>{item.value}</p>
-                </div>
-              ))}
-              {result.detail_page.features?.map((f, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-4">
-                  <p className="font-bold text-sm mb-1" style={{ color: "#1a1a2e" }}>{f.title}</p>
-                  <p className="text-xs text-gray-600 mb-1">{f.desc}</p>
-                  <p className="text-xs text-indigo-500">📷 {f.image_guide}</p>
-                </div>
-              ))}
-              {result.detail_page.faq?.map((f, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-sm font-bold mb-1" style={{ color: "#1a1a2e" }}>Q. {f.q}</p>
-                  <p className="text-xs text-gray-600">A. {f.a}</p>
-                </div>
-              ))}
+              <div>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>판매가</label>
+                <input type="text" value={price} onChange={(e) => setPrice(e.target.value)}
+                  placeholder="예) 19,900원"
+                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
+              </div>
             </div>
-          )}
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>주요 특징</label>
+              <input type="text" value={features} onChange={(e) => setFeatures(e.target.value)}
+                placeholder="예) 유기농 인증, 국산 원료, 당일 발송, 무농약"
+                style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>타겟 고객</label>
+              <input type="text" value={targetCustomer} onChange={(e) => setTargetCustomer(e.target.value)}
+                placeholder="예) 건강 관리하는 30~50대 여성"
+                style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>경쟁사 대비 차별점</label>
+              <input type="text" value={uniquePoint} onChange={(e) => setUniquePoint(e.target.value)}
+                placeholder="예) 타사 대비 안토시아닌 함량 3배, 소분 포장"
+                style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
+            </div>
 
-          {/* 이미지 기획 */}
-          {activeSection === "imageplan" && (
-            <div className="space-y-3">
-              {imagePlan ? (
+            <button onClick={handleSubmit} disabled={loading || !productName} style={{
+              width: "100%", padding: "12px 24px", borderRadius: "8px", border: "none",
+              fontSize: "14px", fontWeight: 700, color: "#fff", cursor: loading || !productName ? "not-allowed" : "pointer",
+              background: "#ef567c", opacity: loading || !productName ? 0.5 : 1, fontFamily: FF,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            }}>
+              {loading ? (
                 <>
-                  <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #667eea, #764ba2)" }}>
-                    <p className="text-xs text-white/70 mb-1">📸 이미지 전략</p>
-                    <p className="text-sm font-bold text-white">{imagePlan.strategy}</p>
-                    {imagePlan.total_images && (
-                      <p className="text-xs text-white/70 mt-1">총 {imagePlan.total_images}장 구성 제안</p>
-                    )}
-                  </div>
+                  <span style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
+                  모든 콘텐츠 생성 중... (약 15~20초)
+                </>
+              ) : "🚀 모든 콘텐츠 한 번에 생성하기"}
+            </button>
+          </div>
 
-                  {imagePlan.competitor_weakness && (
-                    <div className="bg-red-50 border border-red-100 rounded-xl p-3">
-                      <p className="text-xs font-bold text-red-500 mb-1">⚠️ 경쟁사 약점</p>
-                      <p className="text-xs text-red-400">{imagePlan.competitor_weakness}</p>
+          {/* 결과 영역 */}
+          {(result || imagePlan) && (
+            <div>
+              <div style={{ borderTop: "1px solid #e5e7eb", margin: "32px 0 24px" }} />
+
+              {/* 탭 바 */}
+              <div style={{ display: "flex", gap: "6px", marginBottom: "24px", overflowX: "auto", paddingBottom: "4px" }}>
+                {TABS.map((s) => {
+                  const isActive = activeSection === s.id;
+                  return (
+                    <button key={s.id} onClick={() => setActiveSection(s.id)} style={{
+                      whiteSpace: "nowrap", padding: "6px 14px", borderRadius: "7px",
+                      fontSize: "13px", fontWeight: isActive ? 700 : 500, cursor: "pointer",
+                      border: isActive ? "none" : "1px solid #e5e7eb",
+                      background: isActive ? "#ef567c" : "#fff",
+                      color: isActive ? "#fff" : "#6b7280", fontFamily: FF,
+                    }}>
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 마케팅 카피 */}
+              {activeSection === "marketing" && result?.marketing_copies && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>마케팅 카피 3종</p>
+                  {result.marketing_copies.map((c, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "3px 10px", borderRadius: "6px", background: i === 0 ? "#ef567c" : i === 1 ? "#2563eb" : "#16a34a" }}>{c.type}</span>
+                        <CopyBtn text={`${c.copy}\n${c.sub}`} id={`copy-${i}`} />
+                      </div>
+                      <p style={{ fontSize: "16px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{c.copy}</p>
+                      <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>{c.sub}</p>
                     </div>
-                  )}
+                  ))}
+                  <PolicyFilter text={result.marketing_copies.map((c) => `${c.copy} ${c.sub}`).join(" ")} />
+                </div>
+              )}
 
-                  {/* AI 이미지 생성 안내 */}
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                    <p className="text-xs font-bold text-blue-600 mb-1">💡 AI 이미지 생성 방법</p>
-                    <p className="text-xs text-blue-500">각 섹션의 <strong>AI 프롬프트를 복사</strong>한 뒤, 아래 무료 도구에 붙여넣으면 고품질 이미지를 생성할 수 있어요.</p>
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      <a href="https://www.bing.com/images/create" target="_blank" rel="noopener noreferrer"
-                        className="text-xs px-2 py-1 rounded-lg font-bold text-white" style={{ background: "#0078d4" }}>
-                        Bing AI (무료·빠름)
-                      </a>
-                      <a href="https://app.leonardo.ai/ai-generations" target="_blank" rel="noopener noreferrer"
-                        className="text-xs px-2 py-1 rounded-lg font-bold text-white" style={{ background: "#7c3aed" }}>
-                        Leonardo.ai (무료)
-                      </a>
-                      <a href="https://firefly.adobe.com/generate/images" target="_blank" rel="noopener noreferrer"
-                        className="text-xs px-2 py-1 rounded-lg font-bold text-white" style={{ background: "#e74c3c" }}>
-                        Adobe Firefly (무료)
-                      </a>
+              {/* 썸네일 */}
+              {activeSection === "thumbnail" && result?.thumbnail_sets && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>썸네일 문구 세트 3종</p>
+                  {result.thumbnail_sets.map((t, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#9ca3af" }}>세트 {i + 1}</span>
+                        <CopyBtn text={`메인: ${t.main}\n서브: ${t.sub}\n뱃지: ${t.badge}`} id={`thumb-${i}`} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {[{ label: "메인", value: t.main }, { label: "서브", value: t.sub }, { label: "뱃지", value: t.badge }].map((row) => (
+                          <div key={row.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "12px", color: "#9ca3af", width: "32px", flexShrink: 0 }}>{row.label}</span>
+                            <span style={{ fontSize: row.label === "메인" ? "16px" : "14px", fontWeight: row.label === "메인" ? 700 : 400, color: "#111827" }}>{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 상세페이지 */}
+              {activeSection === "detail" && result?.detail_page && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제] ${result.detail_page.problem}\n\n[해결] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
                   </div>
+                  {[
+                    { label: "⚡ 후킹 문구", value: result.detail_page.hook, bg: "#ef567c", color: "#fff" },
+                    { label: "😓 문제 공감", value: result.detail_page.problem, bg: "#fee2e2", color: "#b91c1c" },
+                    { label: "✅ 해결책", value: result.detail_page.solution, bg: "#dbeafe", color: "#1d4ed8" },
+                    { label: "🏆 신뢰 증거", value: result.detail_page.trust, bg: "#d1fae5", color: "#065f46" },
+                    { label: "🔥 긴급성", value: result.detail_page.urgency, bg: "#ffedd5", color: "#c2410c" },
+                    { label: "🛒 구매 유도", value: result.detail_page.cta, bg: "#fdf4ff", color: "#7c3aed" },
+                  ].map((item, i) => (
+                    <div key={i} style={{ background: item.bg, borderRadius: "12px", padding: "16px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: item.color, opacity: 0.8, margin: "0 0 4px" }}>{item.label}</p>
+                      <p style={{ fontSize: "14px", fontWeight: 600, color: item.color, margin: 0, lineHeight: 1.6 }}>{item.value}</p>
+                    </div>
+                  ))}
+                  {result.detail_page.features?.map((f, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{f.title}</p>
+                      <p style={{ fontSize: "14px", color: "#4b5563", margin: "0 0 4px", lineHeight: 1.6 }}>{f.desc}</p>
+                      <p style={{ fontSize: "13px", color: "#2563eb", margin: 0 }}>📷 {f.image_guide}</p>
+                    </div>
+                  ))}
+                  {result.detail_page.faq?.map((f, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "14px 16px" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>Q. {f.q}</p>
+                      <p style={{ fontSize: "14px", color: "#4b5563", margin: 0 }}>A. {f.a}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-                  {imagePlan.sections?.map((section) => {
-                    const colors = SECTION_COLORS[section.order] || SECTION_COLORS[1];
-                    const isOpen = openImageSections.includes(section.order);
-                    return (
-                      <div key={section.order} className="border rounded-xl overflow-hidden" style={{ borderColor: colors.border }}>
-                        <button onClick={() => toggleImageSection(section.order)}
-                          className="w-full flex items-center justify-between p-3 cursor-pointer text-left"
-                          style={{ background: colors.bg }}>
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center flex-shrink-0"
-                              style={{ background: colors.badge }}>{section.order}</span>
-                            <div>
-                              <p className="text-sm font-bold" style={{ color: colors.text }}>{section.name}</p>
-                              <p className="text-xs text-gray-400">{section.purpose}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs px-2 py-0.5 rounded-full font-bold text-white"
-                              style={{ background: colors.badge }}>{section.images?.length || 0}장</span>
-                            <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
-                          </div>
-                        </button>
-
-                        {isOpen && (
-                          <div className="divide-y divide-gray-100">
-                            {section.images?.map((img) => {
-                              const prompt = buildPrompt(img, productName);
-                              const promptKey = `prompt-${section.order}-${img.index}`;
-
-                              return (
-                                <div key={img.index} className="p-4 bg-white">
-                                  {/* 이미지 타입 + 설명 */}
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                                      style={{ background: colors.bg, color: colors.badge }}>
-                                      #{img.index} {img.type}
-                                    </span>
-                                    <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}`, `img-${promptKey}`)}
-                                      className="text-xs text-gray-400 hover:text-indigo-500 cursor-pointer">복사</button>
-                                  </div>
-                                  <p className="text-sm text-gray-700 mb-2 leading-relaxed">{img.description}</p>
-
-                                  {/* 촬영 정보 */}
-                                  <div className="grid grid-cols-3 gap-1.5 mb-2">
-                                    {[
-                                      { label: "각도", value: img.angle },
-                                      { label: "배경", value: img.background },
-                                      { label: "소품", value: img.props || "없음" },
-                                    ].map((item) => (
-                                      <div key={item.label} className="bg-gray-50 rounded-lg p-2">
-                                        <p className="text-xs text-gray-400">{item.label}</p>
-                                        <p className="text-xs font-semibold text-gray-600">{item.value}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  {img.text_overlay && (
-                                    <div className="bg-indigo-50 rounded-lg px-3 py-2 mb-2">
-                                      <p className="text-xs text-indigo-400">텍스트 오버레이</p>
-                                      <p className="text-xs font-bold text-indigo-700">"{img.text_overlay}"</p>
-                                    </div>
-                                  )}
-
-                                  {img.why_better && (
-                                    <div className="flex gap-1.5 items-start mb-3">
-                                      <span className="text-green-500 text-xs mt-0.5">✓</span>
-                                      <p className="text-xs text-green-600">{img.why_better}</p>
-                                    </div>
-                                  )}
-
-
-                                  {/* AI 프롬프트 + 생성 버튼 */}
-                                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <p className="text-xs font-bold text-indigo-600">🤖 AI 이미지 생성 프롬프트</p>
-                                      <button
-                                        onClick={() => copy(prompt, promptKey)}
-                                        className="text-xs px-2 py-0.5 rounded-lg font-bold cursor-pointer"
-                                        style={{
-                                          background: copied === promptKey ? "#e8f9f0" : "#e8f0fe",
-                                          color: copied === promptKey ? "#2d9653" : "#4361ee",
-                                        }}>
-                                        {copied === promptKey ? "✓ 복사됨!" : "📋 복사"}
-                                      </button>
-                                    </div>
-                                    <p className="text-xs text-gray-500 font-mono leading-relaxed mb-2 break-all">{prompt}</p>
-                                    <div className="flex gap-1.5 flex-wrap">
-                                      <button
-                                        onClick={() => {
-                                          copy(prompt, promptKey);
-                                          window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank");
-                                        }}
-                                        className="text-xs px-2.5 py-1.5 rounded-lg font-bold text-white cursor-pointer"
-                                        style={{ background: "#0078d4" }}>
-                                        🚀 Bing AI로 생성
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          copy(prompt, promptKey);
-                                          window.open("https://app.leonardo.ai/ai-generations", "_blank");
-                                        }}
-                                        className="text-xs px-2.5 py-1.5 rounded-lg font-bold text-white cursor-pointer"
-                                        style={{ background: "#7c3aed" }}>
-                                        📋 Leonardo
-                                      </button>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mt-1.5">💡 복사 후 붙여넣기(Ctrl+V)하면 즉시 생성됩니다</p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+              {/* 이미지 기획 */}
+              {activeSection === "imageplan" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {imagePlan ? (
+                    <>
+                      <div style={{ background: "#ef567c", borderRadius: "12px", padding: "16px" }}>
+                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>📸 이미지 전략</p>
+                        <p style={{ fontSize: "14px", fontWeight: 700, color: "#fff", margin: 0 }}>{imagePlan.strategy}</p>
+                        {imagePlan.total_images && (
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", margin: "4px 0 0" }}>총 {imagePlan.total_images}장 구성 제안</p>
                         )}
                       </div>
-                    );
-                  })}
-
-                  {imagePlan.shooting_tips?.length > 0 && (
-                    <div className="bg-amber-50 rounded-xl p-4">
-                      <p className="text-sm font-bold text-amber-700 mb-2">📷 촬영 팁</p>
-                      {imagePlan.shooting_tips.map((tip, i) => (
-                        <div key={i} className="flex gap-2 items-start mb-1.5">
-                          <span className="w-5 h-5 rounded-full bg-amber-400 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
-                          <p className="text-xs text-amber-700">{tip}</p>
+                      {imagePlan.competitor_weakness && (
+                        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "14px 16px" }}>
+                          <p style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", margin: "0 0 4px" }}>⚠️ 경쟁사 약점</p>
+                          <p style={{ fontSize: "14px", color: "#b91c1c", margin: 0 }}>{imagePlan.competitor_weakness}</p>
                         </div>
-                      ))}
+                      )}
+                      {/* Google Flow 가이드 박스 */}
+                      <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "12px", padding: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                          <span style={{ fontSize: "18px" }}>🎬</span>
+                          <div>
+                            <p style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", margin: 0 }}>Google Flow — 이미지 → 영상까지 한 곳에서</p>
+                            <p style={{ fontSize: "12px", color: "#6b7280", margin: 0 }}>flow.google.com · 무료 50 크레딧/일 · 이미지 모델: Nano Banana 2</p>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "12px" }}>
+                          {[
+                            "① 프롬프트 상자에서 Image 선택 → 비율 9:16 · Nano Banana 2 설정",
+                            "② 아래 AI 프롬프트 복사 → flow.google.com에 붙여넣기 → 생성",
+                            "③ 마음에 들면 4K 업스케일링 → 영상(Veo 3.1 Quality)으로 변환",
+                            "④ 크레딧 절약: 이미지 완성 후 영상 변환 순서 지키기",
+                          ].map((step, i) => (
+                            <p key={i} style={{ fontSize: "13px", color: "#166534", margin: 0, lineHeight: 1.6 }}>{step}</p>
+                          ))}
+                        </div>
+                        <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: "8px", padding: "10px 12px", marginBottom: "12px" }}>
+                          <p style={{ fontSize: "12px", fontWeight: 700, color: "#92400e", margin: "0 0 4px" }}>⚠️ 허위광고 주의 (커머스 필수)</p>
+                          <p style={{ fontSize: "12px", color: "#78350f", margin: 0, lineHeight: 1.6 }}>AI는 제품을 "해석해 새로 그림" → 실물과 다를 수 있음. 상세페이지 메인 제품 컷은 반드시 실물 사진 유지. 배경·분위기 영상에만 사용 권장.</p>
+                        </div>
+                        <a href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener noreferrer" style={{
+                          display: "inline-flex", alignItems: "center", gap: "6px",
+                          fontSize: "13px", fontWeight: 700, color: "#fff", padding: "7px 16px",
+                          borderRadius: "7px", background: "#16a34a", textDecoration: "none",
+                        }}>🎬 Google Flow 열기 →</a>
+                      </div>
+
+                      {/* 기타 AI 이미지 도구 */}
+                      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "14px 16px" }}>
+                        <p style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", margin: "0 0 6px" }}>💡 기타 AI 이미지 생성 도구</p>
+                        <p style={{ fontSize: "14px", color: "#1d4ed8", margin: "0 0 10px", lineHeight: 1.6 }}>각 섹션의 AI 프롬프트를 복사한 뒤 아래 도구에 붙여넣으면 고품질 이미지를 생성할 수 있습니다.</p>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {[
+                            { label: "Bing AI (무료·빠름)", color: "#0078d4", url: "https://www.bing.com/images/create" },
+                            { label: "Leonardo.ai (무료)", color: "#7c3aed", url: "https://app.leonardo.ai/ai-generations" },
+                            { label: "Adobe Firefly (무료)", color: "#ef567c", url: "https://firefly.adobe.com/generate/images" },
+                          ].map((tool) => (
+                            <a key={tool.label} href={tool.url} target="_blank" rel="noopener noreferrer" style={{
+                              fontSize: "12px", fontWeight: 700, color: "#fff", padding: "5px 12px", borderRadius: "6px",
+                              background: tool.color, textDecoration: "none",
+                            }}>{tool.label}</a>
+                          ))}
+                        </div>
+                      </div>
+                      {imagePlan.sections?.map((section) => {
+                        const colors = SECTION_COLORS[section.order] || SECTION_COLORS[1];
+                        const isOpen = openImageSections.includes(section.order);
+                        return (
+                          <div key={section.order} style={{ border: `1px solid ${colors.border}`, borderRadius: "12px", overflow: "hidden" }}>
+                            <button onClick={() => toggleImageSection(section.order)} style={{
+                              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                              padding: "12px 16px", background: colors.bg, border: "none", cursor: "pointer", fontFamily: FF, textAlign: "left",
+                            }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: colors.badge, color: "#fff", fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{section.order}</span>
+                                <div>
+                                  <p style={{ fontSize: "14px", fontWeight: 700, color: colors.text, margin: 0 }}>{section.name}</p>
+                                  <p style={{ fontSize: "12px", color: "#9ca3af", margin: 0 }}>{section.purpose}</p>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "2px 8px", borderRadius: "6px", background: colors.badge }}>{section.images?.length || 0}장</span>
+                                <span style={{ fontSize: "12px", color: "#9ca3af" }}>{isOpen ? "▲" : "▼"}</span>
+                              </div>
+                            </button>
+                            {isOpen && (
+                              <div>
+                                {section.images?.map((img) => {
+                                  const prompt = buildPrompt(img, productName);
+                                  const promptKey = `prompt-${section.order}-${img.index}`;
+                                  return (
+                                    <div key={img.index} style={{ padding: "16px", background: "#fff", borderTop: `1px solid ${colors.border}` }}>
+                                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                                        <span style={{ fontSize: "12px", fontWeight: 700, padding: "3px 10px", borderRadius: "6px", background: colors.bg, color: colors.badge }}>#{img.index} {img.type}</span>
+                                        <button onClick={() => copy(`[${img.type}]\n${img.description}\n각도: ${img.angle}\n배경: ${img.background}`, `img-${promptKey}`)} style={{ fontSize: "13px", color: "#6b7280", background: "none", border: "none", cursor: "pointer", fontFamily: FF }}>복사</button>
+                                      </div>
+                                      <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, margin: "0 0 10px" }}>{img.description}</p>
+                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                                        {[{ label: "각도", value: img.angle }, { label: "배경", value: img.background }, { label: "소품", value: img.props || "없음" }].map((item) => (
+                                          <div key={item.label} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px 10px" }}>
+                                            <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 2px" }}>{item.label}</p>
+                                            <p style={{ fontSize: "13px", fontWeight: 600, color: "#374151", margin: 0 }}>{item.value}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {img.text_overlay && (
+                                        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "8px 12px", marginBottom: "8px" }}>
+                                          <p style={{ fontSize: "12px", color: "#2563eb", margin: "0 0 2px" }}>텍스트 오버레이</p>
+                                          <p style={{ fontSize: "13px", fontWeight: 700, color: "#1d4ed8", margin: 0 }}>"{img.text_overlay}"</p>
+                                        </div>
+                                      )}
+                                      {img.why_better && (
+                                        <div style={{ display: "flex", gap: "6px", alignItems: "flex-start", marginBottom: "12px" }}>
+                                          <span style={{ color: "#16a34a", fontSize: "13px" }}>✓</span>
+                                          <p style={{ fontSize: "13px", color: "#15803d", margin: 0, lineHeight: 1.5 }}>{img.why_better}</p>
+                                        </div>
+                                      )}
+                                      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "12px 14px" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                                          <p style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", margin: 0 }}>🤖 AI 이미지 생성 프롬프트</p>
+                                          <button onClick={() => copy(prompt, promptKey)} style={{ fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "6px", border: "1px solid #bfdbfe", background: copied === promptKey ? "#f0fdf4" : "#fff", color: copied === promptKey ? "#15803d" : "#2563eb", cursor: "pointer", fontFamily: FF }}>
+                                            {copied === promptKey ? "✓ 복사됨" : "📋 복사"}
+                                          </button>
+                                        </div>
+                                        <p style={{ fontSize: "12px", color: "#6b7280", fontFamily: "monospace", lineHeight: 1.6, margin: "0 0 10px", wordBreak: "break-all" }}>{prompt}</p>
+                                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                          <button onClick={() => { copy(prompt, promptKey); window.open("https://labs.google/fx/tools/flow", "_blank"); }} style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "6px 12px", borderRadius: "6px", border: "none", background: "#16a34a", cursor: "pointer", fontFamily: FF }}>🎬 Google Flow</button>
+                                          <button onClick={() => { copy(prompt, promptKey); window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank"); }} style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "6px 12px", borderRadius: "6px", border: "none", background: "#0078d4", cursor: "pointer", fontFamily: FF }}>🚀 Bing AI</button>
+                                          <button onClick={() => { copy(prompt, promptKey); window.open("https://app.leonardo.ai/ai-generations", "_blank"); }} style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "6px 12px", borderRadius: "6px", border: "none", background: "#7c3aed", cursor: "pointer", fontFamily: FF }}>Leonardo</button>
+                                        </div>
+                                        <p style={{ fontSize: "12px", color: "#9ca3af", margin: "8px 0 0" }}>💡 복사 후 flow.google.com 또는 Bing AI에 붙여넣기(Ctrl+V)하면 즉시 생성됩니다</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {imagePlan.shooting_tips?.length > 0 && (
+                        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "12px", padding: "16px" }}>
+                          <p style={{ fontSize: "14px", fontWeight: 700, color: "#92400e", margin: "0 0 10px" }}>📷 촬영 팁</p>
+                          {imagePlan.shooting_tips.map((tip, i) => (
+                            <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "6px" }}>
+                              <span style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#f59e0b", color: "#fff", fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                              <p style={{ fontSize: "14px", color: "#92400e", margin: 0, lineHeight: 1.6 }}>{tip}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+                      <p style={{ fontSize: "28px", margin: "0 0 8px" }}>📸</p>
+                      <p style={{ fontSize: "14px", margin: 0 }}>콘텐츠를 먼저 생성해주세요</p>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="text-center py-8 text-gray-400">
-                  <p className="text-2xl mb-2">📸</p>
-                  <p className="text-sm">콘텐츠를 먼저 생성해주세요</p>
+                </div>
+              )}
+
+              {/* 블로그 */}
+              {activeSection === "blog" && result?.blog_post && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>네이버 블로그 포스팅</p>
+                    <CopyBtn text={`${result.blog_post.title}\n\n${result.blog_post.intro}\n\n${result.blog_post.body}\n\n${result.blog_post.outro}`} id="blog-all" />
+                  </div>
+                  <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "12px", padding: "16px" }}>
+                    <p style={{ fontSize: "12px", fontWeight: 700, color: "#15803d", margin: "0 0 4px" }}>📌 SEO 최적화 제목</p>
+                    <p style={{ fontSize: "14px", fontWeight: 700, color: "#14532d", margin: 0 }}>{result.blog_post.title}</p>
+                  </div>
+                  {[{ label: "도입부", value: result.blog_post.intro }, { label: "본문", value: result.blog_post.body }, { label: "마무리", value: result.blog_post.outro }].map((s) => (
+                    <div key={s.label} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: "#9ca3af", margin: "0 0 8px" }}>{s.label}</p>
+                      <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, margin: 0, whiteSpace: "pre-line" }}>{s.value}</p>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                    {result.blog_post.tags?.map((tag, i) => (
+                      <span key={i} style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}>#{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 인스타 */}
+              {activeSection === "instagram" && result?.instagram && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ background: "linear-gradient(135deg, #a855f7, #ec4899)", borderRadius: "12px", padding: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: "#fff", margin: 0 }}>📱 캡션</p>
+                      <CopyBtn text={result.instagram.caption} id="insta-cap" />
+                    </div>
+                    <p style={{ fontSize: "14px", color: "#fff", lineHeight: 1.75, margin: 0 }}>{result.instagram.caption}</p>
+                  </div>
+                  <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: "#9ca3af", margin: 0 }}>스토리 문구</p>
+                      <CopyBtn text={result.instagram.story_text} id="insta-story" />
+                    </div>
+                    <p style={{ fontSize: "14px", color: "#4b5563", margin: 0 }}>{result.instagram.story_text}</p>
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>해시태그</p>
+                      <CopyBtn text={result.instagram.hashtags?.join(" ")} id="insta-hash" />
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                      {result.instagram.hashtags?.map((tag, i) => (
+                        <span key={i} style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", background: "#fdf4ff", color: "#7c3aed", border: "1px solid #e9d5ff" }}>{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 카카오 */}
+              {activeSection === "kakao" && result?.kakao && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {[{ label: "💬 채널 포스팅", value: result.kakao.channel_post, id: "kakao-ch" }, { label: "📤 친구 공유", value: result.kakao.talk_message, id: "kakao-talk" }].map((item) => (
+                    <div key={item.id} style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "12px", padding: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <p style={{ fontSize: "12px", fontWeight: 700, color: "#92400e", margin: 0 }}>{item.label}</p>
+                        <CopyBtn text={item.value} id={item.id} />
+                      </div>
+                      <p style={{ fontSize: "14px", color: "#78350f", lineHeight: 1.75, margin: 0 }}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Canva */}
+              {activeSection === "canva" && result?.canva_guide && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {[
+                    { label: "🎨 썸네일 스타일", value: result.canva_guide.thumbnail_style, bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
+                    { label: "🎨 색상 조합", value: result.canva_guide.color_scheme, bg: "#f9fafb", border: "#e5e7eb", color: "#374151" },
+                    { label: "✍️ 폰트", value: result.canva_guide.font_suggestion, bg: "#f9fafb", border: "#e5e7eb", color: "#374151" },
+                    { label: "📐 레이아웃 팁", value: result.canva_guide.layout_tip, bg: "#f9fafb", border: "#e5e7eb", color: "#374151" },
+                  ].map((item) => (
+                    <div key={item.label} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: "12px", padding: "16px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: item.color, margin: "0 0 4px", opacity: 0.8 }}>{item.label}</p>
+                      <p style={{ fontSize: "14px", color: item.color, margin: 0, lineHeight: 1.6 }}>{item.value}</p>
+                    </div>
+                  ))}
+                  <a href="https://www.canva.com" target="_blank" rel="noopener noreferrer" style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                    padding: "12px 24px", borderRadius: "8px", border: "1px solid #bfdbfe",
+                    fontSize: "14px", fontWeight: 600, color: "#2563eb", textDecoration: "none", background: "#fff",
+                  }}>
+                    🎨 Canva에서 만들기 →
+                  </a>
                 </div>
               )}
             </div>
           )}
 
-          {/* 블로그 */}
-          {activeSection === "blog" && result?.blog_post && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>네이버 블로그 포스팅</p>
-                <CopyBtn text={`${result.blog_post.title}\n\n${result.blog_post.intro}\n\n${result.blog_post.body}\n\n${result.blog_post.outro}`} id="blog-all" />
-              </div>
-              <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-xs font-bold text-green-600 mb-1">📌 SEO 최적화 제목</p>
-                <p className="font-bold text-sm text-green-800">{result.blog_post.title}</p>
-              </div>
-              {[
-                { label: "도입부", value: result.blog_post.intro },
-                { label: "본문", value: result.blog_post.body },
-                { label: "마무리", value: result.blog_post.outro },
-              ].map((s) => (
-                <div key={s.label} className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-xs font-bold text-gray-500 mb-2">{s.label}</p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{s.value}</p>
-                </div>
-              ))}
-              <div className="flex flex-wrap gap-1">
-                {result.blog_post.tags?.map((tag, i) => (
-                  <span key={i} className="text-xs px-2 py-1 rounded-full" style={{ background: "#f0f0ff", color: "#667eea" }}>#{tag}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 인스타 */}
-          {activeSection === "instagram" && result?.instagram && (
-            <div className="space-y-3">
-              <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-white">📱 캡션</p>
-                  <CopyBtn text={result.instagram.caption} id="insta-cap" />
-                </div>
-                <p className="text-sm text-white leading-relaxed">{result.instagram.caption}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-gray-500">스토리 문구</p>
-                  <CopyBtn text={result.instagram.story_text} id="insta-story" />
-                </div>
-                <p className="text-sm text-gray-700">{result.instagram.story_text}</p>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-bold" style={{ color: "#1a1a2e" }}>해시태그</p>
-                  <CopyBtn text={result.instagram.hashtags?.join(" ")} id="insta-hash" />
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {result.instagram.hashtags?.map((tag, i) => (
-                    <span key={i} className="text-xs px-2 py-1 rounded-full" style={{ background: "#f0f0ff", color: "#667eea" }}>{tag}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 카카오 */}
-          {activeSection === "kakao" && result?.kakao && (
-            <div className="space-y-3">
-              <div className="bg-yellow-50 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-yellow-700">💬 채널 포스팅</p>
-                  <CopyBtn text={result.kakao.channel_post} id="kakao-ch" />
-                </div>
-                <p className="text-sm text-yellow-800 leading-relaxed">{result.kakao.channel_post}</p>
-              </div>
-              <div className="bg-yellow-50 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-yellow-700">📤 친구 공유</p>
-                  <CopyBtn text={result.kakao.talk_message} id="kakao-talk" />
-                </div>
-                <p className="text-sm text-yellow-800 leading-relaxed">{result.kakao.talk_message}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Canva */}
-          {activeSection === "canva" && result?.canva_guide && (
-            <div className="space-y-3">
-              {[
-                { label: "🎨 썸네일 스타일", value: result.canva_guide.thumbnail_style, bg: "#eff6ff", color: "#1d4ed8" },
-                { label: "🎨 색상 조합", value: result.canva_guide.color_scheme, bg: "#f9fafb", color: "#374151" },
-                { label: "✍️ 폰트", value: result.canva_guide.font_suggestion, bg: "#f9fafb", color: "#374151" },
-                { label: "📐 레이아웃 팁", value: result.canva_guide.layout_tip, bg: "#f9fafb", color: "#374151" },
-              ].map((item) => (
-                <div key={item.label} className="rounded-xl p-4" style={{ background: item.bg }}>
-                  <p className="text-xs font-bold mb-1" style={{ color: item.color }}>{item.label}</p>
-                  <p className="text-sm" style={{ color: item.color }}>{item.value}</p>
-                </div>
-              ))}
-              <a href="https://www.canva.com" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border-2 border-blue-200 text-blue-600 hover:bg-blue-50">
-                🎨 Canva에서 만들기 →
-              </a>
-            </div>
-          )}
         </div>
-      )}
-      </div>{/* 메인 콘텐츠 닫기 */}
+      </div>
     </div>
   );
 }

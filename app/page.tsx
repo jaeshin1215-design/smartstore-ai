@@ -15,19 +15,20 @@ import ProfitSimulatorTab from "@/components/ProfitSimulatorTab";
 import ContentTab from "@/components/ContentTab";
 
 const TABS = [
-  { id: "calendar",  icon: "ti ti-calendar-month", label: "Calendar"  },
-  { id: "diagnosis", icon: "ti ti-layout-grid",   label: "Diagnose"  },
-  { id: "optimize",  icon: "ti ti-adjustments",   label: "Optimize"  },
-  { id: "inbox",     icon: "ti ti-inbox",          label: "Inbox"     },
-  { id: "discover",  icon: "ti ti-compass",       label: "Discover"  },
-  { id: "content",   icon: "ti ti-file-text",      label: "Content"   },
   { id: "setup",     icon: "ti ti-settings",       label: "Setup"     },
+  { id: "discover",  icon: "ti ti-compass",        label: "Discover"  },
+  { id: "diagnosis", icon: "ti ti-layout-grid",    label: "Diagnose"  },
+  { id: "optimize",  icon: "ti ti-adjustments",    label: "Optimize"  },
+  { id: "content",   icon: "ti ti-file-text",       label: "Content"   },
+  { id: "calendar",  icon: "ti ti-calendar-month", label: "Calendar"  },
+  { id: "inbox",     icon: "ti ti-inbox",           label: "Inbox"     },
 ];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("calendar");
+  const [activeTab, setActiveTab] = useState("setup");
   const [trialOpen, setTrialOpen] = useState(false);
   const [onboardingProgress, setOnboardingProgress] = useState(1);
+  const [seoKeyword, setSeoKeyword] = useState("");
 
   useEffect(() => {
     const isRegistered = localStorage.getItem("product_registered") === "true";
@@ -153,7 +154,9 @@ export default function Home() {
 
       {/* ── Main content ── */}
       <main className="w-full px-6 py-6">
-        {activeTab === "discover" && <DiscoverTab />}
+        {activeTab === "discover" && (
+          <DiscoverTab onNavigateToContent={(kw) => { setSeoKeyword(kw); setActiveTab("content"); }} />
+        )}
 
 
 
@@ -225,7 +228,7 @@ export default function Home() {
         )}
 
         {activeTab === "inbox"     && <CustomerTab />}
-        {activeTab === "content"   && <ContentTab />}
+        {activeTab === "content"   && <ContentTab initialKeyword={seoKeyword} />}
         {activeTab === "setup"     && <StoreSetupTab />}
         {activeTab === "diagnosis" && <DiagnosisTab onSeoNavigate={handleSeoNavigate} />}
         {activeTab === "calendar"  && <CalendarTab />}

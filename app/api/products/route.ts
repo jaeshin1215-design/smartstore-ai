@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
            price ? Number(price) : null,
            purchase_price ? Number(purchase_price) : null,
            shipping_cost ? Number(shipping_cost) : null,
-           is_own ? 1 : 0,
+           is_own !== undefined && is_own !== null ? Number(is_own) : 0,
            matrix_x != null ? Number(matrix_x) : null,
            matrix_y != null ? Number(matrix_y) : null],
   });
