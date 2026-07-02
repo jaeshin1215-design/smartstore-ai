@@ -141,12 +141,42 @@ export default function ContentTab() {
   ];
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-1">
-        <h2 className="text-xl font-bold" style={{ color: "#1a1a2e" }}>🚀 All in One 콘텐츠</h2>
-        <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: "#e74c3c" }}>NEW</span>
+    <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
+
+      {/* 사이드바 */}
+      <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
+        <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>CONTENT</p>
+        <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>콘텐츠를,<br />한 번에</p>
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>상품명 입력 → AI 마케팅 카피·블로그·인스타·상세페이지</p>
+        {[
+          { label: "카피", id: "marketing" },
+          { label: "썸네일", id: "thumbnail" },
+          { label: "상세페이지", id: "detail" },
+          { label: "이미지 기획", id: "imageplan" },
+          { label: "블로그", id: "blog" },
+          { label: "인스타", id: "instagram" },
+          { label: "카카오", id: "kakao" },
+          { label: "Canva", id: "canva" },
+        ].map((f) => {
+          const isActive = activeSection === f.id && !!result;
+          return (
+            <div key={f.id}
+              onClick={() => result && setActiveSection(f.id)}
+              style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: result ? "pointer" : "default" }}>
+              <span style={{ fontSize: "10px", color: isActive ? "#ef567c" : "#c0c4cc", flexShrink: 0 }}>✓</span>
+              <span style={{ fontSize: "13px", color: isActive ? "#ef567c" : "#8f9399", fontWeight: isActive ? 600 : 400 }}>{f.label}</span>
+            </div>
+          );
+        })}
       </div>
-      <p className="text-gray-400 text-sm mb-6">상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지·이미지 기획 한 번에 완성!</p>
+
+      {/* 메인 콘텐츠 */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-xl font-bold" style={{ color: "#1a1a2e" }}>🚀 All in One 콘텐츠</h2>
+          <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: "#e74c3c" }}>NEW</span>
+        </div>
+        <p className="text-gray-400 text-sm mb-6">상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지·이미지 기획 한 번에 완성!</p>
 
       <div className="space-y-4">
         <div>
@@ -576,6 +606,7 @@ export default function ContentTab() {
           )}
         </div>
       )}
+      </div>{/* 메인 콘텐츠 닫기 */}
     </div>
   );
 }
