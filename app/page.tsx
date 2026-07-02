@@ -12,6 +12,7 @@ import TrialModal from "@/components/TrialModal";
 import SellFitFooter from "@/components/SellFitFooter";
 import CalendarTab from "@/components/CalendarTab";
 import ProfitSimulatorTab from "@/components/ProfitSimulatorTab";
+import ContentTab from "@/components/ContentTab";
 
 const TABS = [
   { id: "calendar",  icon: "ti ti-calendar-month", label: "Calendar"  },
@@ -19,6 +20,7 @@ const TABS = [
   { id: "optimize",  icon: "ti ti-adjustments",   label: "Optimize"  },
   { id: "inbox",     icon: "ti ti-inbox",          label: "Inbox"     },
   { id: "discover",  icon: "ti ti-compass",       label: "Discover"  },
+  { id: "content",   icon: "ti ti-file-text",      label: "Content"   },
   { id: "setup",     icon: "ti ti-settings",       label: "Setup"     },
 ];
 
@@ -223,6 +225,7 @@ export default function Home() {
         )}
 
         {activeTab === "inbox"     && <CustomerTab />}
+        {activeTab === "content"   && <ContentTab />}
         {activeTab === "setup"     && <StoreSetupTab />}
         {activeTab === "diagnosis" && <DiagnosisTab onSeoNavigate={handleSeoNavigate} />}
         {activeTab === "calendar"  && <CalendarTab />}
