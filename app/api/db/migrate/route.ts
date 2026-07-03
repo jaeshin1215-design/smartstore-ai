@@ -31,5 +31,13 @@ export async function POST() {
     created_at TEXT DEFAULT (datetime('now'))
   )`);
 
+  // v4 — 경쟁사 추적: AI 판단 결과 컬럼 추가
+  await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN safety_level TEXT");
+  await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN registered_margin_pct REAL");
+  await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN coupang_margin_pct REAL");
+  await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN margin_diff_pct REAL");
+  await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN winner_target_price INTEGER");
+  await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN judgment_reason TEXT");
+
   return NextResponse.json({ ok: true, message: "마이그레이션 완료" });
 }

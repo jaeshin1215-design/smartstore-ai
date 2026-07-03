@@ -75,7 +75,19 @@ export default function StoreSetupTab() {
   const [activeSection, setActiveSection] = useState("상품 등록");
 
   // 경쟁사 추적
-  interface TrackingRecord { id: string; product_name: string; coupang_price: number | null; is_item_winner: number; check_date: string; }
+  interface TrackingRecord {
+    id: string;
+    product_name: string;
+    coupang_price: number | null;
+    is_item_winner: number;
+    check_date: string;
+    safety_level: "안전" | "주의" | "위험" | null;
+    registered_margin_pct: number | null;
+    coupang_margin_pct: number | null;
+    margin_diff_pct: number | null;
+    winner_target_price: number | null;
+    judgment_reason: string | null;
+  }
   const [trackingRecords, setTrackingRecords] = useState<TrackingRecord[]>([]);
   const [tProductName, setTProductName] = useState("");
   const [tCoupangPrice, setTCoupangPrice] = useState("");
@@ -214,6 +226,7 @@ export default function StoreSetupTab() {
 
   const ownProducts = products.filter(p => p.is_own === 1);
   const compProducts = products.filter(p => p.is_own === 0);
+  const candidateProducts = products.filter(p => p.is_own === 2);
 
   if (loading) {
     return (
@@ -406,30 +419,51 @@ export default function StoreSetupTab() {
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                         <thead>
                           <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-                            {["확인일자", "상품명", "쿠팡 판매가", "아이템위너"].map(h => (
-                              <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em" }}>{h}</th>
+                            {["확인일자", "상품명", "쿠팡 판매가", "아이템위너", "판정", "마진차이", "탈환 목표가"].map(h => (
+                              <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {trackingRecords.map(r => (
-                            <tr key={r.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                              <td style={{ padding: "10px", color: "#6b7280" }}>{r.check_date}</td>
-                              <td style={{ padding: "10px", color: "#0f2a1e", fontWeight: 600 }}>{r.product_name}</td>
-                              <td style={{ padding: "10px", color: "#374151" }}>
-                                {r.coupang_price ? Number(r.coupang_price).toLocaleString() + "원" : "—"}
-                              </td>
-                              <td style={{ padding: "10px" }}>
-                                <span style={{
-                                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
-                                  background: r.is_item_winner ? "#dcfce7" : "#f3f4f6",
-                                  color: r.is_item_winner ? "#15803d" : "#6b7280",
-                                }}>
-                                  {r.is_item_winner ? "위너" : "비위너"}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {trackingRecords.map(r => {
+                            const safetyColor =
+                              r.safety_level === "안전" ? { bg: "#dcfce7", color: "#15803d" }
+                              : r.safety_level === "주의" ? { bg: "#fef9c3", color: "#854d0e" }
+                              : r.safety_level === "위험" ? { bg: "#fee2e2", color: "#dc2626" }
+                              : { bg: "#f3f4f6", color: "#9ca3af" };
+                            return (
+                              <tr key={r.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                <td style={{ padding: "10px", color: "#6b7280", whiteSpace: "nowrap" }}>{r.check_date}</td>
+                                <td style={{ padding: "10px", color: "#0f2a1e", fontWeight: 600 }}>{r.product_name}</td>
+                                <td style={{ padding: "10px", color: "#374151", whiteSpace: "nowrap" }}>
+                                  {r.coupang_price ? Number(r.coupang_price).toLocaleString() + "원" : "—"}
+                                </td>
+                                <td style={{ padding: "10px" }}>
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+                                    background: r.is_item_winner ? "#dcfce7" : "#f3f4f6",
+                                    color: r.is_item_winner ? "#15803d" : "#6b7280",
+                                  }}>
+                                    {r.is_item_winner ? "위너" : "비위너"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "10px" }}>
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 10,
+                                    background: safetyColor.bg, color: safetyColor.color,
+                                  }} title={r.judgment_reason ?? ""}>
+                                    {r.safety_level ?? "—"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "10px", color: "#374151", whiteSpace: "nowrap" }}>
+                                  {r.margin_diff_pct != null ? `${r.margin_diff_pct}%p` : "—"}
+                                </td>
+                                <td style={{ padding: "10px", color: "#374151", whiteSpace: "nowrap" }}>
+                                  {r.winner_target_price ? Number(r.winner_target_price).toLocaleString() + "원" : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -573,11 +607,11 @@ export default function StoreSetupTab() {
           {products.length > 0 && (
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 16 }}>
-                등록된 상품 ({ownProducts.length}개 자사 · {compProducts.length}개 경쟁사)
+                등록된 상품 ({ownProducts.length}개 자사 · {compProducts.length}개 경쟁사 · {candidateProducts.length}개 소싱후보)
               </div>
               <div style={{ maxHeight: "360px", overflowY: "auto", paddingRight: "4px" }}>
 
-              {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }].map(group => (
+              {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }, { label: "소싱·위탁후보", list: candidateProducts }].map(group => (
                 group.list.length > 0 && (
                   <div key={group.label} style={{ marginBottom: 20 }}>
                     <div style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.1em", marginBottom: 10 }}>
