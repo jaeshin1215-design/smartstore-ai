@@ -255,7 +255,14 @@ export async function POST(req: NextRequest) {
 
       const dome = (json?.domeggook ?? json) as RawItem;
       const item = await normalizeDetailItem(dome);
-      return NextResponse.json({ item });
+      // DEV DEBUG: raw 구조 확인 후 제거 예정
+      const _dbg = {
+        keys_top: Object.keys(dome),
+        price: (dome.price ?? {}),
+        resale: ((dome.price as RawItem)?.resale ?? {}),
+        basis_title: ((dome.basis as RawItem)?.title ?? ""),
+      };
+      return NextResponse.json({ item, _dbg });
     }
 
     return NextResponse.json({ error: "mode 오류: search | detail" }, { status: 400 });
