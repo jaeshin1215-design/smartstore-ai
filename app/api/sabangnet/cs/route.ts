@@ -15,9 +15,53 @@ import type {
   SabangnetClaimListResponse,
 } from "@/lib/sabangnet/types";
 
+// ── 테스트 모드 목 데이터 ────────────────────────────────────────────
+const TEST_CS_LIST = [
+  {
+    cs_no: "test_001",
+    ord_no: "20260701-0041",
+    channel: "네이버",
+    category: "배송 문의",
+    content: "어제 주문했는데 배송 출발은 언제쯤 되나요? 내일 행사 때 쓸 거라 꼭 오늘 받아야 해요.",
+    created_at: "2026-07-02",
+    status: "unanswered",
+  },
+  {
+    cs_no: "test_002",
+    ord_no: "20260630-0087",
+    channel: "쿠팡",
+    category: "교환·반품",
+    content: "사이즈가 생각보다 커서 교환 가능한가요? 미개봉 상태입니다.",
+    created_at: "2026-07-01",
+    status: "unanswered",
+  },
+  {
+    cs_no: "test_003",
+    ord_no: "20260629-0012",
+    channel: "네이버",
+    category: "상품 문의",
+    content: "이 제품 다른 색상도 있나요? 검정 말고 흰색이나 베이지 계열이 있으면 좋겠어요.",
+    created_at: "2026-06-30",
+    status: "unanswered",
+  },
+];
+
 // ── GET: 미답변 CS 문의 목록 ─────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const isTest = searchParams.get("test") === "1";
+
+  // 테스트 모드: API 키 없어도 목 데이터 반환
+  if (isTest) {
+    return NextResponse.json({
+      mode: "cs",
+      total: TEST_CS_LIST.length,
+      cs_list: TEST_CS_LIST,
+      _test: true,
+    });
+  }
+
   // 환경변수 프리플라이트
   const config = checkSabangnetConfig();
   if (!config.ok) {
@@ -27,7 +71,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { searchParams } = new URL(req.url);
   const mode = searchParams.get("mode") ?? "cs"; // cs | claim
 
   try {
@@ -76,15 +119,6 @@ export async function GET(req: NextRequest) {
 // ── POST: CS 답변 등록 (SABANG_CS_ANS_REG) ───────────────────────────
 
 export async function POST(req: NextRequest) {
-  // 환경변수 프리플라이트
-  const config = checkSabangnetConfig();
-  if (!config.ok) {
-    return NextResponse.json(
-      { error: "사방넷 API 키 미설정", missing: config.missing },
-      { status: 503 }
-    );
-  }
-
   let body: SabangnetCSAnswerPayload;
   try {
     body = await req.json();
@@ -96,6 +130,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "cs_no와 answer 필드 필수" },
       { status: 400 }
+    );
+  }
+
+  // 테스트 모드: test_ 접두어 cs_no는 사방넷 호출 없이 성공 응답
+  if (body.cs_no.startsWith("test_")) {
+    return NextResponse.json({
+      success: true,
+      message: "[테스트] 답변 등록 완료 (사방넷 실제 전송 없음)",
+      cs_no: body.cs_no,
+      _test: true,
+    });
+  }
+
+  // 환경변수 프리플라이트 (실제 모드에서만)
+  const config = checkSabangnetConfig();
+  if (!config.ok) {
+    return NextResponse.json(
+      { error: "사방넷 API 키 미설정", missing: config.missing },
+      { status: 503 }
     );
   }
 

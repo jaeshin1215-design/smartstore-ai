@@ -137,11 +137,15 @@ export default function CustomerTab() {
     if (activeInboxSection === "고객 문의") fetchCS();
   }, [activeInboxSection]);
 
+  // 사방넷 API 키 확보 후 false로 변경
+  const TEST_MODE = true;
+
   async function fetchCS() {
     setCsLoading(true);
     setCsError(null);
     try {
-      const res = await fetch("/api/sabangnet/cs");
+      const url = TEST_MODE ? "/api/sabangnet/cs?test=1" : "/api/sabangnet/cs";
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) setCsError(data.error ?? "사방넷 CS 조회 실패");
       else setCsItems(data.cs_list ?? []);
