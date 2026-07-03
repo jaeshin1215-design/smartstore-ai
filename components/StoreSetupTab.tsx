@@ -53,6 +53,20 @@ export default function StoreSetupTab() {
   const [salesSaved, setSalesSaved] = useState(false);
   const [yesterdaySales, setYesterdaySales] = useState<{revenue?: number; ad_cost?: number} | null>(null);
 
+  // 발주·운송장 state
+  const [ordersFrom, setOrdersFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10).replace(/-/g, "");
+  });
+  const [ordersTo, setOrdersTo] = useState(() => new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+  const [ordersData, setOrdersData] = useState<{orders: {orderNo:string;channel:string;orderedAt:string;productName:string;quantity:number;receiverName:string}[]; total: number} | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [trackingRows, setTrackingRows] = useState([{ orderNo: "", trackingNo: "", courierCode: "", invoiceDate: new Date().toISOString().slice(0, 10).replace(/-/g, "") }]);
+  const [uploadingTracking, setUploadingTracking] = useState(false);
+  const [trackingResult, setTrackingResult] = useState<{success_count: number; fail_count: number; message: string} | null>(null);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
+
   // 스토어 등록 폼
   const [storeName, setStoreName] = useState("");
   const [storeEmail, setStoreEmail] = useState("");
@@ -244,7 +258,7 @@ export default function StoreSetupTab() {
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>SETUP</p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>한 번만 등록하면 끝</p>
         <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>자사·경쟁사 상품 등록</p>
-        {["상품 등록", "경쟁사 추적", "매출 입력"].map(f => (
+        {["상품 등록", "경쟁사 추적", "매출 입력", "발주·운송장"].map(f => (
           <div key={f}
             onClick={() => setActiveSection(f)}
             style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: "pointer", borderRadius: 6, padding: "4px 6px", background: activeSection === f ? "#fff3f6" : "transparent" }}>
@@ -515,6 +529,159 @@ export default function StoreSetupTab() {
               </button>
             </div>
           )}
+
+          {/* ── 발주·운송장 섹션 ── */}
+          {activeSection === "발주·운송장" && (() => {
+            async function fetchOrders() {
+              setLoadingOrders(true);
+              setOrdersError(null);
+              setOrdersData(null);
+              try {
+                const res = await fetch(`/api/sabangnet/orders?from=${ordersFrom}&to=${ordersTo}`);
+                const data = await res.json();
+                if (!res.ok) setOrdersError(data.error ?? "발주 조회 실패");
+                else setOrdersData(data);
+              } catch { setOrdersError("네트워크 오류"); }
+              setLoadingOrders(false);
+            }
+
+            async function uploadTracking() {
+              const items = trackingRows.filter(r => r.orderNo.trim() && r.trackingNo.trim());
+              if (!items.length) return;
+              setUploadingTracking(true);
+              setTrackingError(null);
+              setTrackingResult(null);
+              try {
+                const res = await fetch("/api/sabangnet/tracking", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ items }),
+                });
+                const data = await res.json();
+                if (!res.ok) setTrackingError(data.error ?? "업로드 실패");
+                else setTrackingResult(data);
+              } catch { setTrackingError("네트워크 오류"); }
+              setUploadingTracking(false);
+            }
+
+            const todayFmt = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
+            return (
+              <div>
+                {/* API 키 안내 */}
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#92400e" }}>
+                  ⚠️ 사방넷 API 키 미설정 시 503 응답. <code style={{ background: "#fef3c7", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>SABANGNET_API_KEY</code> + <code style={{ background: "#fef3c7", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>SABANGNET_SHOP_ID</code> 설정 후 활성화.
+                </div>
+
+                {/* 발주 취합 */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>발주 취합</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>사방넷 전채널 주문 조회 → Phase 1 OrderRow 형식 변환</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "flex-end", marginBottom: 14 }}>
+                    <div>
+                      <span style={S.label}>시작일 (YYYYMMDD)</span>
+                      <input style={S.input} placeholder={todayFmt}
+                        value={ordersFrom} onChange={e => setOrdersFrom(e.target.value)} />
+                    </div>
+                    <div>
+                      <span style={S.label}>종료일 (YYYYMMDD)</span>
+                      <input style={S.input} placeholder={todayFmt}
+                        value={ordersTo} onChange={e => setOrdersTo(e.target.value)} />
+                    </div>
+                    <button onClick={fetchOrders} disabled={loadingOrders}
+                      style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: loadingOrders ? "#c4c8cc" : "#ef567c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: loadingOrders ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                      {loadingOrders ? "조회 중..." : "발주 조회 →"}
+                    </button>
+                  </div>
+
+                  {ordersError && (
+                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#dc2626" }}>
+                      ⚠️ {ordersError}
+                    </div>
+                  )}
+
+                  {ordersData && (
+                    <div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>총 {ordersData.total}건</div>
+                      {ordersData.orders.length === 0 ? (
+                        <div style={{ background: "#f9fafb", borderRadius: 8, padding: "20px", textAlign: "center", fontSize: 13, color: "#9ca3af" }}>조회 기간 내 주문 없음</div>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid #e8eaed" }}>
+                                {["주문번호", "채널", "주문일시", "상품명", "수량", "수령인"].map(h => (
+                                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ordersData.orders.map(o => (
+                                <tr key={o.orderNo} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                  <td style={{ padding: "9px 10px", color: "#374151", whiteSpace: "nowrap", fontSize: 11 }}>{o.orderNo}</td>
+                                  <td style={{ padding: "9px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>{o.channel}</td>
+                                  <td style={{ padding: "9px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>{o.orderedAt}</td>
+                                  <td style={{ padding: "9px 10px", color: "#0f2a1e", fontWeight: 600, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.productName}</td>
+                                  <td style={{ padding: "9px 10px", color: "#374151" }}>{o.quantity}</td>
+                                  <td style={{ padding: "9px 10px", color: "#374151" }}>{o.receiverName}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 운송장 업로드 */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>운송장 업로드</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>Phase 1 세트분리 결과 → 사방넷 운송장 자동 등록</div>
+
+                  {trackingRows.map((row, idx) => (
+                    <div key={idx} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1.5fr 1.5fr auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                      <input style={{ ...S.input, fontSize: 12 }} placeholder="주문번호"
+                        value={row.orderNo} onChange={e => setTrackingRows(prev => prev.map((r, i) => i === idx ? { ...r, orderNo: e.target.value } : r))} />
+                      <input style={{ ...S.input, fontSize: 12 }} placeholder="운송장번호"
+                        value={row.trackingNo} onChange={e => setTrackingRows(prev => prev.map((r, i) => i === idx ? { ...r, trackingNo: e.target.value } : r))} />
+                      <input style={{ ...S.input, fontSize: 12 }} placeholder="택배사코드"
+                        value={row.courierCode} onChange={e => setTrackingRows(prev => prev.map((r, i) => i === idx ? { ...r, courierCode: e.target.value } : r))} />
+                      <input style={{ ...S.input, fontSize: 12 }} placeholder={todayFmt}
+                        value={row.invoiceDate} onChange={e => setTrackingRows(prev => prev.map((r, i) => i === idx ? { ...r, invoiceDate: e.target.value } : r))} />
+                      {trackingRows.length > 1 && (
+                        <button onClick={() => setTrackingRows(prev => prev.filter((_, i) => i !== idx))}
+                          style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 16, padding: "0 4px" }}>✕</button>
+                      )}
+                    </div>
+                  ))}
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button onClick={() => setTrackingRows(prev => [...prev, { orderNo: "", trackingNo: "", courierCode: "", invoiceDate: todayFmt }])}
+                      style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid #e0ede9", background: "#f9fafb", color: "#374151", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      + 행 추가
+                    </button>
+                    <button onClick={uploadTracking} disabled={uploadingTracking}
+                      style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: uploadingTracking ? "#c4c8cc" : "#0f2a1e", color: "#fff", fontSize: 13, fontWeight: 600, cursor: uploadingTracking ? "default" : "pointer" }}>
+                      {uploadingTracking ? "등록 중..." : "사방넷에 운송장 등록 →"}
+                    </button>
+                  </div>
+
+                  {trackingError && (
+                    <div style={{ marginTop: 12, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#dc2626" }}>
+                      ⚠️ {trackingError}
+                    </div>
+                  )}
+
+                  {trackingResult && (
+                    <div style={{ marginTop: 12, background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#15803d" }}>
+                      ✓ {trackingResult.message} (성공 {trackingResult.success_count}건 · 실패 {trackingResult.fail_count}건)
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── 상품 등록 섹션 ── */}
           {activeSection === "상품 등록" && (
