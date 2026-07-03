@@ -161,11 +161,11 @@ export default function CustomerTab() {
       const res = await fetch("/api/reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: cs.content }),
+        body: JSON.stringify({ inquiry: cs.content }),
       });
-      const data = await res.json();
-      const text = data.reply ?? data.answer ?? data.draft ?? "";
-      if (text) setDrafts(p => ({ ...p, [cs.cs_no]: text }));
+      if (!res.ok) throw new Error(`reply API ${res.status}`);
+      const text = await res.text();
+      if (text.trim()) setDrafts(p => ({ ...p, [cs.cs_no]: text.trim() }));
     } catch { /* 무시 */ }
     setGeneratingDraft(null);
   }
