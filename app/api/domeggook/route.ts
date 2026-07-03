@@ -26,8 +26,8 @@ async function fetchNaverShopMedianPrice(
   title: string,
   costPrice: number
 ): Promise<number | null> {
-  const clientId     = process.env.NAVER_CLIENT_ID!;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET!;
+  const clientId     = process.env.NAVER_DATALAB_CLIENT_ID!;
+  const clientSecret = process.env.NAVER_DATALAB_CLIENT_SECRET!;
 
   if (!clientId || !clientSecret) {
     console.log("[naver_shop] SKIP: 환경변수 없음");
