@@ -206,7 +206,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
     const reason=scoring?(track==="season"?scoring.seasonality.evidence:scoring.channel.evidence):(selected.margin_pct>0?`마진 ${selected.margin_pct}%`:"미채점");
     // 3번 규칙: X=시즌성, Y=마진 → Diagnose 매트릭스 좌표
     const matrixX=scoring?scoring.seasonality.score:50;
-    const matrixY=scoring?scoring.margin.score:50;
+    const matrixY=scoring?scoring.margin.score:(selected.margin_pct>0?selected.margin_pct:50);
     setCandidates(prev=>prev.map(c=>c.no===selected.no?{...c,status:regStatus}:c));
     setSelected(prev=>prev?{...prev,status:regStatus}:prev);
     const card:GridCard={id:selected.no,name:selected.name,category:selected.category,status:regStatus,reason:`${regChannel} · ${regMonth} · ${reason}`,keyword:selected.keyword,matrix_x:matrixX,matrix_y:matrixY};
@@ -215,7 +215,10 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
     const storeId=typeof window!=="undefined"?localStorage.getItem("sellfit_store_id"):null;
     if(storeId){
       try{
-        await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({store_id:storeId,name:selected.name,url:selected.no?`https://domeggook.com/product/${selected.no}`:null,keyword:selected.keyword,category:selected.category,price:selected.sell_price||0,purchase_price:0,is_own:2,matrix_x:matrixX,matrix_y:matrixY})});
+        // purchase_price: sell_price × (1 - margin_pct/100) 역산 — DiagnosisTab 재계산 로직 활성화
+        const derivedPurchasePrice=selected.sell_price>0&&selected.margin_pct>0
+          ?Math.round(selected.sell_price*(1-selected.margin_pct/100)):0;
+        await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({store_id:storeId,name:selected.name,url:selected.no?`https://domeggook.com/product/${selected.no}`:null,keyword:selected.keyword,category:selected.category,price:selected.sell_price||0,purchase_price:derivedPurchasePrice,is_own:2,matrix_x:matrixX,matrix_y:matrixY})});
       }catch{/* 실패 무시 — 발굴현황엔 이미 반영됨 */}
     }
     setShowRegForm(false);if(regStatus==="실증")setSeoTarget(selected.name);
