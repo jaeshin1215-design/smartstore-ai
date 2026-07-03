@@ -150,6 +150,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [regChannel,setRegChannel]=useState(CHANNELS[0]);
   const [regMonth,setRegMonth]=useState(MONTHS[0]);
   const [regStatus,setRegStatus]=useState<"실증"|"검토">("실증");
+  const [regDone,setRegDone]=useState(false);
 
   const inputRef=useRef<HTMLInputElement>(null);
   const seoRef=useRef<HTMLDivElement>(null);
@@ -233,7 +234,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
         await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({store_id:storeId,name:selected.name,url:selected.no?`https://domeggook.com/product/${selected.no}`:null,keyword:selected.keyword,category:selected.category,price:selected.sell_price||0,purchase_price:derivedPurchasePrice,is_own:2,matrix_x:matrixX,matrix_y:matrixY})});
       }catch{/* 실패 무시 — 발굴현황엔 이미 반영됨 */}
     }
-    setShowRegForm(false);if(regStatus==="실증"){if(onNavigateToContent)onNavigateToContent(selected.name);else setSeoTarget(selected.name);}
+    setRegDone(true);setTimeout(()=>{setShowRegForm(false);setRegDone(false);},900);// 자동 이동 없음. 등록만 하고 Discover에 남음.
   },[selected,scoring,track,regChannel,regMonth,regStatus]);
 
   const gateHold=useCallback(()=>{
@@ -469,7 +470,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                       ))}
                     </div>
                   </div>
-                  <button onClick={handleRegister} style={{ width:"100%", height:"40px", background:PINK.main, color:"#fff", border:"none", borderRadius:"8px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>확정 → 등록</button>
+                  <button onClick={handleRegister} disabled={regDone} style={{ width:"100%", height:"40px", background:regDone?"#22c55e":PINK.main, color:"#fff", border:"none", borderRadius:"8px", fontSize:"14px", fontWeight:700, cursor:regDone?"default":"pointer", fontFamily:"inherit", transition:"background 0.2s" }}>{regDone?"등록완료 ✓":"확정 → 등록"}</button>
                 </div>
               )}
 
