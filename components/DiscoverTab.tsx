@@ -143,7 +143,8 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [scoring,setScoring]=useState<ScoreResult|null>(null);
   const [scoreLoading,setScoreLoading]=useState(false);
   const [gridCards,setGridCards]=useState<GridCard[]>([]);
-  const [seoTarget,setSeoTarget]=useState<string|null>(null);
+  const [showSeoModal,setShowSeoModal]=useState(false);
+  const [seoModalKw,setSeoModalKw]=useState("");
   const [showTrendModal,setShowTrendModal]=useState(false);
   const [trendModalKw,setTrendModalKw]=useState("");
   const [showRegForm,setShowRegForm]=useState(false);
@@ -153,9 +154,6 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [regDone,setRegDone]=useState(false);
 
   const inputRef=useRef<HTMLInputElement>(null);
-  const seoRef=useRef<HTMLDivElement>(null);
-
-  useEffect(()=>{if(seoTarget&&seoRef.current)seoRef.current.scrollIntoView({behavior:"smooth",block:"start"});},[seoTarget]);
   useEffect(()=>{setCandidateScores({});setScoring(null);},[track]);
   useEffect(()=>{
     if(mode!=="auto"||hotKeywords.length>0)return;
@@ -182,7 +180,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
 
   const searchDomeggook=useCallback(async(kw:string)=>{
     if(!kw.trim())return;
-    setSearchLoading(true);setSearchError("");setSelected(null);setScoring(null);setCandidateScores({});setShowRegForm(false);setSeoTarget(null);
+    setSearchLoading(true);setSearchError("");setSelected(null);setScoring(null);setCandidateScores({});setShowRegForm(false);
     try{
       const res=await fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"search",keyword:kw})});
       const j=await res.json() as {items?:Omit<Candidate,"status"|"keyword">[];error?:string};
@@ -427,10 +425,10 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                       {scoring&&!showRegForm&&(
                         <button onClick={()=>{setTrendModalKw(selected?.keyword||"");setShowTrendModal(true);}} style={{ width:"100%", height:"34px", marginTop:"8px", background:"#f9fafb", color:"#4a4f57", border:"1px solid #e5e7eb", borderRadius:"8px", fontSize:"12px", fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"5px" }}>🔍 트렌드 상세 분석 →</button>
                       )}
-                      {selected?.status==="실증"&&!showRegForm&&(
+                      {scoring&&!showRegForm&&(
                         <div style={{ marginTop:"12px", display:"flex", flexDirection:"column", gap:"8px" }}>
-                          <button onClick={()=>{ onNavigateToContent ? onNavigateToContent(selected.name) : setSeoTarget(selected.name); }} style={{ width:"100%", height:"36px", background:PINK.light, color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"8px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>✏️ 상품명 최적화 → Content</button>
-                          {track==="season"&&<div style={{ padding:"10px 14px", background:PINK.light, borderRadius:"8px", fontSize:"12px", color:PINK.text }}>📅 시즌 상품 — Calendar에서 시즌 일정 관리</div>}
+                          <button onClick={()=>{setSeoModalKw(selected?.name||"");setShowSeoModal(true);}} style={{ width:"100%", height:"36px", background:PINK.light, color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"8px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>✏️ 상품명 최적화</button>
+                          {track==="season"&&selected?.status==="실증"&&<div style={{ padding:"10px 14px", background:PINK.light, borderRadius:"8px", fontSize:"12px", color:PINK.text }}>📅 시즌 상품 — Calendar에서 시즌 일정 관리</div>}
                         </div>
                       )}
                     </>
@@ -474,21 +472,6 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                 </div>
               )}
 
-              {/* SEO panel */}
-              {seoTarget&&(
-                <div ref={seoRef} style={{ marginTop:"12px" }}>
-                  <div style={{ ...CARD_STYLE, overflow:"hidden" }}>
-                    <div style={{ padding:"14px 20px", borderBottom:`1px solid ${PINK.light}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:PINK.light }}>
-                      <div>
-                        <p style={{ fontSize:"11px", color:PINK.text, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", margin:"0 0 2px" }}>상품명 최적화</p>
-                        <p style={{ fontSize:"14px", fontWeight:700, color:"#111", margin:0 }}>{seoTarget.length>40?seoTarget.slice(0,40)+"…":seoTarget}</p>
-                      </div>
-                      <button onClick={()=>setSeoTarget(null)} style={{ width:"28px", height:"28px", background:"#fff", color:"#6b7280", border:`1px solid ${PINK.mid}`, borderRadius:"6px", fontSize:"14px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}>✕</button>
-                    </div>
-                    <div style={{ padding:"24px" }}><SeoTab initialKeyword={seoTarget}/></div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -524,7 +507,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px" }}>
                         <span style={{ fontSize:"11px", fontWeight:700, padding:"3px 9px", borderRadius:"4px", background:st.bg, color:st.color }}>{card.status}</span>
                         {card.status==="실증"&&(
-                          <button onClick={e=>{e.stopPropagation(); onNavigateToContent ? onNavigateToContent(card.name) : setSeoTarget(card.name);}} style={{ fontSize:"11px", padding:"3px 9px", background:"rgba(255,255,255,0.8)", color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"4px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Content →</button>
+                          <button onClick={e=>{e.stopPropagation(); onNavigateToContent&&onNavigateToContent(card.name);}} style={{ fontSize:"11px", padding:"3px 9px", background:"rgba(255,255,255,0.8)", color:PINK.text, border:`1px solid ${PINK.mid}`, borderRadius:"4px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Content →</button>
                         )}
                       </div>
                       <p style={{ fontSize:"16px", fontWeight:800, color:"#111", margin:"0 0 4px", lineHeight:1.2, letterSpacing:"-0.01em" }}>{card.name.length>28?card.name.slice(0,28)+"…":card.name}</p>
@@ -560,6 +543,30 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
             </div>
             <div style={{ padding:"24px" }}>
               <TrendTab initialKeyword={trendModalKw} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ③ 상품명 최적화 모달 */}
+      {showSeoModal&&(
+        <div
+          style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center" }}
+          onClick={()=>setShowSeoModal(false)}
+        >
+          <div
+            style={{ background:"#fff", borderRadius:"14px", width:"min(900px,95vw)", maxHeight:"88vh", overflow:"auto", boxShadow:"0 24px 64px rgba(0,0,0,0.18)" }}
+            onClick={e=>e.stopPropagation()}
+          >
+            <div style={{ padding:"16px 24px", borderBottom:"1px solid #e8eaed", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:"#fff", zIndex:1 }}>
+              <div>
+                <p style={{ fontSize:"11px", fontWeight:600, color:PINK.main, letterSpacing:"0.06em", textTransform:"uppercase", margin:"0 0 2px" }}>상품명 최적화</p>
+                <p style={{ fontSize:"15px", fontWeight:700, color:"#111", margin:0 }}>{seoModalKw.length>50?seoModalKw.slice(0,50)+"…":seoModalKw}</p>
+              </div>
+              <button onClick={()=>setShowSeoModal(false)} style={{ width:"32px", height:"32px", background:"#f1f5f9", border:"none", borderRadius:"8px", fontSize:"16px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}>✕</button>
+            </div>
+            <div style={{ padding:"24px" }}>
+              <SeoTab initialKeyword={seoModalKw}/>
             </div>
           </div>
         </div>
