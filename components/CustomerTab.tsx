@@ -4,24 +4,6 @@ import { useState, useEffect } from "react";
 
 const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
-interface Chip { label: string; bg: string; border: string; color: string; }
-interface AnnoItem {
-  id: string;
-  date: string;
-  views: number;
-  impressions: number;
-  title: string;
-  chips: Chip[];
-  para1: string;
-  para2: string;
-  mockupType: "inquiry" | "positive" | "negative";
-  boxBig: string;
-  boxSub: string;
-  boxKo: string;
-  para3: string;
-  para4: string;
-}
-
 interface SabangnetCS {
   cs_no: string;
   ord_no: string;
@@ -32,7 +14,17 @@ interface SabangnetCS {
   status: "unanswered" | "answered";
 }
 
-/* ── Mockup ── */
+const SAMPLE_CS_ITEM: SabangnetCS = {
+  cs_no: "sample_001",
+  ord_no: "20260531-0023",
+  channel: "네이버",
+  category: "배송 문의",
+  content: "주문 번호 20260531-0023 배송 출발 언제쯤 되나요? 내일 무조건 받아야 돼요.",
+  created_at: "2026-06-01",
+  status: "unanswered",
+};
+
+/* ── Inbox Mockup ── */
 function InboxMockup({ type, large }: { type: "inquiry" | "positive" | "negative"; large?: boolean }) {
   const accent = type === "positive" ? "#15803d" : type === "negative" ? "#dc2626" : "#1d4ed8";
   const accentBg = type === "positive" ? "#dcfce7" : type === "negative" ? "#fee2e2" : "#dbeafe";
@@ -65,7 +57,7 @@ function InboxMockup({ type, large }: { type: "inquiry" | "positive" | "negative
   );
 }
 
-/* ── GradientBox ── */
+/* ── GradientBox (리뷰용 — 핑크/보라 계열) ── */
 function GradientBox({ big, sub, ko, mockupType }: { big: string; sub: string; ko: string; mockupType: "inquiry" | "positive" | "negative" }) {
   const darkColor = mockupType === "negative" ? "#4a0e0e" : mockupType === "positive" ? "#0a2e1a" : "#0d1a3a";
   return (
@@ -80,7 +72,29 @@ function GradientBox({ big, sub, ko, mockupType }: { big: string; sub: string; k
   );
 }
 
-/* ── 리뷰 하드코딩 데이터 (리뷰 대응 섹션 전용) ── */
+/* ── InquiryGradientBox (고객 문의용 — 블루 계열) ── */
+function InquiryGradientBox({ channel, category }: { channel: string; category: string }) {
+  return (
+    <div style={{ borderRadius: "16px", background: "linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%)", padding: "48px 52px", marginBottom: "28px", display: "flex", alignItems: "center", gap: "40px", minHeight: "260px" }}>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: "44px", fontWeight: 900, color: "#0d1a3a", lineHeight: 1.1, margin: "0 0 16px 0", letterSpacing: "-0.03em" }}>Reply Fast.</p>
+        <p style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280", lineHeight: 1.6, margin: "0 0 10px 0" }}>{channel} · {category}</p>
+        <p style={{ fontSize: "14px", fontWeight: 600, color: "#6b7280", lineHeight: 1.5, margin: 0 }}>빠른 답변 → 고객 신뢰 + 재구매율 향상</p>
+      </div>
+      <div style={{ flexShrink: 0 }}><InboxMockup type="inquiry" large /></div>
+    </div>
+  );
+}
+
+/* ── 리뷰 하드코딩 데이터 ── */
+interface AnnoItem {
+  id: string; date: string; views: number; impressions: number; title: string;
+  chips: { label: string; bg: string; border: string; color: string }[];
+  para1: string; para2: string;
+  mockupType: "inquiry" | "positive" | "negative";
+  boxBig: string; boxSub: string; boxKo: string;
+  para3: string; para4: string;
+}
 const REVIEW_ITEMS: AnnoItem[] = [
   {
     id: "a2", date: "2026.05.31", views: 1, impressions: 1,
@@ -108,7 +122,6 @@ export default function CustomerTab() {
   const [counts, setCounts] = useState<Record<string, Record<string, number>>>({});
   const [activeInboxSection, setActiveInboxSection] = useState<InboxSection>("고객 문의");
 
-  // 사방넷 CS 상태
   const [csItems, setCsItems] = useState<SabangnetCS[]>([]);
   const [csLoading, setCsLoading] = useState(false);
   const [csError, setCsError] = useState<string | null>(null);
@@ -130,11 +143,8 @@ export default function CustomerTab() {
     try {
       const res = await fetch("/api/sabangnet/cs");
       const data = await res.json();
-      if (!res.ok) {
-        setCsError(data.error ?? "사방넷 CS 조회 실패");
-      } else {
-        setCsItems(data.cs_list ?? []);
-      }
+      if (!res.ok) setCsError(data.error ?? "사방넷 CS 조회 실패");
+      else setCsItems(data.cs_list ?? []);
     } catch {
       setCsError("네트워크 오류");
     }
@@ -176,6 +186,112 @@ export default function CustomerTab() {
     "리뷰 대응": { desc: "긍정/부정 리뷰 분류 · 답글 초안 자동 생성" },
     "배송 알림": { desc: "배송 지연·반품 알림 (준비 중)" },
   };
+
+  function renderCSItem(cs: SabangnetCS, idx: number, total: number, isSample: boolean) {
+    return (
+      <div key={cs.cs_no}>
+        <div style={{ display: "flex", gap: "44px" }}>
+          {/* 왼쪽 메타 — 리뷰 대응과 동일 구조 */}
+          <div style={{ width: "100px", flexShrink: 0, textAlign: "right", paddingTop: "4px" }}>
+            <p style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500, margin: "0 0 8px 0" }}>
+              {cs.created_at?.slice(0, 10)?.replace(/-/g, ".") ?? "—"}
+            </p>
+            {isSample ? (
+              <p style={{ fontSize: "13px", color: "#9ca3af", margin: "0 0 2px 0" }}>샘플</p>
+            ) : (
+              <>
+                <p style={{ fontSize: "13px", color: "#9ca3af", margin: "0 0 2px 0" }}>1 view</p>
+                <p style={{ fontSize: "13px", color: "#9ca3af", margin: 0 }}>{cs.channel}</p>
+              </>
+            )}
+          </div>
+
+          {/* 오른쪽 에디토리얼 — 리뷰 대응과 동일 구조 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* 제목 + 칩 */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "18px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#111827", lineHeight: 1.4, margin: 0, flex: 1 }}>
+                {cs.content}
+              </h2>
+              <div style={{ display: "flex", gap: "6px", flexShrink: 0, paddingTop: "3px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #93c5fd", color: "#1d4ed8", whiteSpace: "nowrap" }}>고객 문의</span>
+                <span style={{ fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626", whiteSpace: "nowrap" }}>{cs.category || "NEW"}</span>
+              </div>
+            </div>
+
+            {/* 설명 */}
+            <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "14px" }}>
+              {cs.channel || "쇼핑 채널"}을 통해 접수된 고객 문의입니다. 빠른 답변으로 고객 신뢰와 재구매율을 높이세요.
+            </p>
+            <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "28px" }}>
+              주문번호: {cs.ord_no || "—"}{isSample ? " (샘플 미리보기)" : " — AI 초안을 확인하고 수정 후 사방넷에 즉시 등록하세요."}
+            </p>
+
+            {/* 그라디언트 박스 (블루 계열) */}
+            <InquiryGradientBox channel={cs.channel || "채널"} category={cs.category || "배송 문의"} />
+
+            {/* 샘플이면 안내 문구 */}
+            {isSample ? (
+              <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "28px" }}>
+                API 키 설정 후 실제 문의에 AI 초안을 생성하고 사방넷에 바로 등록할 수 있습니다.
+              </p>
+            ) : submitted[cs.cs_no] ? (
+              <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "12px", padding: "16px 20px", marginBottom: "28px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "18px" }}>✓</span>
+                <div>
+                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#15803d", margin: 0 }}>사방넷 답변 등록 완료</p>
+                  <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>고객에게 답변이 전송됐습니다.</p>
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginBottom: "28px" }}>
+                {!drafts[cs.cs_no] && (
+                  <button onClick={() => generateDraft(cs)} disabled={generatingDraft === cs.cs_no}
+                    style={{ fontSize: "13px", fontWeight: 600, padding: "9px 20px", borderRadius: "8px", border: "none", background: generatingDraft === cs.cs_no ? "#c4c8cc" : "#ef567c", color: "#fff", cursor: generatingDraft === cs.cs_no ? "default" : "pointer", fontFamily: FF, display: "flex", alignItems: "center", gap: "6px" }}>
+                    {generatingDraft === cs.cs_no
+                      ? <><span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> 초안 생성 중...</>
+                      : "✨ AI 답변 초안 생성"}
+                  </button>
+                )}
+                {drafts[cs.cs_no] !== undefined && (
+                  <div style={{ background: "#fff5f7", border: "1px solid #ffd6e0", borderRadius: "12px", padding: "16px" }}>
+                    <p style={{ fontSize: "12px", fontWeight: 700, color: "#ef567c", margin: "0 0 8px" }}>✨ AI 답변 초안 — 수정 후 등록</p>
+                    <textarea
+                      value={drafts[cs.cs_no]}
+                      onChange={e => setDrafts(p => ({ ...p, [cs.cs_no]: e.target.value }))}
+                      rows={4}
+                      style={{ width: "100%", border: "1px solid #ffd6e0", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#374151", fontFamily: FF, resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.7, background: "#fff", marginBottom: "10px" }}
+                    />
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => submitAnswer(cs.cs_no)} disabled={submitting === cs.cs_no || !drafts[cs.cs_no]?.trim()}
+                        style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", background: submitting === cs.cs_no ? "#c4c8cc" : "#ef567c", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: submitting === cs.cs_no ? "default" : "pointer", fontFamily: FF }}>
+                        {submitting === cs.cs_no ? "등록 중..." : "사방넷에 답변 등록 →"}
+                      </button>
+                      <button onClick={() => generateDraft(cs)} disabled={generatingDraft === cs.cs_no}
+                        style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #ffd6e0", background: "#fff", color: "#ef567c", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: FF }}>
+                        재생성
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 반응 이모지 */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {["😊", "😍", "🔥"].map(e => (
+                <button key={e} onClick={() => react(cs.cs_no, e)}
+                  style={{ fontSize: "15px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "7px", padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontFamily: FF }}>
+                  {e}<span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: 600 }}>{(counts[cs.cs_no] || {})[e] || 0}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        {idx < total - 1 && <div style={{ borderTop: "1px solid #e5e7eb", margin: "52px 0" }} />}
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: "100%", fontFamily: FF, display: "flex", gap: "40px", alignItems: "flex-start" }}>
@@ -222,7 +338,7 @@ export default function CustomerTab() {
 
           <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: "32px" }} />
 
-          {/* ── 고객 문의 섹션 (사방넷 연결) ── */}
+          {/* ── 고객 문의 섹션 ── */}
           {activeInboxSection === "고객 문의" && (
             <div>
               {/* 로딩 */}
@@ -233,35 +349,21 @@ export default function CustomerTab() {
                 </div>
               )}
 
-              {/* 에러 (키 미설정 포함) */}
+              {/* 에러 — 상단 소형 노티스 */}
               {!csLoading && csError && (
-                <div>
-                  <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "16px 20px", marginBottom: "24px" }}>
-                    <p style={{ fontSize: "14px", fontWeight: 700, color: "#dc2626", margin: "0 0 6px" }}>⚠️ {csError}</p>
-                    {csError.includes("미설정") && (
-                      <p style={{ fontSize: "13px", color: "#9ca3af", margin: "0 0 10px" }}>
-                        .env.local에 <code style={{ background: "#f9fafb", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>SABANGNET_API_KEY</code>, <code style={{ background: "#f9fafb", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>SABANGNET_SHOP_ID</code> 설정 후 활성화됩니다.
-                      </p>
-                    )}
-                    <button onClick={fetchCS} style={{ fontSize: "12px", padding: "5px 12px", borderRadius: "6px", border: "1px solid #fecaca", background: "#fff", color: "#dc2626", cursor: "pointer", fontFamily: FF }}>
-                      다시 시도
-                    </button>
-                  </div>
-
-                  {/* 에러 시 하드코딩 샘플 미리보기 */}
-                  <div style={{ background: "#f9fafb", borderRadius: "12px", border: "1px dashed #e5e7eb", padding: "20px", marginBottom: "24px" }}>
-                    <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 12px" }}>↓ 사방넷 연결 전 샘플 미리보기 (API 키 설정 후 실제 데이터로 교체됩니다)</p>
-                    <div style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "14px 16px", background: "#fff" }}>
-                      <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #93c5fd", color: "#1d4ed8" }}>고객 문의</span>
-                        <span style={{ fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "6px", background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626" }}>NEW</span>
-                      </div>
-                      <p style={{ fontSize: "14px", fontWeight: 600, color: "#111827", margin: "0 0 4px" }}>주문 번호 20260531-0023 배송 출발 언제쯤 되나요? 내일 무조건 받아야 돼요.</p>
-                      <p style={{ fontSize: "13px", color: "#9ca3af", margin: 0 }}>2026.06.01 · 샘플</p>
-                    </div>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: csError.includes("미설정") ? "#fffbeb" : "#fef2f2", border: `1px solid ${csError.includes("미설정") ? "#fde68a" : "#fecaca"}`, borderRadius: "8px", marginBottom: "40px" }}>
+                  <span style={{ fontSize: "13px", color: csError.includes("미설정") ? "#92400e" : "#dc2626" }}>
+                    ⚠️ {csError}{csError.includes("미설정") ? " — 아래는 샘플 미리보기입니다" : ""}
+                  </span>
+                  <button onClick={fetchCS}
+                    style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: `1px solid ${csError.includes("미설정") ? "#fde68a" : "#fecaca"}`, background: "#fff", color: csError.includes("미설정") ? "#92400e" : "#dc2626", cursor: "pointer", fontFamily: FF }}>
+                    다시 시도
+                  </button>
                 </div>
               )}
+
+              {/* 에러 시 샘플 (리뷰 대응과 동일 레이아웃) */}
+              {!csLoading && csError && renderCSItem(SAMPLE_CS_ITEM, 0, 1, true)}
 
               {/* 정상: 문의 없음 */}
               {!csLoading && !csError && csItems.length === 0 && (
@@ -272,82 +374,12 @@ export default function CustomerTab() {
                 </div>
               )}
 
-              {/* 정상: 문의 목록 */}
-              {!csLoading && !csError && csItems.map((cs, idx) => (
-                <div key={cs.cs_no}>
-                  <div style={{ display: "flex", gap: "44px" }}>
-                    {/* 왼쪽 메타 */}
-                    <div style={{ width: "100px", flexShrink: 0, textAlign: "right", paddingTop: "4px" }}>
-                      <p style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500, margin: "0 0 4px" }}>{cs.created_at?.slice(0, 10) ?? "—"}</p>
-                      <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "10px", background: "#eff6ff", color: "#2563eb" }}>{cs.channel}</span>
-                    </div>
-
-                    {/* 오른쪽 콘텐츠 */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px" }}>
-                        <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#111827", lineHeight: 1.5, margin: 0, flex: 1 }}>{cs.content}</h2>
-                        <div style={{ display: "flex", gap: "6px", flexShrink: 0, paddingTop: "3px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #93c5fd", color: "#1d4ed8", whiteSpace: "nowrap" }}>고객 문의</span>
-                          <span style={{ fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626", whiteSpace: "nowrap" }}>{cs.category || "NEW"}</span>
-                        </div>
-                      </div>
-
-                      <p style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "16px" }}>주문번호: {cs.ord_no || "—"}</p>
-
-                      {/* 등록 완료 상태 */}
-                      {submitted[cs.cs_no] ? (
-                        <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "12px", padding: "16px 20px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "18px" }}>✓</span>
-                          <div>
-                            <p style={{ fontSize: "14px", fontWeight: 700, color: "#15803d", margin: 0 }}>사방넷 답변 등록 완료</p>
-                            <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>고객에게 답변이 전송됐습니다.</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          {/* AI 초안 생성 버튼 */}
-                          {!drafts[cs.cs_no] && (
-                            <button onClick={() => generateDraft(cs)} disabled={generatingDraft === cs.cs_no}
-                              style={{ fontSize: "13px", fontWeight: 600, padding: "9px 18px", borderRadius: "8px", border: "none", background: generatingDraft === cs.cs_no ? "#c4c8cc" : "#ef567c", color: "#fff", cursor: generatingDraft === cs.cs_no ? "default" : "pointer", fontFamily: FF, marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px" }}>
-                              {generatingDraft === cs.cs_no ? (
-                                <><span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> AI 초안 생성 중...</>
-                              ) : "✨ AI 답변 초안 생성"}
-                            </button>
-                          )}
-
-                          {/* 초안 편집 + 등록 */}
-                          {drafts[cs.cs_no] !== undefined && (
-                            <div style={{ background: "#fff5f7", border: "1px solid #ffd6e0", borderRadius: "12px", padding: "16px", marginBottom: "16px" }}>
-                              <p style={{ fontSize: "12px", fontWeight: 700, color: "#ef567c", margin: "0 0 8px" }}>✨ AI 답변 초안 — 수정 후 등록</p>
-                              <textarea
-                                value={drafts[cs.cs_no]}
-                                onChange={e => setDrafts(p => ({ ...p, [cs.cs_no]: e.target.value }))}
-                                rows={4}
-                                style={{ width: "100%", border: "1px solid #ffd6e0", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#374151", fontFamily: FF, resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.7, background: "#fff", marginBottom: "10px" }}
-                              />
-                              <div style={{ display: "flex", gap: "8px" }}>
-                                <button onClick={() => submitAnswer(cs.cs_no)} disabled={submitting === cs.cs_no || !drafts[cs.cs_no]?.trim()}
-                                  style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", background: submitting === cs.cs_no ? "#c4c8cc" : "#ef567c", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: submitting === cs.cs_no ? "default" : "pointer", fontFamily: FF }}>
-                                  {submitting === cs.cs_no ? "등록 중..." : "사방넷에 답변 등록 →"}
-                                </button>
-                                <button onClick={() => generateDraft(cs)} disabled={generatingDraft === cs.cs_no}
-                                  style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #ffd6e0", background: "#fff", color: "#ef567c", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: FF, whiteSpace: "nowrap" }}>
-                                  재생성
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {idx < csItems.length - 1 && <div style={{ borderTop: "1px solid #e5e7eb", margin: "40px 0" }} />}
-                </div>
-              ))}
+              {/* 정상: CS 목록 */}
+              {!csLoading && !csError && csItems.map((cs, idx) => renderCSItem(cs, idx, csItems.length, false))}
             </div>
           )}
 
-          {/* ── 리뷰 대응 섹션 (기존 하드코딩 유지) ── */}
+          {/* ── 리뷰 대응 섹션 ── */}
           {activeInboxSection === "리뷰 대응" && (
             <div>
               {REVIEW_ITEMS.map((item, idx) => {
@@ -378,7 +410,8 @@ export default function CustomerTab() {
                         </p>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           {["😊", "😍", "🔥"].map(e => (
-                            <button key={e} onClick={() => react(item.id, e)} style={{ fontSize: "15px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "7px", padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontFamily: FF }}>
+                            <button key={e} onClick={() => react(item.id, e)}
+                              style={{ fontSize: "15px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "7px", padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontFamily: FF }}>
                               {e}<span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: 600 }}>{r[e] || 0}</span>
                             </button>
                           ))}
