@@ -363,6 +363,16 @@ export default function TrendTab({ onSeoNavigate, initialKeyword }: { onSeoNavig
 
       {/* ════ CENTER: Main content ════ */}
       <div ref={resultCardRef}>
+        {/* Section heading */}
+        <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "6px" }}>
+          TREND ANALYZER
+        </p>
+        <h1 style={{ fontSize: "clamp(22px,3vw,28px)", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, marginBottom: "4px" }}>
+          지금 뭐가<br />팔려?
+        </h1>
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "20px", lineHeight: 1.6 }}>
+          AI가 "지금 팔리는 키워드"를 분석합니다
+        </p>
 
         {/* Search card */}
         <div style={CARD} className="p-5">
