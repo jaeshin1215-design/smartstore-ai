@@ -277,15 +277,15 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
         <div style={{ maxWidth: "1232px", margin: "0 auto" }}>
 
           {/* Hero — with bottom border */}
-          <div style={{ paddingBottom:"28px", marginBottom:"28px", borderBottom:"1px solid #e8eaed" }}>
+          <div style={{ paddingBottom:"16px", marginBottom:"16px", borderBottom:"1px solid #e8eaed" }}>
             <h1 style={{ fontSize:"28px", fontWeight:800, letterSpacing:"-0.02em", color:"#0d0d0e", margin:"0 0 6px" }}>Find What To Sell.</h1>
             <p style={{ fontSize:"14px", color:"#4b5563", margin:"0 0 10px", lineHeight:1.6 }}>무엇을 팔지, 먼저 찾는다.</p>
             <p style={{ fontSize:"14px", color:"#4b5563", margin:0, lineHeight:1.6 }}>시즌 상품을 도매에서 발굴하고 데이터로 매긴다. 고르는 건 당신이다.</p>
           </div>
 
           {/* Track toggle + Mode toggle */}
-          <div style={{ marginBottom:"24px" }}>
-            <div style={{ marginBottom:"16px" }}>
+          <div style={{ marginBottom:"16px" }}>
+            <div style={{ marginBottom:"12px" }}>
               <div style={{ fontSize:"11px", color:"#9ca3af", fontWeight:600, marginBottom:"8px", letterSpacing:"0.05em", textTransform:"uppercase" }}>발굴 트랙</div>
               <div style={{ display:"inline-flex", gap:"8px" }}>
                 {(["steady","season"] as const).map(t=>(
@@ -476,14 +476,14 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
           </div>
 
           {/* ── WHY card — 흰색 카드 (dark band 제거) ── */}
-          <div style={{ ...CARD_STYLE, border:"1.5px solid #d8dadc", boxShadow:"0 6px 24px rgba(0,0,0,0.09)", padding:"40px 48px", margin:"48px 0" }}>
+          <div style={{ ...CARD_STYLE, border:"1.5px solid #d8dadc", boxShadow:"0 6px 24px rgba(0,0,0,0.09)", padding:"24px 32px", margin:"24px 0" }}>
             <p style={{ fontSize:"11px", color:PINK.main, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", margin:"0 0 14px" }}>Why This Works</p>
             <h2 style={{ fontSize:"26px", fontWeight:800, color:"#0d0d0e", margin:"0 0 12px", letterSpacing:"-0.02em" }}>발굴은 전략이다.</h2>
             <p style={{ fontSize:"15px", color:"#6b7280", margin:0, lineHeight:1.6 }}>먼저 찾는 자가 시즌을 갖는다.</p>
           </div>
 
           {/* ── 발굴 현황 ── */}
-          <div style={{ marginBottom:"48px" }}>
+          <div style={{ marginBottom:"24px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"20px" }}>
               <div>
                 <h2 style={{ fontSize:"20px", fontWeight:800, margin:"0 0 4px", letterSpacing:"-0.01em" }}>발굴 현황</h2>
@@ -502,7 +502,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                   const st=GRID_STATUS_STYLE[card.status];
                   return(
                     <div key={card.id}
-                      style={{ padding:"32px 24px", minHeight:"200px", background:"linear-gradient(135deg, #ccd9f0 0%, #ecd4e3 100%)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"12px", cursor:card.status==="발굴 예정"?"pointer":"default", transition:"box-shadow 0.15s" }}
+                      style={{ padding:"20px", minHeight:"160px", background:"linear-gradient(135deg, #ccd9f0 0%, #ecd4e3 100%)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"12px", cursor:card.status==="발굴 예정"?"pointer":"default", transition:"box-shadow 0.15s" }}
                       onClick={()=>{if(card.status==="발굴 예정"&&card.keyword){setTrack("season");searchDomeggook(card.keyword);window.scrollTo({top:0,behavior:"smooth"});}}}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px" }}>
                         <span style={{ fontSize:"11px", fontWeight:700, padding:"3px 9px", borderRadius:"4px", background:st.bg, color:st.color }}>{card.status}</span>
