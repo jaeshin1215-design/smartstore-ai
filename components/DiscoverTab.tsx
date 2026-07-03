@@ -233,7 +233,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
         await fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({store_id:storeId,name:selected.name,url:selected.no?`https://domeggook.com/product/${selected.no}`:null,keyword:selected.keyword,category:selected.category,price:selected.sell_price||0,purchase_price:derivedPurchasePrice,is_own:2,matrix_x:matrixX,matrix_y:matrixY})});
       }catch{/* 실패 무시 — 발굴현황엔 이미 반영됨 */}
     }
-    setShowRegForm(false);if(regStatus==="실증")setSeoTarget(selected.name);
+    setShowRegForm(false);if(regStatus==="실증"){if(onNavigateToContent)onNavigateToContent(selected.name);else setSeoTarget(selected.name);}
   },[selected,scoring,track,regChannel,regMonth,regStatus]);
 
   const gateHold=useCallback(()=>{
