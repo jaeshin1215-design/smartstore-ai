@@ -130,6 +130,11 @@ export default function CustomerTab() {
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
 
+  // 리뷰 대응 state
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, string>>({});
+  const [generatingReview, setGeneratingReview] = useState<string | null>(null);
+  const [reviewCopied, setReviewCopied] = useState<Record<string, boolean>>({});
+
   const react = (id: string, emoji: string) =>
     setCounts(p => ({ ...p, [id]: { ...(p[id] || {}), [emoji]: ((p[id] || {})[emoji] || 0) + 1 } }));
 
@@ -183,6 +188,32 @@ export default function CustomerTab() {
       if (res.ok) setSubmitted(p => ({ ...p, [cs_no]: true }));
     } catch { /* 무시 */ }
     setSubmitting(null);
+  }
+
+  async function generateReviewDraft(item: AnnoItem) {
+    setGeneratingReview(item.id);
+    try {
+      const res = await fetch("/api/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          review: item.title,
+          type: item.mockupType === "positive" ? "positive" : "negative",
+        }),
+      });
+      if (!res.ok) throw new Error(`review API ${res.status}`);
+      const text = await res.text();
+      if (text.trim()) setReviewDrafts(p => ({ ...p, [item.id]: text.trim() }));
+    } catch { /* 무시 */ }
+    setGeneratingReview(null);
+  }
+
+  async function copyReviewDraft(id: string) {
+    const text = reviewDrafts[id];
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setReviewCopied(p => ({ ...p, [id]: true }));
+    setTimeout(() => setReviewCopied(p => ({ ...p, [id]: false })), 2000);
   }
 
   const SECTION_META: Record<InboxSection, { desc: string }> = {
@@ -412,6 +443,37 @@ export default function CustomerTab() {
                         <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "28px" }}>
                           <span style={{ color: "#2563eb", textDecoration: "underline", cursor: "pointer" }}>{item.para4}</span>
                         </p>
+
+                        {/* AI 답글 초안 */}
+                        {!reviewDrafts[item.id] ? (
+                          <button onClick={() => generateReviewDraft(item)} disabled={generatingReview === item.id}
+                            style={{ fontSize: "13px", fontWeight: 600, padding: "9px 20px", borderRadius: "8px", border: "none", background: generatingReview === item.id ? "#c4c8cc" : "#ef567c", color: "#fff", cursor: generatingReview === item.id ? "default" : "pointer", fontFamily: FF, display: "flex", alignItems: "center", gap: "6px", marginBottom: "28px" }}>
+                            {generatingReview === item.id
+                              ? <><span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> 초안 생성 중...</>
+                              : "✨ AI 답글 초안 생성"}
+                          </button>
+                        ) : (
+                          <div style={{ background: "#fff5f7", border: "1px solid #ffd6e0", borderRadius: "12px", padding: "16px", marginBottom: "28px" }}>
+                            <p style={{ fontSize: "12px", fontWeight: 700, color: "#ef567c", margin: "0 0 8px" }}>✨ AI 답글 초안 — 수정 후 네이버 쇼핑에 직접 붙여넣기</p>
+                            <textarea
+                              value={reviewDrafts[item.id]}
+                              onChange={e => setReviewDrafts(p => ({ ...p, [item.id]: e.target.value }))}
+                              rows={4}
+                              style={{ width: "100%", border: "1px solid #ffd6e0", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#374151", fontFamily: FF, resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.7, background: "#fff", marginBottom: "10px" }}
+                            />
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button onClick={() => copyReviewDraft(item.id)}
+                                style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", background: reviewCopied[item.id] ? "#15803d" : "#ef567c", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: FF, transition: "background 0.2s" }}>
+                                {reviewCopied[item.id] ? "✓ 복사 완료" : "답글 복사 →"}
+                              </button>
+                              <button onClick={() => generateReviewDraft(item)} disabled={generatingReview === item.id}
+                                style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #ffd6e0", background: "#fff", color: "#ef567c", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: FF }}>
+                                재생성
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           {["😊", "😍", "🔥"].map(e => (
                             <button key={e} onClick={() => react(item.id, e)}
