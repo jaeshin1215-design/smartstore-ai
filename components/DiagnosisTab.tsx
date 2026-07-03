@@ -141,9 +141,10 @@ export default function DiagnosisTab({
       const raw: Product[] = json.products || [];
       // ⑤ purchase_price 기반 matrix_y 실시간 계산 (Y축=마진율%, 상품별 독립 — min/max 정규화 없음)
       const list = raw.map(p => {
-        if (p.price > 0 && p.purchase_price > 0 && (p.matrix_y === null || p.matrix_y === undefined)) {
+        // matrix_y가 0이거나 없으면 purchase_price로 재계산 (0점 버그 방지)
+        if (p.price > 0 && p.purchase_price > 0 && !p.matrix_y) {
           const marginY = Math.round(((p.price - p.purchase_price) / p.price) * 100);
-          return { ...p, matrix_y: Math.max(0, Math.min(100, marginY)) };
+          return { ...p, matrix_y: Math.max(1, Math.min(100, marginY)) };
         }
         return p;
       });

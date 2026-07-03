@@ -97,6 +97,10 @@ async function fetchNaverShopMedianPrice(
 
 type RawItem = Record<string, unknown>;
 
+// supply fallback threshold: supply가 이 배율 초과일 때만 sellPrice로 인정
+// 1.01 = 공급가 대비 1% 초과면 허용 (너무 엄격한 1.05에서 완화)
+const SUPPLY_PRICE_THRESHOLD = 1.01;
+
 // ── getItemList 응답 정규화 ──────────────────────────────────────────────
 // 응답구조: json.domeggook.list.item[]: { no, title, thumb, price(숫자) }
 function normalizeListItem(raw: RawItem) {
@@ -152,7 +156,7 @@ async function normalizeDetailItem(dome: RawItem) {
     } else {
       const supplyPrice = Number(price.supply ?? 0);
       console.log(`[detail] naver 실패 → supply=${supplyPrice} (threshold=${Math.round(costPrice * 1.05)})`);
-      if (supplyPrice > costPrice * 1.05) {
+      if (supplyPrice > costPrice * SUPPLY_PRICE_THRESHOLD) {
         sellPrice    = supplyPrice;
         marginSource = "supply";
         console.log(`[detail] → supply`);
