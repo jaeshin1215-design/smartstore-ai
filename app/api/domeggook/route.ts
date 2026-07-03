@@ -131,41 +131,30 @@ async function normalizeDetailItem(dome: RawItem) {
 
   let sellPrice   = 0;
   let marginSource: "resale" | "naver_shop" | "supply" | "unknown" = "unknown";
+  let _naverRaw: number | null = null;
 
-  // 1순위: resale.Recommand / resale.minimum
   const resaleRecommand = Number(resale.Recommand ?? resale.recommand ?? 0);
   const resaleMinimum   = Number(resale.minimum ?? 0);
-
-  console.log(`[detail] no=${String(basis.no ?? "")} title="${title}" costPrice=${costPrice} resaleRecommand=${resaleRecommand} resaleMinimum=${resaleMinimum}`);
 
   if (resaleRecommand > costPrice) {
     sellPrice    = resaleRecommand;
     marginSource = "resale";
-    console.log(`[detail] → resale (Recommand=${resaleRecommand})`);
   } else if (resaleMinimum > costPrice) {
     sellPrice    = resaleMinimum;
     marginSource = "resale";
-    console.log(`[detail] → resale (minimum=${resaleMinimum})`);
   } else {
-    console.log(`[detail] resale 없음 → 네이버 쇼핑 조회`);
-    const naverMedian = await fetchNaverShopMedianPrice(title, costPrice);
-    if (naverMedian && naverMedian > costPrice) {
-      sellPrice    = naverMedian;
+    _naverRaw = await fetchNaverShopMedianPrice(title, costPrice);
+    if (_naverRaw && _naverRaw > costPrice) {
+      sellPrice    = _naverRaw;
       marginSource = "naver_shop";
-      console.log(`[detail] → naver_shop (median=${naverMedian})`);
     } else {
       const supplyPrice = Number(price.supply ?? 0);
-      console.log(`[detail] naver 실패 → supply=${supplyPrice} (threshold=${Math.round(costPrice * 1.05)})`);
       if (supplyPrice > costPrice * SUPPLY_PRICE_THRESHOLD) {
         sellPrice    = supplyPrice;
         marginSource = "supply";
-        console.log(`[detail] → supply`);
-      } else {
-        console.log(`[detail] → unknown`);
       }
     }
   }
-  console.log(`[detail] 최종 margin_source=${marginSource} sellPrice=${sellPrice} margin=${calcMarginPct(costPrice, sellPrice)}%`);
 
   const marginPct = calcMarginPct(costPrice, sellPrice);
 
@@ -182,6 +171,7 @@ async function normalizeDetailItem(dome: RawItem) {
     sell_price:    sellPrice,
     margin_pct:    marginPct,
     margin_source: marginSource,
+    _naverRaw,    // DEV DEBUG: 제거 예정
     // costPrice(공급가)는 절대 클라이언트에 노출하지 않음 (도매꾹 ToS)
   };
 }
