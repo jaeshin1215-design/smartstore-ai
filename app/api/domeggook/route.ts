@@ -121,7 +121,8 @@ function normalizeListItem(raw: RawItem) {
 // price.resale.Recommand = 재판매 권장가 (최우선)
 // price.supply       = 도매꾹 직접 판매가 (매입가와 거의 같음, fallback 불가)
 // → fallback: 네이버 쇼핑 중앙값
-async function normalizeDetailItem(dome: RawItem) {
+// searchKeyword: 사용자가 Discover 탭에 입력한 키워드 (상품명보다 넓은 시장가 조회에 사용)
+async function normalizeDetailItem(dome: RawItem, searchKeyword?: string) {
   const basis  = (dome.basis ?? {}) as RawItem;
   const price  = (dome.price ?? {}) as RawItem;
   const resale = (price.resale ?? {}) as RawItem;
@@ -131,7 +132,6 @@ async function normalizeDetailItem(dome: RawItem) {
 
   let sellPrice   = 0;
   let marginSource: "resale" | "naver_shop" | "supply" | "unknown" = "unknown";
-  let _naverRaw: number | null = null;
 
   const resaleRecommand = Number(resale.Recommand ?? resale.recommand ?? 0);
   const resaleMinimum   = Number(resale.minimum ?? 0);
@@ -143,9 +143,11 @@ async function normalizeDetailItem(dome: RawItem) {
     sellPrice    = resaleMinimum;
     marginSource = "resale";
   } else {
-    _naverRaw = await fetchNaverShopMedianPrice(title, costPrice);
-    if (_naverRaw && _naverRaw > costPrice) {
-      sellPrice    = _naverRaw;
+    // 사용자 검색 키워드 우선, 없으면 상품명에서 추출
+    const naverQuery = searchKeyword ?? title;
+    const naverMedian = await fetchNaverShopMedianPrice(naverQuery, costPrice);
+    if (naverMedian && naverMedian > costPrice) {
+      sellPrice    = naverMedian;
       marginSource = "naver_shop";
     } else {
       const supplyPrice = Number(price.supply ?? 0);
@@ -171,14 +173,13 @@ async function normalizeDetailItem(dome: RawItem) {
     sell_price:    sellPrice,
     margin_pct:    marginPct,
     margin_source: marginSource,
-    _naverRaw,    // DEV DEBUG: 제거 예정
     // costPrice(공급가)는 절대 클라이언트에 노출하지 않음 (도매꾹 ToS)
   };
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { mode: string; keyword?: string; no?: string; page?: number };
+    const body = await req.json() as { mode: string; keyword?: string; no?: string; page?: number; searchKeyword?: string };
     const { mode } = body;
 
     // ── search: 키워드 → 상품 목록 (마진 계산 없음) ────────────────────
@@ -244,15 +245,8 @@ export async function POST(req: NextRequest) {
       }
 
       const dome = (json?.domeggook ?? json) as RawItem;
-      const item = await normalizeDetailItem(dome);
-      // DEV DEBUG: raw 구조 확인 후 제거 예정
-      const _dbg = {
-        keys_top: Object.keys(dome),
-        price: (dome.price ?? {}),
-        resale: ((dome.price as RawItem)?.resale ?? {}),
-        basis_title: ((dome.basis as RawItem)?.title ?? ""),
-      };
-      return NextResponse.json({ item, _dbg });
+      const item = await normalizeDetailItem(dome, body.searchKeyword);
+      return NextResponse.json({ item });
     }
 
     return NextResponse.json({ error: "mode 오류: search | detail" }, { status: 400 });

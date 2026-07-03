@@ -184,7 +184,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
     setSelected(c);setScoring(null);setScoreLoading(true);setShowRegForm(false);
     try{
       const[detailRes,seasonality,competition]=await Promise.all([
-        fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"detail",no:c.no})}).then(r=>r.json()) as Promise<{item?:{margin_pct:number;sell_price:number;margin_source?:MarginSource}}>,
+        fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"detail",no:c.no,searchKeyword:c.keyword})}).then(r=>r.json()) as Promise<{item?:{margin_pct:number;sell_price:number;margin_source?:MarginSource}}>,
         fetchSeasonality(c.keyword),fetchCompetition(c.keyword),
       ]);
       const ap=detailRes.item?.margin_pct??c.margin_pct,as_=detailRes.item?.margin_source??"unknown";
