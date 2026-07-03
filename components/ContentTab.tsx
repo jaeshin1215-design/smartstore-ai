@@ -39,6 +39,22 @@ interface ImagePlanResult {
   shooting_tips: string[];
 }
 
+interface VideoScene {
+  order: number;
+  purpose: string;
+  duration: 4 | 6 | 8 | 10;
+  model: string;
+  camera_move: string;
+  risk_level: "안전" | "검수필수" | "위험";
+  risk_reason: string;
+  flow_prompt: string;
+}
+interface VideoPlanResult {
+  strategy: string;
+  scenes: VideoScene[];
+  safety_note: string;
+}
+
 const SECTION_COLORS: Record<number, { bg: string; border: string; badge: string; text: string }> = {
   1: { bg: "#fff7ed", border: "#fed7aa", badge: "#ea580c", text: "#9a3412" },
   2: { bg: "#fef2f2", border: "#fecaca", badge: "#dc2626", text: "#991b1b" },
@@ -49,6 +65,12 @@ const SECTION_COLORS: Record<number, { bg: string; border: string; badge: string
   7: { bg: "#fffbeb", border: "#fde68a", badge: "#d97706", text: "#92400e" },
   8: { bg: "#f0fdf4", border: "#86efac", badge: "#15803d", text: "#14532d" },
   9: { bg: "#fdf4ff", border: "#e9d5ff", badge: "#9333ea", text: "#6b21a8" },
+};
+
+const RISK_COLORS: Record<string, { bg: string; border: string; badge: string; text: string }> = {
+  "안전":    { bg: "#f0fdf4", border: "#86efac", badge: "#16a34a", text: "#166534" },
+  "검수필수": { bg: "#fffbeb", border: "#fde68a", badge: "#d97706", text: "#92400e" },
+  "위험":    { bg: "#fef2f2", border: "#fecaca", badge: "#dc2626", text: "#991b1b" },
 };
 
 function buildPrompt(img: ImageItem, productName: string): string {
@@ -76,6 +98,7 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
   useEffect(() => {
     if (initialKeyword) setProductName(initialKeyword);
   }, [initialKeyword]);
+
   const [category, setCategory] = useState("");
   const [features, setFeatures] = useState("");
   const [targetCustomer, setTargetCustomer] = useState("");
@@ -83,35 +106,48 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
   const [uniquePoint, setUniquePoint] = useState("");
   const [result, setResult] = useState<ContentResult | null>(null);
   const [imagePlan, setImagePlan] = useState<ImagePlanResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState("marketing");
+  const [videoPlan, setVideoPlan] = useState<VideoPlanResult | null>(null);
+  const [loadingType, setLoadingType] = useState<"image" | "content" | "video" | null>(null);
+  const [activeSection, setActiveSection] = useState("imageplan");
   const [copied, setCopied] = useState<string | null>(null);
   const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
 
-  const handleSubmit = async () => {
+  const payload = () => ({ productName, category, features, targetCustomer, price, uniquePoint });
+
+  const handleImagePlan = async () => {
     if (!productName) return;
-    setLoading(true);
-    setResult(null);
+    setLoadingType("image");
     setImagePlan(null);
     try {
-      const payload = { productName, category, features, targetCustomer, price, uniquePoint };
-      const [contentSettled, imageSettled] = await Promise.allSettled([
-        fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
-        fetch("/api/imageplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
-      ]);
-      if (contentSettled.status === "fulfilled") {
-        const contentData = await contentSettled.value.json();
-        if (contentData.result) { setResult(contentData.result); setActiveSection("marketing"); }
-      }
-      if (imageSettled.status === "fulfilled") {
-        const imageData = await imageSettled.value.json();
-        if (imageData.result) { setImagePlan(imageData.result); setOpenImageSections([1]); }
-      }
-    } catch {
-      alert("오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch("/api/imageplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload()) });
+      const data = await res.json();
+      if (data.result) { setImagePlan(data.result); setOpenImageSections([1]); setActiveSection("imageplan"); }
+    } catch { alert("오류가 발생했습니다."); }
+    finally { setLoadingType(null); }
+  };
+
+  const handleContentSet = async () => {
+    if (!productName) return;
+    setLoadingType("content");
+    setResult(null);
+    try {
+      const res = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload()) });
+      const data = await res.json();
+      if (data.result) { setResult(data.result); setActiveSection("marketing"); }
+    } catch { alert("오류가 발생했습니다."); }
+    finally { setLoadingType(null); }
+  };
+
+  const handleVideoPlan = async () => {
+    if (!productName) return;
+    setLoadingType("video");
+    setVideoPlan(null);
+    try {
+      const res = await fetch("/api/videoplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload()) });
+      const data = await res.json();
+      if (data.result) { setVideoPlan(data.result); setActiveSection("videoplan"); }
+    } catch { alert("오류가 발생했습니다."); }
+    finally { setLoadingType(null); }
   };
 
   const copy = (text: string, key: string) => {
@@ -137,68 +173,88 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
   );
 
   const TABS = [
+    { id: "imageplan", label: "이미지 기획" },
+    { id: "videoplan", label: "영상 기획" },
     { id: "marketing", label: "카피" },
     { id: "thumbnail", label: "썸네일" },
     { id: "detail", label: "상세페이지" },
-    { id: "imageplan", label: "이미지 기획" },
     { id: "blog", label: "블로그" },
     { id: "instagram", label: "인스타" },
     { id: "kakao", label: "카카오" },
     { id: "canva", label: "Canva" },
   ];
 
-  const SIDEBAR_ITEMS = [
-    { label: "카피", id: "marketing" },
-    { label: "썸네일", id: "thumbnail" },
-    { label: "상세페이지", id: "detail" },
-    { label: "이미지 기획", id: "imageplan" },
-    { label: "블로그", id: "blog" },
-    { label: "인스타", id: "instagram" },
-    { label: "카카오", id: "kakao" },
-    { label: "Canva", id: "canva" },
-  ];
+  const hasAnyResult = !!(result || imagePlan || videoPlan);
 
   return (
     <div style={{ width: "100%", fontFamily: FF, display: "flex", gap: "40px", alignItems: "flex-start" }}>
 
-      {/* 사이드바 — Inbox 동일 토큰 */}
+      {/* 사이드바 */}
       <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>CONTENT</p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>콘텐츠를,<br />한 번에</p>
-        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>상품명 입력 → AI 마케팅 카피·블로그·인스타·상세페이지</p>
-        {SIDEBAR_ITEMS.map((f) => {
+        <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "16px", lineHeight: 1.5 }}>이미지·영상·마케팅<br />선택 생성</p>
+
+        {/* 매일 하는 일 */}
+        <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "6px" }}>매일 하는 일</p>
+        {[
+          { label: "이미지 기획", id: "imageplan", hasResult: !!imagePlan },
+          { label: "영상 기획", id: "videoplan", hasResult: !!videoPlan },
+        ].map((f) => {
+          const isActive = activeSection === f.id && f.hasResult;
+          return (
+            <div key={f.id}
+              onClick={() => f.hasResult && setActiveSection(f.id)}
+              style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: f.hasResult ? "pointer" : "default" }}>
+              <span style={{ fontSize: "10px", color: f.hasResult ? (isActive ? "#ef567c" : "#16a34a") : "#e5e7eb", flexShrink: 0 }}>✓</span>
+              <span style={{ fontSize: "13px", color: isActive ? "#ef567c" : f.hasResult ? "#374151" : "#c0c4cc", fontWeight: isActive ? 600 : 400 }}>{f.label}</span>
+            </div>
+          );
+        })}
+
+        <div style={{ borderTop: "1px solid #e5e7eb", margin: "10px 0 10px" }} />
+
+        {/* 한 번에 세트 */}
+        <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "6px" }}>한 번에 세트</p>
+        {[
+          { label: "카피", id: "marketing" },
+          { label: "썸네일", id: "thumbnail" },
+          { label: "상세페이지", id: "detail" },
+          { label: "블로그", id: "blog" },
+          { label: "인스타", id: "instagram" },
+          { label: "카카오", id: "kakao" },
+          { label: "Canva", id: "canva" },
+        ].map((f) => {
           const isActive = activeSection === f.id && !!result;
           return (
             <div key={f.id}
               onClick={() => result && setActiveSection(f.id)}
               style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: result ? "pointer" : "default" }}>
-              <span style={{ fontSize: "10px", color: isActive ? "#ef567c" : "#c0c4cc", flexShrink: 0 }}>✓</span>
-              <span style={{ fontSize: "13px", color: isActive ? "#ef567c" : "#8f9399", fontWeight: isActive ? 600 : 400 }}>{f.label}</span>
+              <span style={{ fontSize: "10px", color: result ? (isActive ? "#ef567c" : "#16a34a") : "#e5e7eb", flexShrink: 0 }}>✓</span>
+              <span style={{ fontSize: "13px", color: isActive ? "#ef567c" : result ? "#374151" : "#c0c4cc", fontWeight: isActive ? 600 : 400 }}>{f.label}</span>
             </div>
           );
         })}
       </div>
 
-      {/* 메인 콘텐츠 — Inbox 동일 토큰 */}
+      {/* 메인 콘텐츠 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ maxWidth: "840px", margin: "0 auto", paddingBottom: "80px" }}>
 
           {/* 헤더 */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-            <div>
-              <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#111827", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-                All in One 콘텐츠
-              </h1>
-              <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
-                상품 정보 한 번 입력 → 마케팅 카피·블로그·인스타·상세페이지·이미지 기획 한 번에 완성
-              </p>
-            </div>
+          <div style={{ marginBottom: "18px" }}>
+            <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#111827", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+              All in One 콘텐츠
+            </h1>
+            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
+              이미지 기획·영상 기획·마케팅 세트 — 원하는 것만 선택 생성
+            </p>
           </div>
 
-          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: "32px" }} />
+          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: "28px" }} />
 
           {/* 입력 폼 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "24px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "20px" }}>
             <div>
               <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
                 상품명 <span style={{ color: "#ef567c" }}>*</span>
@@ -209,56 +265,97 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>카테고리</label>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                  카테고리 <span style={{ fontSize: "12px", fontWeight: 400, color: "#9ca3af" }}>(선택)</span>
+                </label>
                 <input type="text" value={category} onChange={(e) => setCategory(e.target.value)}
                   placeholder="예) 식품 > 건강식품"
                   style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>판매가</label>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                  판매가 <span style={{ fontSize: "12px", fontWeight: 400, color: "#9ca3af" }}>(선택)</span>
+                </label>
                 <input type="text" value={price} onChange={(e) => setPrice(e.target.value)}
                   placeholder="예) 19,900원"
                   style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
               </div>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>주요 특징</label>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                주요 특징 <span style={{ fontSize: "12px", fontWeight: 400, color: "#9ca3af" }}>(선택)</span>
+              </label>
               <input type="text" value={features} onChange={(e) => setFeatures(e.target.value)}
                 placeholder="예) 유기농 인증, 국산 원료, 당일 발송, 무농약"
                 style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>타겟 고객</label>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                타겟 고객 <span style={{ fontSize: "12px", fontWeight: 400, color: "#9ca3af" }}>(선택)</span>
+              </label>
               <input type="text" value={targetCustomer} onChange={(e) => setTargetCustomer(e.target.value)}
                 placeholder="예) 건강 관리하는 30~50대 여성"
                 style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>경쟁사 대비 차별점</label>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                경쟁사 대비 차별점 <span style={{ fontSize: "12px", fontWeight: 400, color: "#9ca3af" }}>(선택)</span>
+              </label>
               <input type="text" value={uniquePoint} onChange={(e) => setUniquePoint(e.target.value)}
                 placeholder="예) 타사 대비 안토시아닌 함량 3배, 소분 포장"
                 style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
             </div>
 
-            <button onClick={handleSubmit} disabled={loading || !productName} style={{
-              width: "100%", padding: "12px 24px", borderRadius: "8px", border: "none",
-              fontSize: "14px", fontWeight: 700, color: "#fff", cursor: loading || !productName ? "not-allowed" : "pointer",
-              background: "#ef567c", opacity: loading || !productName ? 0.5 : 1, fontFamily: FF,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-            }}>
-              {loading ? (
-                <>
-                  <span style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
-                  모든 콘텐츠 생성 중... (약 15~20초)
-                </>
-              ) : "🚀 모든 콘텐츠 한 번에 생성하기"}
-            </button>
+            {/* 버튼 3개 */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <button onClick={handleImagePlan} disabled={loadingType !== null || !productName} style={{
+                flex: 1, minWidth: "140px", padding: "11px 16px", borderRadius: "8px", border: "none",
+                fontSize: "13px", fontWeight: 700, color: "#fff", cursor: (loadingType !== null || !productName) ? "not-allowed" : "pointer",
+                background: "#ef567c", opacity: (loadingType !== null || !productName) ? 0.5 : 1, fontFamily: FF,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+                {loadingType === "image" ? (
+                  <>
+                    <span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
+                    생성 중...
+                  </>
+                ) : "📸 이미지 기획 생성"}
+              </button>
+
+              <button onClick={handleVideoPlan} disabled={loadingType !== null || !productName} style={{
+                flex: 1, minWidth: "140px", padding: "11px 16px", borderRadius: "8px", border: "none",
+                fontSize: "13px", fontWeight: 700, color: "#fff", cursor: (loadingType !== null || !productName) ? "not-allowed" : "pointer",
+                background: "#16a34a", opacity: (loadingType !== null || !productName) ? 0.5 : 1, fontFamily: FF,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+                {loadingType === "video" ? (
+                  <>
+                    <span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
+                    생성 중...
+                  </>
+                ) : "🎬 영상 기획 생성"}
+              </button>
+
+              <button onClick={handleContentSet} disabled={loadingType !== null || !productName} style={{
+                flex: 1, minWidth: "140px", padding: "11px 16px", borderRadius: "8px", border: "none",
+                fontSize: "13px", fontWeight: 700, color: "#fff", cursor: (loadingType !== null || !productName) ? "not-allowed" : "pointer",
+                background: "#2563eb", opacity: (loadingType !== null || !productName) ? 0.5 : 1, fontFamily: FF,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+                {loadingType === "content" ? (
+                  <>
+                    <span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
+                    생성 중...
+                  </>
+                ) : "🚀 마케팅 콘텐츠 세트 생성"}
+              </button>
+            </div>
           </div>
 
           {/* 결과 영역 */}
-          {(result || imagePlan) && (
+          {hasAnyResult && (
             <div>
-              <div style={{ borderTop: "1px solid #e5e7eb", margin: "32px 0 24px" }} />
+              <div style={{ borderTop: "1px solid #e5e7eb", margin: "28px 0 20px" }} />
 
               {/* 탭 바 */}
               <div style={{ display: "flex", gap: "6px", marginBottom: "24px", overflowX: "auto", paddingBottom: "4px" }}>
@@ -278,82 +375,6 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                 })}
               </div>
 
-              {/* 마케팅 카피 */}
-              {activeSection === "marketing" && result?.marketing_copies && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>마케팅 카피 3종</p>
-                  {result.marketing_copies.map((c, i) => (
-                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "3px 10px", borderRadius: "6px", background: i === 0 ? "#ef567c" : i === 1 ? "#2563eb" : "#16a34a" }}>{c.type}</span>
-                        <CopyBtn text={`${c.copy}\n${c.sub}`} id={`copy-${i}`} />
-                      </div>
-                      <p style={{ fontSize: "16px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{c.copy}</p>
-                      <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>{c.sub}</p>
-                    </div>
-                  ))}
-                  <PolicyFilter text={result.marketing_copies.map((c) => `${c.copy} ${c.sub}`).join(" ")} />
-                </div>
-              )}
-
-              {/* 썸네일 */}
-              {activeSection === "thumbnail" && result?.thumbnail_sets && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>썸네일 문구 세트 3종</p>
-                  {result.thumbnail_sets.map((t, i) => (
-                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#9ca3af" }}>세트 {i + 1}</span>
-                        <CopyBtn text={`메인: ${t.main}\n서브: ${t.sub}\n뱃지: ${t.badge}`} id={`thumb-${i}`} />
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        {[{ label: "메인", value: t.main }, { label: "서브", value: t.sub }, { label: "뱃지", value: t.badge }].map((row) => (
-                          <div key={row.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "12px", color: "#9ca3af", width: "32px", flexShrink: 0 }}>{row.label}</span>
-                            <span style={{ fontSize: row.label === "메인" ? "16px" : "14px", fontWeight: row.label === "메인" ? 700 : 400, color: "#111827" }}>{row.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* 상세페이지 */}
-              {activeSection === "detail" && result?.detail_page && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제] ${result.detail_page.problem}\n\n[해결] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
-                  </div>
-                  {[
-                    { label: "⚡ 후킹 문구", value: result.detail_page.hook, bg: "#ef567c", color: "#fff" },
-                    { label: "😓 문제 공감", value: result.detail_page.problem, bg: "#fee2e2", color: "#b91c1c" },
-                    { label: "✅ 해결책", value: result.detail_page.solution, bg: "#dbeafe", color: "#1d4ed8" },
-                    { label: "🏆 신뢰 증거", value: result.detail_page.trust, bg: "#d1fae5", color: "#065f46" },
-                    { label: "🔥 긴급성", value: result.detail_page.urgency, bg: "#ffedd5", color: "#c2410c" },
-                    { label: "🛒 구매 유도", value: result.detail_page.cta, bg: "#fdf4ff", color: "#7c3aed" },
-                  ].map((item, i) => (
-                    <div key={i} style={{ background: item.bg, borderRadius: "12px", padding: "16px" }}>
-                      <p style={{ fontSize: "12px", fontWeight: 700, color: item.color, opacity: 0.8, margin: "0 0 4px" }}>{item.label}</p>
-                      <p style={{ fontSize: "14px", fontWeight: 600, color: item.color, margin: 0, lineHeight: 1.6 }}>{item.value}</p>
-                    </div>
-                  ))}
-                  {result.detail_page.features?.map((f, i) => (
-                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
-                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{f.title}</p>
-                      <p style={{ fontSize: "14px", color: "#4b5563", margin: "0 0 4px", lineHeight: 1.6 }}>{f.desc}</p>
-                      <p style={{ fontSize: "13px", color: "#2563eb", margin: 0 }}>📷 {f.image_guide}</p>
-                    </div>
-                  ))}
-                  {result.detail_page.faq?.map((f, i) => (
-                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "14px 16px" }}>
-                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>Q. {f.q}</p>
-                      <p style={{ fontSize: "14px", color: "#4b5563", margin: 0 }}>A. {f.a}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* 이미지 기획 */}
               {activeSection === "imageplan" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -372,7 +393,6 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                           <p style={{ fontSize: "14px", color: "#b91c1c", margin: 0 }}>{imagePlan.competitor_weakness}</p>
                         </div>
                       )}
-                      {/* Google Flow 가이드 박스 */}
                       <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "12px", padding: "16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
                           <span style={{ fontSize: "18px" }}>🎬</span>
@@ -401,8 +421,6 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                           borderRadius: "7px", background: "#16a34a", textDecoration: "none",
                         }}>🎬 Google Flow 열기 →</a>
                       </div>
-
-                      {/* 기타 AI 이미지 도구 */}
                       <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "14px 16px" }}>
                         <p style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", margin: "0 0 6px" }}>💡 기타 AI 이미지 생성 도구</p>
                         <p style={{ fontSize: "14px", color: "#1d4ed8", margin: "0 0 10px", lineHeight: 1.6 }}>각 섹션의 AI 프롬프트를 복사한 뒤 아래 도구에 붙여넣으면 고품질 이미지를 생성할 수 있습니다.</p>
@@ -510,9 +528,204 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                   ) : (
                     <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
                       <p style={{ fontSize: "28px", margin: "0 0 8px" }}>📸</p>
-                      <p style={{ fontSize: "14px", margin: 0 }}>콘텐츠를 먼저 생성해주세요</p>
+                      <p style={{ fontSize: "14px", margin: 0 }}>상품명 입력 후 "이미지 기획 생성"을 클릭해주세요</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* 영상 기획 */}
+              {activeSection === "videoplan" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {videoPlan ? (
+                    <>
+                      {/* 전략 카드 */}
+                      <div style={{ background: "#ef567c", borderRadius: "12px", padding: "16px" }}>
+                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", margin: "0 0 4px" }}>🎬 영상 캠페인 전략</p>
+                        <p style={{ fontSize: "14px", fontWeight: 700, color: "#fff", margin: 0 }}>{videoPlan.strategy}</p>
+                      </div>
+
+                      {/* 안전 노트 */}
+                      {videoPlan.safety_note && (
+                        <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: "12px", padding: "14px 16px" }}>
+                          <p style={{ fontSize: "12px", fontWeight: 700, color: "#92400e", margin: "0 0 4px" }}>⚠️ 제품 정확도 원칙</p>
+                          <p style={{ fontSize: "13px", color: "#78350f", margin: 0, lineHeight: 1.6 }}>{videoPlan.safety_note}</p>
+                        </div>
+                      )}
+
+                      {/* 위험도 범례 */}
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        {(["안전", "검수필수", "위험"] as const).map((level) => {
+                          const c = RISK_COLORS[level];
+                          return (
+                            <span key={level} style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "6px", background: c.bg, border: `1px solid ${c.border}`, color: c.badge }}>
+                              {level === "안전" ? "🟢" : level === "검수필수" ? "🟡" : "🔴"} {level}
+                            </span>
+                          );
+                        })}
+                        <span style={{ fontSize: "12px", color: "#9ca3af", alignSelf: "center" }}>— 각 씬별 허위광고 위험도</span>
+                      </div>
+
+                      {/* 씬별 카드 */}
+                      {videoPlan.scenes?.map((scene) => {
+                        const c = RISK_COLORS[scene.risk_level] || RISK_COLORS["안전"];
+                        const promptKey = `video-scene-${scene.order}`;
+                        return (
+                          <div key={scene.order} style={{ border: `1px solid ${c.border}`, borderRadius: "12px", overflow: "hidden" }}>
+                            {/* 씬 헤더 */}
+                            <div style={{ background: c.bg, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: c.badge, color: "#fff", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  {scene.order}
+                                </span>
+                                <div>
+                                  <p style={{ fontSize: "14px", fontWeight: 700, color: c.text, margin: 0 }}>{scene.purpose}</p>
+                                  <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
+                                    <span style={{ fontSize: "12px", color: "#6b7280" }}>{scene.duration}초</span>
+                                    <span style={{ fontSize: "12px", color: "#6b7280" }}>·</span>
+                                    <span style={{ fontSize: "12px", color: "#6b7280" }}>{scene.model}</span>
+                                    <span style={{ fontSize: "12px", color: "#6b7280" }}>·</span>
+                                    <span style={{ fontSize: "12px", color: "#6b7280" }}>{scene.camera_move}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <span style={{ fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "6px", background: c.badge, color: "#fff", flexShrink: 0 }}>
+                                {scene.risk_level}
+                              </span>
+                            </div>
+
+                            {/* 씬 본문 */}
+                            <div style={{ padding: "14px 16px", background: "#fff", display: "flex", flexDirection: "column", gap: "10px" }}>
+                              {/* 위험도 이유 */}
+                              <div style={{ display: "flex", gap: "6px", alignItems: "flex-start" }}>
+                                <span style={{ fontSize: "13px", color: c.badge, flexShrink: 0 }}>
+                                  {scene.risk_level === "안전" ? "✓" : scene.risk_level === "검수필수" ? "!" : "⚠"}
+                                </span>
+                                <p style={{ fontSize: "13px", color: c.text, margin: 0, lineHeight: 1.5 }}>{scene.risk_reason}</p>
+                              </div>
+
+                              {/* Flow 프롬프트 */}
+                              <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "10px", padding: "12px 14px" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                                  <p style={{ fontSize: "12px", fontWeight: 700, color: "#15803d", margin: 0 }}>🎬 Google Flow 프롬프트</p>
+                                  <button onClick={() => copy(scene.flow_prompt, promptKey)} style={{
+                                    fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "6px",
+                                    border: "1px solid #86efac", background: copied === promptKey ? "#dcfce7" : "#fff",
+                                    color: copied === promptKey ? "#15803d" : "#16a34a", cursor: "pointer", fontFamily: FF,
+                                  }}>
+                                    {copied === promptKey ? "✓ 복사됨" : "📋 복사"}
+                                  </button>
+                                </div>
+                                <p style={{ fontSize: "12px", color: "#374151", fontFamily: "monospace", lineHeight: 1.7, margin: "0 0 10px", wordBreak: "break-all" }}>{scene.flow_prompt}</p>
+                                <button onClick={() => { copy(scene.flow_prompt, promptKey); window.open("https://labs.google/fx/tools/flow", "_blank"); }} style={{
+                                  fontSize: "12px", fontWeight: 700, color: "#fff", padding: "6px 14px", borderRadius: "6px",
+                                  border: "none", background: "#16a34a", cursor: "pointer", fontFamily: FF,
+                                  display: "inline-flex", alignItems: "center", gap: "4px",
+                                }}>
+                                  🎬 복사 후 Google Flow 열기 →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Google Flow 안내 */}
+                      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "14px 16px" }}>
+                        <p style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", margin: "0 0 6px" }}>💡 Google Flow 영상 생성 가이드</p>
+                        {[
+                          "① flow.google.com → 프롬프트 상자 → Video 선택",
+                          "② 모델: Quality (커머스 추천 · 왜곡 적음)",
+                          "③ 길이: 각 씬에 명시된 초 선택",
+                          "④ 프롬프트 복사 후 붙여넣기 → 생성",
+                          "⑤ 무료 50 크레딧/일 — 크레딧 절약: '안전' 씬 먼저 확인",
+                        ].map((step, i) => (
+                          <p key={i} style={{ fontSize: "13px", color: "#1d4ed8", margin: "0 0 4px", lineHeight: 1.6 }}>{step}</p>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+                      <p style={{ fontSize: "28px", margin: "0 0 8px" }}>🎬</p>
+                      <p style={{ fontSize: "14px", margin: 0 }}>상품명 입력 후 "영상 기획 생성"을 클릭해주세요</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 마케팅 카피 */}
+              {activeSection === "marketing" && result?.marketing_copies && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>마케팅 카피 3종</p>
+                  {result.marketing_copies.map((c, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "3px 10px", borderRadius: "6px", background: i === 0 ? "#ef567c" : i === 1 ? "#2563eb" : "#16a34a" }}>{c.type}</span>
+                        <CopyBtn text={`${c.copy}\n${c.sub}`} id={`copy-${i}`} />
+                      </div>
+                      <p style={{ fontSize: "16px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{c.copy}</p>
+                      <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>{c.sub}</p>
+                    </div>
+                  ))}
+                  <PolicyFilter text={result.marketing_copies.map((c) => `${c.copy} ${c.sub}`).join(" ")} />
+                </div>
+              )}
+
+              {/* 썸네일 */}
+              {activeSection === "thumbnail" && result?.thumbnail_sets && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: 0 }}>썸네일 문구 세트 3종</p>
+                  {result.thumbnail_sets.map((t, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#9ca3af" }}>세트 {i + 1}</span>
+                        <CopyBtn text={`메인: ${t.main}\n서브: ${t.sub}\n뱃지: ${t.badge}`} id={`thumb-${i}`} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {[{ label: "메인", value: t.main }, { label: "서브", value: t.sub }, { label: "뱃지", value: t.badge }].map((row) => (
+                          <div key={row.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "12px", color: "#9ca3af", width: "32px", flexShrink: 0 }}>{row.label}</span>
+                            <span style={{ fontSize: row.label === "메인" ? "16px" : "14px", fontWeight: row.label === "메인" ? 700 : 400, color: "#111827" }}>{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 상세페이지 */}
+              {activeSection === "detail" && result?.detail_page && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <CopyBtn text={`[후킹] ${result.detail_page.hook}\n\n[문제] ${result.detail_page.problem}\n\n[해결] ${result.detail_page.solution}\n\n[신뢰] ${result.detail_page.trust}\n\n[긴급] ${result.detail_page.urgency}\n\n[CTA] ${result.detail_page.cta}`} id="detail-all" />
+                  </div>
+                  {[
+                    { label: "⚡ 후킹 문구", value: result.detail_page.hook, bg: "#ef567c", color: "#fff" },
+                    { label: "😓 문제 공감", value: result.detail_page.problem, bg: "#fee2e2", color: "#b91c1c" },
+                    { label: "✅ 해결책", value: result.detail_page.solution, bg: "#dbeafe", color: "#1d4ed8" },
+                    { label: "🏆 신뢰 증거", value: result.detail_page.trust, bg: "#d1fae5", color: "#065f46" },
+                    { label: "🔥 긴급성", value: result.detail_page.urgency, bg: "#ffedd5", color: "#c2410c" },
+                    { label: "🛒 구매 유도", value: result.detail_page.cta, bg: "#fdf4ff", color: "#7c3aed" },
+                  ].map((item, i) => (
+                    <div key={i} style={{ background: item.bg, borderRadius: "12px", padding: "16px" }}>
+                      <p style={{ fontSize: "12px", fontWeight: 700, color: item.color, opacity: 0.8, margin: "0 0 4px" }}>{item.label}</p>
+                      <p style={{ fontSize: "14px", fontWeight: 600, color: item.color, margin: 0, lineHeight: 1.6 }}>{item.value}</p>
+                    </div>
+                  ))}
+                  {result.detail_page.features?.map((f, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>{f.title}</p>
+                      <p style={{ fontSize: "14px", color: "#4b5563", margin: "0 0 4px", lineHeight: 1.6 }}>{f.desc}</p>
+                      <p style={{ fontSize: "13px", color: "#2563eb", margin: 0 }}>📷 {f.image_guide}</p>
+                    </div>
+                  ))}
+                  {result.detail_page.faq?.map((f, i) => (
+                    <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "14px 16px" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 4px" }}>Q. {f.q}</p>
+                      <p style={{ fontSize: "14px", color: "#4b5563", margin: 0 }}>A. {f.a}</p>
+                    </div>
+                  ))}
                 </div>
               )}
 
