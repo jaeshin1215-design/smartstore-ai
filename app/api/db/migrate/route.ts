@@ -20,5 +20,16 @@ export async function POST() {
   await runSafe("ALTER TABLE sellfit_products ADD COLUMN matrix_x REAL");
   await runSafe("ALTER TABLE sellfit_products ADD COLUMN matrix_y REAL");
 
+  // v3 — 경쟁사 추적 (쿠팡 판매가·아이템위너 일별 기록)
+  await runSafe(`CREATE TABLE IF NOT EXISTS sellfit_competitor_tracking (
+    id TEXT PRIMARY KEY,
+    store_id TEXT NOT NULL,
+    product_name TEXT NOT NULL,
+    coupang_price INTEGER,
+    is_item_winner INTEGER DEFAULT 0,
+    check_date TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+
   return NextResponse.json({ ok: true, message: "마이그레이션 완료" });
 }

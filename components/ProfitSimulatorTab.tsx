@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import * as XLSX from "xlsx";
 
 const PINK = { main: "#D4537E", mid: "#E89CB8", light: "#FBEAF0", text: "#993556" };
 const CARD: React.CSSProperties = {
@@ -24,7 +25,7 @@ interface ScenarioConfig {
 const SCENARIOS: Record<Scenario, ScenarioConfig> = {
   conservative: { label: "보수", labelKo: "안전 우선", color: "#4a9f6e", dropSavingPct: 3, marginImprovementPt: 1, targetProfitRate: 4.0 },
   moderate:     { label: "중간", labelKo: "균형 성장", color: PINK.main,  dropSavingPct: 7, marginImprovementPt: 3, targetProfitRate: 6.5 },
-  aggressive:   { label: "공격", labelKo: "최대 이익", color: "#2563eb",  dropSavingPct: 12,marginImprovementPt: 5, targetProfitRate: 9.0 },
+  aggressive:   { label: "비전", labelKo: "비전 목표", color: "#2563eb",  dropSavingPct: 12,marginImprovementPt: 5, targetProfitRate: 7.0 },
 };
 
 const MONTHS_KO = ["6월", "7월", "8월", "9월", "10월", "11월", "12월", "1월"];
@@ -62,6 +63,19 @@ export default function ProfitSimulatorTab() {
   const [dropMode, setDropMode] = useState(false);
   const [showInputs, setShowInputs] = useState(false);
 
+  // ② 정산/매출집계
+  const [showSettlement, setShowSettlement] = useState(false);
+  const [uploadedRows, setUploadedRows] = useState<Record<string, unknown>[]>([]);
+  const [uploadCols, setUploadCols] = useState<string[]>([]);
+  const [colChannel, setColChannel] = useState("");
+  const [colSaleAmt, setColSaleAmt] = useState("");
+  const [colCostAmt, setColCostAmt] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ③ 채널별 광고 집계
+  const [showAdBoard, setShowAdBoard] = useState(false);
+  const [adRows, setAdRows] = useState([{ channel: "", adCost: "", roas: "" }]);
+
   useEffect(() => {
     const storeId = localStorage.getItem("sellfit_store_id");
     if (!storeId) return;
@@ -93,7 +107,7 @@ export default function ProfitSimulatorTab() {
   const targetProfitRates: Record<Scenario, number> = {
     conservative: 4.0,
     moderate:     6.5,
-    aggressive:   9.0,
+    aggressive:   7.0,
   };
   const baselineProfitRate = 1.5;  // 현재 영업이익률
   const baselineProfit = baseRevenue * (baselineProfitRate / 100);
@@ -449,6 +463,239 @@ export default function ProfitSimulatorTab() {
             </div>
           )}
         </div>
+        {/* ══ BLOCK 4: 정산/매출집계 ══ */}
+        <div style={{ ...CARD }}>
+          <button
+            onClick={() => setShowSettlement(!showSettlement)}
+            style={{ width: "100%", padding: "14px 20px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#374151" }}>정산/매출집계</span>
+              <span style={{ fontSize: "10px", background: "#fef3c7", color: "#92400e", padding: "1px 7px", borderRadius: "9px", fontWeight: 600 }}>Phase 1</span>
+            </div>
+            <span style={{ fontSize: "11px", color: "#9ca3af", transform: showSettlement ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
+          </button>
+
+          {showSettlement && (
+            <div style={{ padding: "0 20px 24px", borderTop: "1px solid #f3f4f6" }}>
+              <p style={{ fontSize: "12px", color: "#6b7280", lineHeight: 1.7, marginTop: "14px", marginBottom: "16px" }}>
+                사방넷 엑셀(xlsx/xls/csv)을 업로드하면 채널별 마진을 자동 계산합니다.<br />
+                <span style={{ color: "#9ca3af" }}>컬럼명 선택 → 계산 실행 → 결과 보드 순서.</span>
+              </p>
+
+              {/* 업로드 */}
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "16px" }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: "none" }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = evt => {
+                      const buf = evt.target?.result;
+                      const wb = XLSX.read(buf, { type: "array" });
+                      const ws = wb.Sheets[wb.SheetNames[0]];
+                      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+                      setUploadedRows(rows);
+                      setUploadCols(rows.length > 0 ? Object.keys(rows[0]) : []);
+                      setColChannel(""); setColSaleAmt(""); setColCostAmt("");
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ padding: "9px 18px", borderRadius: "8px", border: "1px solid #e8eaed", background: "#fff", fontSize: "13px", fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  엑셀 파일 선택
+                </button>
+                {uploadedRows.length > 0 && (
+                  <span style={{ fontSize: "12px", color: "#6b7280" }}>{uploadedRows.length}건 로드됨 · {uploadCols.length}개 컬럼</span>
+                )}
+              </div>
+
+              {/* 컬럼 선택 */}
+              {uploadCols.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+                  {[
+                    { label: "채널명 컬럼", value: colChannel, set: setColChannel },
+                    { label: "판매금액 컬럼 (VAT포함)", value: colSaleAmt, set: setColSaleAmt },
+                    { label: "원가 컬럼 (VAT포함)", value: colCostAmt, set: setColCostAmt },
+                  ].map(f => (
+                    <div key={f.label}>
+                      <label style={{ fontSize: "10px", color: "#9ca3af", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</label>
+                      <select
+                        value={f.value}
+                        onChange={e => f.set(e.target.value)}
+                        style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e8eaed", background: "#fff", fontSize: "12px", color: "#374151", fontFamily: "inherit", cursor: "pointer" }}
+                      >
+                        <option value="">— 선택 —</option>
+                        {uploadCols.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 결과 보드 */}
+              {colChannel && colSaleAmt && colCostAmt && uploadedRows.length > 0 && (() => {
+                const MULTIPLIERS: Record<string, number> = {
+                  "띵샵": 0.88, "원룸만들기": 0.85, "현대홈쇼핑": 1.1,
+                  "블루베리": 0.85, "이모야킨지로": 0.8,
+                };
+                const grouped: Record<string, { R: number; O: number; count: number }> = {};
+                for (const row of uploadedRows) {
+                  const ch = String(row[colChannel] ?? "기타").trim();
+                  const sale = Number(row[colSaleAmt]) || 0;
+                  const cost = Number(row[colCostAmt]) || 0;
+                  if (!grouped[ch]) grouped[ch] = { R: 0, O: 0, count: 0 };
+                  const mult = MULTIPLIERS[ch] ?? 1.0;
+                  grouped[ch].R += (sale / 1.1) * mult;
+                  grouped[ch].O += cost / 1.1;
+                  grouped[ch].count += 1;
+                }
+                const rows = Object.entries(grouped).map(([ch, { R, O, count }]) => {
+                  const S = R * 0.02; const T = R * 0.02;
+                  const margin = R > 0 ? ((R - O - S - T) / R) * 100 : 0;
+                  const mult = MULTIPLIERS[ch] ?? 1.0;
+                  return { ch, R, O, S, T, margin, count, mult };
+                }).sort((a, b) => b.R - a.R);
+                const totalR = rows.reduce((s, r) => s + r.R, 0);
+                return (
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>채널별 마진 보드 · 총 {uploadedRows.length}건</div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid #e8eaed" }}>
+                            {["채널", "건수", "배율", "VAT제외매출", "마진율", "S+T(수수료)"].map(h => (
+                              <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: "10px", color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map(r => (
+                            <tr key={r.ch} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                              <td style={{ padding: "9px 10px", fontWeight: 600, color: "#0f2a1e" }}>{r.ch}</td>
+                              <td style={{ padding: "9px 10px", color: "#6b7280" }}>{r.count}</td>
+                              <td style={{ padding: "9px 10px", color: r.mult !== 1 ? "#f59e0b" : "#6b7280" }}>{r.mult !== 1 ? `×${r.mult}` : "일반"}</td>
+                              <td style={{ padding: "9px 10px", color: "#374151" }}>{Math.round(r.R).toLocaleString()}원</td>
+                              <td style={{ padding: "9px 10px", fontWeight: 700, color: r.margin >= 20 ? "#15803d" : r.margin >= 10 ? "#d97706" : "#dc2626" }}>{r.margin.toFixed(1)}%</td>
+                              <td style={{ padding: "9px 10px", color: "#6b7280" }}>{Math.round(r.S + r.T).toLocaleString()}원</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ borderTop: "2px solid #e8eaed" }}>
+                            <td colSpan={3} style={{ padding: "9px 10px", fontWeight: 700, color: "#374151", fontSize: "11px" }}>합계</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{Math.round(totalR).toLocaleString()}원</td>
+                            <td colSpan={2} />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <p style={{ fontSize: "10px", color: "#c0c4cc", marginTop: "10px", lineHeight: 1.6 }}>
+                      이모야킨지로 ×0.8 — 확인 필요 (지시서 명시) · Phase2: 사방넷 API 연동 시 업로드 단계 제거, 계산 로직 재사용
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* ══ BLOCK 5: 채널별 광고 집계 ══ */}
+        <div style={{ ...CARD }}>
+          <button
+            onClick={() => setShowAdBoard(!showAdBoard)}
+            style={{ width: "100%", padding: "14px 20px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#374151" }}>채널별 광고 집계</span>
+              <span style={{ fontSize: "10px", background: "#ede9fe", color: "#6d28d9", padding: "1px 7px", borderRadius: "9px", fontWeight: 600 }}>수동입력</span>
+            </div>
+            <span style={{ fontSize: "11px", color: "#9ca3af", transform: showAdBoard ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
+          </button>
+
+          {showAdBoard && (
+            <div style={{ padding: "0 20px 24px", borderTop: "1px solid #f3f4f6" }}>
+              <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "14px", marginBottom: "16px", lineHeight: 1.6 }}>
+                ※ 이다슬 프로 답변 확인 후 스펙 조정 예정 — 현재는 수동 입력 최소 버전
+              </div>
+
+              {/* 입력 행들 */}
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "8px", marginBottom: "8px" }}>
+                {["채널명", "주간 광고비 (원)", "ROAS", ""].map(h => (
+                  <div key={h} style={{ fontSize: "10px", color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em", padding: "0 4px" }}>{h}</div>
+                ))}
+              </div>
+              {adRows.map((row, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "8px", marginBottom: "8px" }}>
+                  <input
+                    placeholder="예) 스마트스토어"
+                    value={row.channel}
+                    onChange={e => setAdRows(prev => prev.map((r, j) => j === i ? { ...r, channel: e.target.value } : r))}
+                    style={{ padding: "8px 10px", borderRadius: "8px", border: "1px solid #e8eaed", fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                  />
+                  <input
+                    type="number" placeholder="예) 150000"
+                    value={row.adCost}
+                    onChange={e => setAdRows(prev => prev.map((r, j) => j === i ? { ...r, adCost: e.target.value } : r))}
+                    style={{ padding: "8px 10px", borderRadius: "8px", border: "1px solid #e8eaed", fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                  />
+                  <input
+                    type="number" placeholder="예) 3.2"
+                    value={row.roas}
+                    onChange={e => setAdRows(prev => prev.map((r, j) => j === i ? { ...r, roas: e.target.value } : r))}
+                    style={{ padding: "8px 10px", borderRadius: "8px", border: "1px solid #e8eaed", fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                  />
+                  <button
+                    onClick={() => setAdRows(prev => prev.filter((_, j) => j !== i))}
+                    style={{ padding: "8px", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "14px" }}
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setAdRows(prev => [...prev, { channel: "", adCost: "", roas: "" }])}
+                style={{ fontSize: "12px", color: "#6b7280", background: "none", border: "1px dashed #e8eaed", borderRadius: "8px", padding: "7px 14px", cursor: "pointer", fontFamily: "inherit", marginBottom: "16px" }}
+              >
+                + 채널 추가
+              </button>
+
+              {/* 집계 결과 */}
+              {adRows.some(r => r.channel && r.adCost) && (
+                <div style={{ background: "#f9fafb", borderRadius: "8px", padding: "14px" }}>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "10px", fontWeight: 600, letterSpacing: "0.05em" }}>주간 집계</div>
+                  {adRows.filter(r => r.channel && r.adCost).map((r, i) => {
+                    const cost = Number(r.adCost) || 0;
+                    const roas = Number(r.roas) || 0;
+                    const rev = roas > 0 ? cost * roas : null;
+                    return (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f3f4f6" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>{r.channel}</span>
+                        <div style={{ display: "flex", gap: "16px", fontSize: "12px", color: "#6b7280" }}>
+                          <span>광고비 {cost.toLocaleString()}원</span>
+                          {roas > 0 && <span style={{ color: roas >= 3 ? "#15803d" : "#d97706", fontWeight: 700 }}>ROAS {roas.toFixed(1)}</span>}
+                          {rev && <span>추정매출 {Math.round(rev).toLocaleString()}원</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                    <span style={{ color: "#9ca3af" }}>총 광고비</span>
+                    <span style={{ fontWeight: 700, color: "#374151" }}>
+                      {adRows.filter(r => r.adCost).reduce((s, r) => s + (Number(r.adCost) || 0), 0).toLocaleString()}원
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
       </div>
     </div>

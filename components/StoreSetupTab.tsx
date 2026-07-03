@@ -71,6 +71,17 @@ export default function StoreSetupTab() {
   const [collecting, setCollecting] = useState(false);
   const [collectResult, setCollectResult] = useState<{product: string; searchVolume: number; cpc: number; competitors: number}[] | null>(null);
 
+  // 섹션 탭
+  const [activeSection, setActiveSection] = useState("상품 등록");
+
+  // 경쟁사 추적
+  interface TrackingRecord { id: string; product_name: string; coupang_price: number | null; is_item_winner: number; check_date: string; }
+  const [trackingRecords, setTrackingRecords] = useState<TrackingRecord[]>([]);
+  const [tProductName, setTProductName] = useState("");
+  const [tCoupangPrice, setTCoupangPrice] = useState("");
+  const [tIsItemWinner, setTIsItemWinner] = useState(false);
+  const [savingTracking, setSavingTracking] = useState(false);
+
   useEffect(() => {
     initAndLoad();
   }, []);
@@ -221,9 +232,11 @@ export default function StoreSetupTab() {
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>한 번만 등록하면 끝</p>
         <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>자사·경쟁사 상품 등록</p>
         {["상품 등록", "경쟁사 추적", "매출 입력"].map(f => (
-          <div key={f} style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px" }}>
-            <span style={{ fontSize: "10px", color: "#c0c4cc", flexShrink: 0 }}>✓</span>
-            <span style={{ fontSize: "13px", color: "#8f9399" }}>{f}</span>
+          <div key={f}
+            onClick={() => setActiveSection(f)}
+            style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: "pointer", borderRadius: 6, padding: "4px 6px", background: activeSection === f ? "#fff3f6" : "transparent" }}>
+            <span style={{ fontSize: "10px", color: activeSection === f ? "#ef567c" : "#c0c4cc", flexShrink: 0 }}>✓</span>
+            <span style={{ fontSize: "13px", color: activeSection === f ? "#ef567c" : "#8f9399", fontWeight: activeSection === f ? 700 : 400 }}>{f}</span>
           </div>
         ))}
       </div>
@@ -298,6 +311,180 @@ export default function StoreSetupTab() {
             </button>
           </div>
 
+          {/* ── 경쟁사 추적 섹션 ── */}
+          {activeSection === "경쟁사 추적" && (() => {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            async function handleSaveTracking() {
+              if (!tProductName || !store) return;
+              setSavingTracking(true);
+              try {
+                await fetch("/api/competitor-tracking", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    store_id: store.id,
+                    product_name: tProductName,
+                    coupang_price: tCoupangPrice ? Number(tCoupangPrice) : null,
+                    is_item_winner: tIsItemWinner,
+                    check_date: todayStr,
+                  }),
+                });
+                const res = await fetch(`/api/competitor-tracking?store_id=${store.id}`);
+                const data = await res.json();
+                setTrackingRecords(data.records || []);
+                setTProductName(""); setTCoupangPrice(""); setTIsItemWinner(false);
+              } catch (e) { console.error(e); }
+              setSavingTracking(false);
+            }
+            async function loadTracking() {
+              if (!store) return;
+              const res = await fetch(`/api/competitor-tracking?store_id=${store.id}`);
+              const data = await res.json();
+              setTrackingRecords(data.records || []);
+            }
+            if (trackingRecords.length === 0) loadTracking();
+            return (
+              <div>
+                {/* 입력 폼 */}
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>쿠팡 판매가 기록</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 수기 확인 → 여기에 기록 → 추이 자동 적재</div>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <div>
+                      <span style={S.label}>자사 상품 선택 *</span>
+                      <select style={S.select} value={tProductName} onChange={e => setTProductName(e.target.value)}>
+                        <option value="">— 상품 선택 —</option>
+                        {ownProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <span style={S.label}>쿠팡 판매가 (원)</span>
+                        <input style={S.input} type="number" placeholder="예) 35900"
+                          value={tCoupangPrice} onChange={e => setTCoupangPrice(e.target.value)} />
+                      </div>
+                      <div>
+                        <span style={S.label}>아이템위너 여부</span>
+                        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                          {[true, false].map(v => (
+                            <button key={String(v)}
+                              onClick={() => setTIsItemWinner(v)}
+                              style={{
+                                flex: 1, padding: "10px", borderRadius: 8, border: "1px solid",
+                                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                borderColor: tIsItemWinner === v ? "#0f2a1e" : "#e0ede9",
+                                background: tIsItemWinner === v ? "#0f2a1e" : "#fff",
+                                color: tIsItemWinner === v ? "#fff" : "#6b7280",
+                              }}>
+                              {v ? "Y (위너)" : "N (비위너)"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ background: "#f9fafb", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#9ca3af" }}>
+                      확인일자: {todayStr} (자동 기록)
+                    </div>
+                    <button onClick={handleSaveTracking} disabled={savingTracking || !tProductName}
+                      style={{
+                        padding: "11px", borderRadius: 8, border: "none",
+                        background: !tProductName ? "#e8eaed" : savingTracking ? "#c4c8cc" : "#ef567c",
+                        color: "#fff", fontSize: 13, fontWeight: 600, cursor: tProductName ? "pointer" : "default",
+                      }}>
+                      {savingTracking ? "저장 중..." : "기록하기 →"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 기록 목록 */}
+                {trackingRecords.length > 0 && (
+                  <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 16 }}>
+                      추적 기록 ({trackingRecords.length}건)
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid #e8eaed" }}>
+                            {["확인일자", "상품명", "쿠팡 판매가", "아이템위너"].map(h => (
+                              <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trackingRecords.map(r => (
+                            <tr key={r.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                              <td style={{ padding: "10px", color: "#6b7280" }}>{r.check_date}</td>
+                              <td style={{ padding: "10px", color: "#0f2a1e", fontWeight: 600 }}>{r.product_name}</td>
+                              <td style={{ padding: "10px", color: "#374151" }}>
+                                {r.coupang_price ? Number(r.coupang_price).toLocaleString() + "원" : "—"}
+                              </td>
+                              <td style={{ padding: "10px" }}>
+                                <span style={{
+                                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+                                  background: r.is_item_winner ? "#dcfce7" : "#f3f4f6",
+                                  color: r.is_item_winner ? "#15803d" : "#6b7280",
+                                }}>
+                                  {r.is_item_winner ? "위너" : "비위너"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {trackingRecords.length === 0 && (
+                  <div style={{ background: "#f9fafb", borderRadius: 12, border: "1px dashed #e0ede9", padding: "32px", textAlign: "center" }}>
+                    <div style={{ fontSize: 13, color: "#9ca3af" }}>아직 기록 없음 — 위 폼으로 첫 번째 기록을 남겨보세요</div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── 매출 입력 섹션 ── */}
+          {activeSection === "매출 입력" && (
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>오늘 매출 입력</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 5분 · 30일 누적 = PoC 결과 보고서</div>
+              {yesterdaySales && (
+                <div style={{ background: "#f9fafb", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#6b7280" }}>
+                  어제: 매출 {yesterdaySales.revenue ? Number(yesterdaySales.revenue).toLocaleString() + "원" : "—"}
+                  {yesterdaySales.ad_cost ? ` · 광고비 ${Number(yesterdaySales.ad_cost).toLocaleString()}원` : ""}
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div>
+                  <span style={S.label}>오늘 매출 (원)</span>
+                  <input style={S.input} type="number" placeholder="예) 1768000"
+                    value={salesRevenue} onChange={e => setSalesRevenue(e.target.value)} />
+                </div>
+                <div>
+                  <span style={S.label}>광고비 (원)</span>
+                  <input style={S.input} type="number" placeholder="예) 102000"
+                    value={salesAdCost} onChange={e => setSalesAdCost(e.target.value)} />
+                </div>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <span style={S.label}>어제 액션 결과 (선택)</span>
+                <input style={S.input} placeholder="예) 상품명 수정 후 클릭 +15%"
+                  value={salesAction} onChange={e => setSalesAction(e.target.value)} />
+              </div>
+              <button onClick={handleSaveSales} disabled={savingSales}
+                style={{ width: "100%", padding: "11px", borderRadius: 8, border: "none",
+                  background: salesSaved ? "#4a4f57" : savingSales ? "#c4c8cc" : "#4a4f57",
+                  color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {salesSaved ? "저장 완료" : savingSales ? "저장 중..." : "오늘 매출 저장 →"}
+              </button>
+            </div>
+          )}
+
+          {/* ── 상품 등록 섹션 ── */}
+          {activeSection === "상품 등록" && (
+          <>
           {/* 상품 등록 폼 */}
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginBottom: 24 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 16 }}>
@@ -460,43 +647,7 @@ export default function StoreSetupTab() {
               </div>{/* /scroll wrapper */}
             </div>
           )}
-          {/* 매출 수동 입력 */}
-          {store && (
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>오늘 매출 입력</div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 5분 · 30일 누적 = PoC 결과 보고서</div>
-
-              {yesterdaySales && (
-                <div style={{ background: "#f9fafb", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#6b7280" }}>
-                  어제: 매출 {yesterdaySales.revenue ? Number(yesterdaySales.revenue).toLocaleString() + "원" : "—"}
-                  {yesterdaySales.ad_cost ? ` · 광고비 ${Number(yesterdaySales.ad_cost).toLocaleString()}원` : ""}
-                </div>
-              )}
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <span style={S.label}>오늘 매출 (원)</span>
-                  <input style={S.input} type="number" placeholder="예) 1768000"
-                    value={salesRevenue} onChange={e => setSalesRevenue(e.target.value)} />
-                </div>
-                <div>
-                  <span style={S.label}>광고비 (원)</span>
-                  <input style={S.input} type="number" placeholder="예) 102000"
-                    value={salesAdCost} onChange={e => setSalesAdCost(e.target.value)} />
-                </div>
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <span style={S.label}>어제 액션 결과 (선택)</span>
-                <input style={S.input} placeholder="예) 상품명 수정 후 클릭 +15%"
-                  value={salesAction} onChange={e => setSalesAction(e.target.value)} />
-              </div>
-              <button onClick={handleSaveSales} disabled={savingSales}
-                style={{ width: "100%", padding: "11px", borderRadius: 8, border: "none",
-                  background: salesSaved ? "#4a4f57" : savingSales ? "#c4c8cc" : "#4a4f57",
-                  color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                {salesSaved ? "저장 완료" : savingSales ? "저장 중..." : "오늘 매출 저장 →"}
-              </button>
-            </div>
+          </>
           )}
         </>
       )}
