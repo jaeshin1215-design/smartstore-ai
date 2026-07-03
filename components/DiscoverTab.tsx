@@ -169,6 +169,16 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
     };run();
   },[mode,hotKeywords.length]);
 
+  const prefetchMargins=useCallback((items:Candidate[])=>{
+    items.forEach(async(c)=>{
+      try{
+        const r=await fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"detail",no:c.no,searchKeyword:c.keyword})});
+        const j=await r.json() as {item?:{margin_pct:number;sell_price:number;margin_source?:string}};
+        if(j.item){setCandidates(prev=>prev.map(p=>p.no===c.no?{...p,margin_pct:j.item!.margin_pct,sell_price:j.item!.sell_price}:p));}
+      }catch{/*무시*/}
+    });
+  },[]);
+
   const searchDomeggook=useCallback(async(kw:string)=>{
     if(!kw.trim())return;
     setSearchLoading(true);setSearchError("");setSelected(null);setScoring(null);setCandidateScores({});setShowRegForm(false);setSeoTarget(null);
@@ -176,9 +186,11 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
       const res=await fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"search",keyword:kw})});
       const j=await res.json() as {items?:Omit<Candidate,"status"|"keyword">[];error?:string};
       if(j.error){setSearchError(j.error);setCandidates([]);return;}
-      setCandidates((j.items??[]).map(i=>({...i,keyword:kw,status:"신규"})));
+      const items=(j.items??[]).map(i=>({...i,keyword:kw,status:"신규"} as Candidate));
+      setCandidates(items);
+      prefetchMargins(items);
     }catch{setSearchError("도매꾹 연결 오류");}finally{setSearchLoading(false);}
-  },[]);
+  },[prefetchMargins]);
 
   const scoreCandidate=useCallback(async(c:Candidate)=>{
     setSelected(c);setScoring(null);setScoreLoading(true);setShowRegForm(false);
