@@ -14,6 +14,15 @@ interface SabangnetCS {
   status: "unanswered" | "answered";
 }
 
+interface DefectRecord {
+  orderNo: string;
+  receivedAt: string;
+  channel: "카카오톡 채널" | "대표폰";
+  defectType: "교환" | "반품";
+  description: string;
+  savedAt: string;
+}
+
 const SAMPLE_CS_ITEM: SabangnetCS = {
   cs_no: "sample_001",
   ord_no: "20260531-0023",
@@ -57,7 +66,7 @@ function InboxMockup({ type, large }: { type: "inquiry" | "positive" | "negative
   );
 }
 
-/* ── GradientBox (리뷰용 — 핑크/보라 계열) ── */
+/* ── GradientBox (리뷰용) ── */
 function GradientBox({ big, sub, ko, mockupType }: { big: string; sub: string; ko: string; mockupType: "inquiry" | "positive" | "negative" }) {
   const darkColor = mockupType === "negative" ? "#4a0e0e" : mockupType === "positive" ? "#0a2e1a" : "#0d1a3a";
   return (
@@ -116,12 +125,22 @@ const REVIEW_ITEMS: AnnoItem[] = [
   },
 ];
 
-type InboxSection = "고객 문의" | "리뷰 대응" | "배송 알림";
+// ② 배송 알림 삭제 — InboxSection 타입에서 제거
+type InboxSection = "고객 문의" | "리뷰 대응";
+type CsSubTab = "미답변 문의" | "불량품 접수";
+
+const S_INPUT: React.CSSProperties = {
+  width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
+  border: "1px solid #e5e7eb", background: "#fff", outline: "none",
+  fontFamily: FF, boxSizing: "border-box",
+};
 
 export default function CustomerTab() {
   const [counts, setCounts] = useState<Record<string, Record<string, number>>>({});
   const [activeInboxSection, setActiveInboxSection] = useState<InboxSection>("고객 문의");
+  const [csSubTab, setCsSubTab] = useState<CsSubTab>("미답변 문의");
 
+  // CS 상태
   const [csItems, setCsItems] = useState<SabangnetCS[]>([]);
   const [csLoading, setCsLoading] = useState(false);
   const [csError, setCsError] = useState<string | null>(null);
@@ -130,20 +149,29 @@ export default function CustomerTab() {
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
 
-  // 리뷰 대응 state
+  // 리뷰 상태
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, string>>({});
   const [generatingReview, setGeneratingReview] = useState<string | null>(null);
   const [reviewCopied, setReviewCopied] = useState<Record<string, boolean>>({});
+
+  // ⑤ 불량품 접수 상태
+  const [defectForm, setDefectForm] = useState<{
+    orderNo: string; receivedAt: string;
+    channel: "카카오톡 채널" | "대표폰";
+    defectType: "교환" | "반품";
+    description: string;
+  }>({ orderNo: "", receivedAt: "", channel: "카카오톡 채널", defectType: "교환", description: "" });
+  const [defectList, setDefectList] = useState<DefectRecord[]>([]);
+  const [defectSaved, setDefectSaved] = useState(false);
 
   const react = (id: string, emoji: string) =>
     setCounts(p => ({ ...p, [id]: { ...(p[id] || {}), [emoji]: ((p[id] || {})[emoji] || 0) + 1 } }));
 
   useEffect(() => {
-    if (activeInboxSection === "고객 문의") fetchCS();
-  }, [activeInboxSection]);
+    if (activeInboxSection === "고객 문의" && csSubTab === "미답변 문의") fetchCS();
+  }, [activeInboxSection, csSubTab]);
 
-  // 사방넷 API 키 확보 후 false로 변경
-  const TEST_MODE = true;
+  const TEST_MODE = true; // 사방넷 API 키 확보 후 false로 변경
 
   async function fetchCS() {
     setCsLoading(true);
@@ -196,10 +224,7 @@ export default function CustomerTab() {
       const res = await fetch("/api/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          review: item.title,
-          type: item.mockupType === "positive" ? "positive" : "negative",
-        }),
+        body: JSON.stringify({ review: item.title, type: item.mockupType === "positive" ? "positive" : "negative" }),
       });
       if (!res.ok) throw new Error(`review API ${res.status}`);
       const text = await res.text();
@@ -216,17 +241,28 @@ export default function CustomerTab() {
     setTimeout(() => setReviewCopied(p => ({ ...p, [id]: false })), 2000);
   }
 
+  function saveDefect() {
+    if (!defectForm.orderNo.trim() || !defectForm.description.trim()) return;
+    const record: DefectRecord = {
+      ...defectForm,
+      savedAt: new Date().toLocaleDateString("ko-KR"),
+    };
+    setDefectList(p => [record, ...p]);
+    setDefectForm({ orderNo: "", receivedAt: "", channel: "카카오톡 채널", defectType: "교환", description: "" });
+    setDefectSaved(true);
+    setTimeout(() => setDefectSaved(false), 2500);
+  }
+
+  // ② 배송 알림 제거
   const SECTION_META: Record<InboxSection, { desc: string }> = {
-    "고객 문의": { desc: "사방넷 미답변 문의 자동 수집 · AI 초안 → 즉시 등록" },
+    "고객 문의": { desc: "사방넷 연동 채널 문의만 자동 수집 · AI 초안 → 즉시 등록" },
     "리뷰 대응": { desc: "긍정/부정 리뷰 분류 · 답글 초안 자동 생성" },
-    "배송 알림": { desc: "배송 지연·반품 알림 (준비 중)" },
   };
 
   function renderCSItem(cs: SabangnetCS, idx: number, total: number, isSample: boolean) {
     return (
       <div key={cs.cs_no}>
         <div style={{ display: "flex", gap: "44px" }}>
-          {/* 왼쪽 메타 — 리뷰 대응과 동일 구조 */}
           <div style={{ width: "100px", flexShrink: 0, textAlign: "right", paddingTop: "4px" }}>
             <p style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500, margin: "0 0 8px 0" }}>
               {cs.created_at?.slice(0, 10)?.replace(/-/g, ".") ?? "—"}
@@ -241,9 +277,7 @@ export default function CustomerTab() {
             )}
           </div>
 
-          {/* 오른쪽 에디토리얼 — 리뷰 대응과 동일 구조 */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* 제목 + 칩 */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "18px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#111827", lineHeight: 1.4, margin: 0, flex: 1 }}>
                 {cs.content}
@@ -254,18 +288,16 @@ export default function CustomerTab() {
               </div>
             </div>
 
-            {/* 설명 */}
+            {/* ③ 오타 수정: 을→를 */}
             <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "14px" }}>
-              {cs.channel || "쇼핑 채널"}을 통해 접수된 고객 문의입니다. 빠른 답변으로 고객 신뢰와 재구매율을 높이세요.
+              {cs.channel || "쇼핑 채널"}를 통해 접수된 고객 문의입니다. 빠른 답변으로 고객 신뢰와 재구매율을 높이세요.
             </p>
             <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "28px" }}>
               주문번호: {cs.ord_no || "—"}{isSample ? " (샘플 미리보기)" : " — AI 초안을 확인하고 수정 후 사방넷에 즉시 등록하세요."}
             </p>
 
-            {/* 그라디언트 박스 (블루 계열) */}
             <InquiryGradientBox channel={cs.channel || "채널"} category={cs.category || "배송 문의"} />
 
-            {/* 샘플이면 안내 문구 */}
             {isSample ? (
               <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.75, marginBottom: "28px" }}>
                 API 키 설정 후 실제 문의에 AI 초안을 생성하고 사방넷에 바로 등록할 수 있습니다.
@@ -312,7 +344,6 @@ export default function CustomerTab() {
               </div>
             )}
 
-            {/* 반응 이모지 */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {["😊", "😍", "🔥"].map(e => (
                 <button key={e} onClick={() => react(cs.cs_no, e)}
@@ -331,12 +362,12 @@ export default function CustomerTab() {
   return (
     <div style={{ width: "100%", fontFamily: FF, display: "flex", gap: "40px", alignItems: "flex-start" }}>
 
-      {/* 사이드바 */}
+      {/* 사이드바 — ② 배송 알림 제거, 사이드바 설명 수정 */}
       <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>INBOX</p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>고객 목소리, 한곳에서</p>
-        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>문의·리뷰·배송 자동 분류</p>
-        {(["고객 문의", "리뷰 대응", "배송 알림"] as InboxSection[]).map(f => {
+        <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>문의·리뷰 자동 분류</p>
+        {(["고객 문의", "리뷰 대응"] as InboxSection[]).map(f => {
           const isActive = activeInboxSection === f;
           return (
             <div key={f} onClick={() => setActiveInboxSection(f)}
@@ -363,7 +394,7 @@ export default function CustomerTab() {
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" /></svg>
                 Filter
               </button>
-              {activeInboxSection === "고객 문의" && (
+              {activeInboxSection === "고객 문의" && csSubTab === "미답변 문의" && (
                 <button onClick={fetchCS} style={{ fontSize: "13px", fontWeight: 700, padding: "8px 18px", borderRadius: "7px", border: "none", background: "#ef567c", color: "#fff", cursor: "pointer", fontFamily: FF }}>
                   새로고침
                 </button>
@@ -371,46 +402,159 @@ export default function CustomerTab() {
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: "32px" }} />
+          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: "28px" }} />
 
           {/* ── 고객 문의 섹션 ── */}
           {activeInboxSection === "고객 문의" && (
             <div>
-              {/* 로딩 */}
-              {csLoading && (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
-                  <div style={{ width: "20px", height: "20px", border: "2px solid #e5e7eb", borderTopColor: "#ef567c", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite", marginBottom: "12px" }} />
-                  <p style={{ fontSize: "14px", margin: 0 }}>사방넷 문의 불러오는 중...</p>
-                </div>
-              )}
+              {/* ④ 채널 범위 표기 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px", padding: "8px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px" }}>
+                <span style={{ fontSize: "12px", color: "#0369a1" }}>ℹ</span>
+                <span style={{ fontSize: "13px", color: "#0369a1" }}>사방넷 연동 채널 문의만 자동 수집됩니다 (수기채널 제외)</span>
+              </div>
 
-              {/* 에러 — 상단 소형 노티스 */}
-              {!csLoading && csError && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: csError.includes("미설정") ? "#fffbeb" : "#fef2f2", border: `1px solid ${csError.includes("미설정") ? "#fde68a" : "#fecaca"}`, borderRadius: "8px", marginBottom: "40px" }}>
-                  <span style={{ fontSize: "13px", color: csError.includes("미설정") ? "#92400e" : "#dc2626" }}>
-                    ⚠️ {csError}{csError.includes("미설정") ? " — 아래는 샘플 미리보기입니다" : ""}
-                  </span>
-                  <button onClick={fetchCS}
-                    style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: `1px solid ${csError.includes("미설정") ? "#fde68a" : "#fecaca"}`, background: "#fff", color: csError.includes("미설정") ? "#92400e" : "#dc2626", cursor: "pointer", fontFamily: FF }}>
-                    다시 시도
+              {/* 서브탭: 미답변 문의 | 불량품 접수 */}
+              <div style={{ display: "flex", gap: "4px", marginBottom: "28px", background: "#f3f4f6", borderRadius: "10px", padding: "4px" }}>
+                {(["미답변 문의", "불량품 접수"] as CsSubTab[]).map(t => (
+                  <button key={t} onClick={() => setCsSubTab(t)}
+                    style={{ flex: 1, padding: "8px 0", borderRadius: "7px", border: "none", background: csSubTab === t ? "#fff" : "transparent", color: csSubTab === t ? "#111827" : "#9ca3af", fontSize: "13px", fontWeight: csSubTab === t ? 700 : 500, cursor: "pointer", fontFamily: FF, boxShadow: csSubTab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }}>
+                    {t}
+                    {t === "불량품 접수" && defectList.length > 0 && (
+                      <span style={{ marginLeft: "5px", fontSize: "11px", background: "#ef567c", color: "#fff", borderRadius: "10px", padding: "1px 6px" }}>{defectList.length}</span>
+                    )}
                   </button>
-                </div>
+                ))}
+              </div>
+
+              {/* ── 서브탭: 미답변 문의 ── */}
+              {csSubTab === "미답변 문의" && (
+                <>
+                  {csLoading && (
+                    <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+                      <div style={{ width: "20px", height: "20px", border: "2px solid #e5e7eb", borderTopColor: "#ef567c", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite", marginBottom: "12px" }} />
+                      <p style={{ fontSize: "14px", margin: 0 }}>사방넷 문의 불러오는 중...</p>
+                    </div>
+                  )}
+
+                  {!csLoading && csError && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: csError.includes("미설정") ? "#fffbeb" : "#fef2f2", border: `1px solid ${csError.includes("미설정") ? "#fde68a" : "#fecaca"}`, borderRadius: "8px", marginBottom: "40px" }}>
+                      <span style={{ fontSize: "13px", color: csError.includes("미설정") ? "#92400e" : "#dc2626" }}>
+                        ⚠️ {csError}{csError.includes("미설정") ? " — 아래는 샘플 미리보기입니다" : ""}
+                      </span>
+                      <button onClick={fetchCS}
+                        style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: `1px solid ${csError.includes("미설정") ? "#fde68a" : "#fecaca"}`, background: "#fff", color: csError.includes("미설정") ? "#92400e" : "#dc2626", cursor: "pointer", fontFamily: FF }}>
+                        다시 시도
+                      </button>
+                    </div>
+                  )}
+
+                  {!csLoading && csError && renderCSItem(SAMPLE_CS_ITEM, 0, 1, true)}
+
+                  {!csLoading && !csError && csItems.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "64px 0", color: "#9ca3af" }}>
+                      <p style={{ fontSize: "32px", margin: "0 0 12px" }}>✓</p>
+                      <p style={{ fontSize: "16px", fontWeight: 700, color: "#374151", margin: "0 0 6px" }}>미답변 문의 없음</p>
+                      <p style={{ fontSize: "14px", margin: 0 }}>사방넷 연동 채널의 모든 문의가 처리됐습니다.</p>
+                    </div>
+                  )}
+
+                  {!csLoading && !csError && csItems.map((cs, idx) => renderCSItem(cs, idx, csItems.length, false))}
+                </>
               )}
 
-              {/* 에러 시 샘플 (리뷰 대응과 동일 레이아웃) */}
-              {!csLoading && csError && renderCSItem(SAMPLE_CS_ITEM, 0, 1, true)}
+              {/* ⑤ 서브탭: 불량품 접수 (수동) */}
+              {csSubTab === "불량품 접수" && (
+                <div>
+                  {/* 안내 배너 */}
+                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "10px", padding: "14px 18px", marginBottom: "24px" }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: "#c2410c", margin: "0 0 4px" }}>📱 카카오톡 채널 / 대표폰 접수 전용</p>
+                    <p style={{ fontSize: "13px", color: "#92400e", margin: 0, lineHeight: 1.6 }}>
+                      고객으로부터 불량 사유 이미지·영상을 받은 후 아래 폼에 수동 입력하세요. 사방넷과 별개로 운영됩니다.
+                    </p>
+                  </div>
 
-              {/* 정상: 문의 없음 */}
-              {!csLoading && !csError && csItems.length === 0 && (
-                <div style={{ textAlign: "center", padding: "64px 0", color: "#9ca3af" }}>
-                  <p style={{ fontSize: "32px", margin: "0 0 12px" }}>✓</p>
-                  <p style={{ fontSize: "16px", fontWeight: 700, color: "#374151", margin: "0 0 6px" }}>미답변 문의 없음</p>
-                  <p style={{ fontSize: "14px", margin: 0 }}>사방넷 연동 채널의 모든 문의가 처리됐습니다.</p>
+                  {/* 입력 폼 */}
+                  <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+                    <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 18px" }}>불량품 접수 입력</p>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", display: "block", marginBottom: "4px" }}>주문번호 *</label>
+                        <input style={S_INPUT} placeholder="예) 20260701-0041"
+                          value={defectForm.orderNo} onChange={e => setDefectForm(p => ({ ...p, orderNo: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", display: "block", marginBottom: "4px" }}>접수 날짜</label>
+                        <input style={S_INPUT} type="date"
+                          value={defectForm.receivedAt} onChange={e => setDefectForm(p => ({ ...p, receivedAt: e.target.value }))} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>접수 경로</label>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          {(["카카오톡 채널", "대표폰"] as const).map(v => (
+                            <button key={v} onClick={() => setDefectForm(p => ({ ...p, channel: v }))}
+                              style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: FF, borderColor: defectForm.channel === v ? "#c2410c" : "#e5e7eb", background: defectForm.channel === v ? "#fff7ed" : "#fff", color: defectForm.channel === v ? "#c2410c" : "#6b7280" }}>
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>처리 유형</label>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          {(["교환", "반품"] as const).map(v => (
+                            <button key={v} onClick={() => setDefectForm(p => ({ ...p, defectType: v }))}
+                              style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: FF, borderColor: defectForm.defectType === v ? "#1d4ed8" : "#e5e7eb", background: defectForm.defectType === v ? "#eff6ff" : "#fff", color: defectForm.defectType === v ? "#1d4ed8" : "#6b7280" }}>
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={{ fontSize: "11px", color: "#6b7280", letterSpacing: "0.06em", display: "block", marginBottom: "4px" }}>불량 사유 *</label>
+                      <textarea rows={3} placeholder="예) 제품 봉합 부위 실밥 풀림, 색상 얼룩 발생 등" style={{ ...S_INPUT, resize: "vertical", lineHeight: 1.7 }}
+                        value={defectForm.description} onChange={e => setDefectForm(p => ({ ...p, description: e.target.value }))} />
+                    </div>
+
+                    <div style={{ background: "#f9fafb", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontSize: "12px", color: "#6b7280", lineHeight: 1.6 }}>
+                      📎 이미지·영상은 카카오톡/대표폰으로 별도 수령 후 주문번호와 함께 보관하세요. 자동 첨부는 미지원.
+                    </div>
+
+                    <button onClick={saveDefect} disabled={!defectForm.orderNo.trim() || !defectForm.description.trim()}
+                      style={{ width: "100%", padding: "11px", borderRadius: "8px", border: "none", background: (!defectForm.orderNo.trim() || !defectForm.description.trim()) ? "#e5e7eb" : defectSaved ? "#15803d" : "#ef567c", color: (!defectForm.orderNo.trim() || !defectForm.description.trim()) ? "#9ca3af" : "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: FF, transition: "background 0.2s" }}>
+                      {defectSaved ? "✓ 저장 완료" : "불량품 접수 저장 →"}
+                    </button>
+                  </div>
+
+                  {/* 저장된 접수 목록 */}
+                  {defectList.length > 0 && (
+                    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 16px" }}>접수 기록 ({defectList.length}건)</p>
+                      {defectList.map((d, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 0", borderBottom: i < defectList.length - 1 ? "1px solid #f3f4f6" : "none", gap: "12px" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                              <span style={{ fontSize: "13px", fontWeight: 700, color: "#111827" }}>{d.orderNo}</span>
+                              <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "10px", background: d.defectType === "교환" ? "#eff6ff" : "#fef2f2", color: d.defectType === "교환" ? "#1d4ed8" : "#dc2626" }}>{d.defectType}</span>
+                              <span style={{ fontSize: "11px", color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: "10px" }}>{d.channel}</span>
+                            </div>
+                            <p style={{ fontSize: "13px", color: "#4b5563", margin: 0, lineHeight: 1.5 }}>{d.description}</p>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <p style={{ fontSize: "12px", color: "#9ca3af", margin: 0 }}>{d.savedAt}</p>
+                            {d.receivedAt && <p style={{ fontSize: "12px", color: "#9ca3af", margin: "2px 0 0" }}>접수 {d.receivedAt}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* 정상: CS 목록 */}
-              {!csLoading && !csError && csItems.map((cs, idx) => renderCSItem(cs, idx, csItems.length, false))}
             </div>
           )}
 
@@ -444,7 +588,6 @@ export default function CustomerTab() {
                           <span style={{ color: "#2563eb", textDecoration: "underline", cursor: "pointer" }}>{item.para4}</span>
                         </p>
 
-                        {/* AI 답글 초안 */}
                         {!reviewDrafts[item.id] ? (
                           <button onClick={() => generateReviewDraft(item)} disabled={generatingReview === item.id}
                             style={{ fontSize: "13px", fontWeight: 600, padding: "9px 20px", borderRadius: "8px", border: "none", background: generatingReview === item.id ? "#c4c8cc" : "#ef567c", color: "#fff", cursor: generatingReview === item.id ? "default" : "pointer", fontFamily: FF, display: "flex", alignItems: "center", gap: "6px", marginBottom: "28px" }}>
@@ -488,15 +631,6 @@ export default function CustomerTab() {
                   </div>
                 );
               })}
-            </div>
-          )}
-
-          {/* ── 배송 알림 섹션 ── */}
-          {activeInboxSection === "배송 알림" && (
-            <div style={{ textAlign: "center", padding: "64px 0" }}>
-              <p style={{ fontSize: "32px", margin: "0 0 12px" }}>🚚</p>
-              <p style={{ fontSize: "16px", fontWeight: 700, color: "#374151", margin: "0 0 6px" }}>배송 알림 — 준비 중</p>
-              <p style={{ fontSize: "14px", color: "#9ca3af", margin: 0 }}>배송 지연·반품 자동 알림이 다음 업데이트에 추가됩니다.</p>
             </div>
           )}
 
