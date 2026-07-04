@@ -737,7 +737,7 @@ export default function DiagnosisTab({
 
         {/* Matrix Card */}
         <div style={{
-          height: "520px",
+          height: "calc(100vh - 350px)",
           display: "flex",
           flexDirection: "column",
           background: "#ffffff",
@@ -1736,6 +1736,7 @@ export default function DiagnosisTab({
           borderRadius: "8px",
           padding: "20px 24px",
           marginTop: "16px",
+          minHeight: "calc(100vh - 350px)",
         }}>
           <CustomerMatrix storeId={storeId} />
         </div>
