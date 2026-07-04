@@ -363,11 +363,12 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                           <span style={{ fontSize:"10px", fontWeight:700, padding:"2px 8px", borderRadius:"4px", background:st.bg, color:st.color }}>{c.status}</span>
                           <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
                             {cs&&<span style={{ fontSize:"12px", fontWeight:700, color:scoreBarColor(cs.total) }}>{cs.total}점</span>}
-                            {c.margin_pct>0&&<span style={{ fontSize:"11px", color:"#6b7280" }}>마진 {c.margin_pct}%</span>}
+                            {(()=>{const ms=c.margin_pct>0?Math.min(100,c.margin_pct*2):null;return <span style={{ fontSize:"11px", fontWeight:600, color:ms!=null?scoreBarColor(ms):"#d1d5db" }}>{ms!=null?`마진 ${ms}점`:"마진 —"}</span>;})()}
                           </div>
                         </div>
                         <p style={{ fontSize:"13px", fontWeight:600, color:"#111", margin:"4px 0 2px", lineHeight:1.3 }}>{c.name.length>28?c.name.slice(0,28)+"…":c.name}</p>
                         {c.sell_price>0&&<p style={{ fontSize:"12px", color:"#9ca3af", margin:0 }}>{c.sell_price.toLocaleString()}원</p>}
+                        {!cs&&c.margin_pct>0&&<p style={{ fontSize:"11px", color:"#bfbfbf", margin:"4px 0 0" }}>나머지 3축은 분석 버튼 클릭</p>}
                       </button>
                     );
                   })}
@@ -389,7 +390,23 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                     <p style={{ fontSize:"12px", color:"#9ca3af", margin:0 }}>{selected?.category}</p>
                   </div>
                   {scoreLoading?(
-                    <div>{[0,1,2,3].map(i=><div key={i} style={{ marginBottom:"18px" }}><div style={{ display:"flex", justifyContent:"space-between", marginBottom:"8px" }}><div style={{ width:"80px", height:"14px", background:"#f1f5f9", borderRadius:"4px" }}/><div style={{ width:"48px", height:"14px", background:"#f1f5f9", borderRadius:"4px" }}/></div><div style={{ height:"6px", background:"#f1f5f9", borderRadius:"3px" }}/></div>)}</div>
+                    <div>
+                      {(selected?.margin_pct??0)>0?(()=>{const ms=Math.min(100,selected!.margin_pct*2),lbl=ms>=70?"우수":ms>=40?"보통":"낮음";return(<>
+                        <div style={{ marginBottom:"16px",padding:"12px 14px",marginLeft:"-14px",marginRight:"-14px",background:PINK.light,borderRadius:"8px",border:`1px solid ${PINK.mid}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"6px" }}>
+                            <span style={{ fontSize:"14px", fontWeight:700, color:PINK.text }}>마진</span>
+                            <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                              <span style={{ fontSize:"12px", color:"#6b7280" }}>{lbl}</span>
+                              <span style={{ fontSize:"18px", fontWeight:800, color:scoreBarColor(ms) }}>{ms}</span>
+                            </div>
+                          </div>
+                          <ScoreBar score={ms}/>
+                          <p style={{ fontSize:"11px", color:"#9ca3af", margin:"4px 0 0" }}>마진율 {selected!.margin_pct}% · 시즌성·경쟁·채널 분석 중...</p>
+                        </div>
+                        {[0,1,2].map(i=><div key={i} style={{ marginBottom:"18px" }}><div style={{ display:"flex", justifyContent:"space-between", marginBottom:"8px" }}><div style={{ width:"80px", height:"14px", background:"#f1f5f9", borderRadius:"4px" }}/><div style={{ width:"48px", height:"14px", background:"#f1f5f9", borderRadius:"4px" }}/></div><div style={{ height:"6px", background:"#f1f5f9", borderRadius:"3px" }}/></div>)}
+                      </>);})()
+                      :<>{[0,1,2,3].map(i=><div key={i} style={{ marginBottom:"18px" }}><div style={{ display:"flex", justifyContent:"space-between", marginBottom:"8px" }}><div style={{ width:"80px", height:"14px", background:"#f1f5f9", borderRadius:"4px" }}/><div style={{ width:"48px", height:"14px", background:"#f1f5f9", borderRadius:"4px" }}/></div><div style={{ height:"6px", background:"#f1f5f9", borderRadius:"3px" }}/></div>)}</>}
+                    </div>
                   ):scoring?(
                     <>
                       {getAxisOrder(scoring,track).map(({label,axis,highlight})=>(
