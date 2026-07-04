@@ -175,15 +175,16 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   }));
 
   return (
-    <div style={{ fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
+    <div style={{ fontFamily: "'Pretendard', -apple-system, sans-serif", height: "100%", display: "flex", flexDirection: "column" }}>
       {/* 헤더 */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "14px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "14px", flexShrink: 0 }}>
         <span style={{ fontSize: "13px", fontWeight: 700, color: "#0d0d0e" }}>고객 매트릭스</span>
         <span style={{ fontSize: "11px", color: "#8f9399" }}>객단가 × 구매횟수 — 쿠폰 발송 기준</span>
       </div>
 
-      {/* SVG */}
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, display: "block" }}>
+      {/* SVG wrapper — flex: 1 로 남은 높이 채움 */}
+      <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "100%", display: "block" }}>
         {/* 배경 4분면 */}
         {[
           { x: PL,       y: PT,       w: xSepSvg - PL, h: ySepSvg - PT, q: "high-one" },
@@ -261,9 +262,10 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
           </g>
         ))}
       </svg>
+      </div>{/* /SVG wrapper */}
 
       {/* 푸터 */}
-      <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "12px" }}>
+      <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
         <span style={{ fontSize: "11px", color: "#8f9399" }}>
           표본 {sampleCount}명 — 참고용, 확정 아님
         </span>

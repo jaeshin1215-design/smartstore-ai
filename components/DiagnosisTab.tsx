@@ -1736,7 +1736,10 @@ export default function DiagnosisTab({
           borderRadius: "8px",
           padding: "20px 24px",
           marginTop: "16px",
-          minHeight: "calc(100vh - 350px)",
+          height: "calc(100vh - 350px)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}>
           <CustomerMatrix storeId={storeId} />
         </div>
