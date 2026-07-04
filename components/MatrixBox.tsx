@@ -89,6 +89,7 @@ interface MatrixBoxProps {
   hoverProductId?: string | null;
   setHoverProductId?: (id: string | null) => void;
   config?: MatrixConfig;
+  anomalyIds?: string[];
 }
 
 export default function MatrixBox({
@@ -101,6 +102,7 @@ export default function MatrixBox({
   hoverProductId,
   setHoverProductId,
   config = SELLFIT_CONFIG,
+  anomalyIds = [],
 }: MatrixBoxProps) {
   const [bounds, setBounds] = useState<Bounds | null>({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -422,6 +424,8 @@ export default function MatrixBox({
               const isLegacy   = p.is_own === 1; // ★ 공간 이력 (filled)
               const isManual   = p.is_own === 3; // + 등록 후보 (filled + dark stroke)
 
+              const isAnomaly = anomalyIds.includes(p.id);
+
               return (
                 <g
                   key={p.id}
@@ -430,6 +434,14 @@ export default function MatrixBox({
                   onMouseLeave={() => setHoverProductId?.(null)}
                   onMouseDown={e => handleMouseDown(e, p.id, mx, my)}
                 >
+                  {/* 이상 신호 링 */}
+                  {isAnomaly && (
+                    <>
+                      <circle cx={cx} cy={cy} r={r + 7} fill="none" stroke="#ef4444" strokeWidth={1.8} strokeDasharray="3 2" />
+                      <text x={cx} y={cy - r - 10} textAnchor="middle" style={{ fontSize: "8px", fill: "#ef4444", fontWeight: 700, pointerEvents: "none" }}>이상 신호</text>
+                    </>
+                  )}
+
                   {/* hover halo */}
                   {isActive && (
                     <circle cx={cx} cy={cy} r={r + 6} fill={dotColor} fillOpacity="0.15" />

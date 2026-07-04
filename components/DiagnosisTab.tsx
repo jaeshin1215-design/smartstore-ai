@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
 import MatrixBox, { getProductColor, MEZZANINE_CONFIG, SELLFIT_CONFIG } from "./MatrixBox";
+import CustomerMatrix from "./CustomerMatrix";
 import PolicyFilter from "./PolicyFilter";
 import { DemoBadge } from "./DemoBadge";
 import {
@@ -70,6 +71,10 @@ export default function DiagnosisTab({
   
   // Hover sync state (matrix ↔ left list)
   const [hoverProductId, setHoverProductId] = useState<string | null>(null);
+
+  // 이상탐지
+  const [anomalyIds,    setAnomalyIds]    = useState<string[]>([]);
+  const [contamination, setContamination] = useState(0.05);
 
   // Matrix Option States (⚙️ Settings Dropdown)
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -189,6 +194,15 @@ export default function DiagnosisTab({
       setLoading(false);
     }
   }, [loadProducts]);
+
+  // 이상탐지: storeId·contamination·products 갱신 시 자동 재계산
+  useEffect(() => {
+    if (!storeId || products.length === 0) return;
+    fetch(`/api/anomaly?store_id=${storeId}&contamination=${contamination}`)
+      .then(r => r.json())
+      .then(d => setAnomalyIds(d.anomalyIds || []))
+      .catch(() => {});
+  }, [storeId, contamination, products.length]);
 
   // Click outside listener for settings dropdown
   useEffect(() => {
@@ -788,7 +802,7 @@ export default function DiagnosisTab({
                   { id: "scale",  label: "Scale dots",                 state: scaleDots,     setter: setScaleDots },
                   { id: "labels", label: "Idea labels",                state: showLabels,    setter: setShowLabels },
                   { id: "grid",   label: "Grid lines",                 state: showGrid,      setter: setShowGrid },
-                  { id: "part",   label: "Show partially prioriti...", state: showPartially, setter: setShowPartially }
+                  { id: "part",   label: "Show partially prioriti...", state: showPartially, setter: setShowPartially },
                 ].map((opt) => (
                   <div 
                     key={opt.id}
@@ -810,6 +824,22 @@ export default function DiagnosisTab({
                     {opt.state && <i className="ti ti-check" style={{ fontSize: "10px", color: "#ef567c" }}></i>}
                   </div>
                 ))}
+                {/* 이상탐지 민감도 슬라이더 */}
+                <div style={{ padding: "8px 16px", borderTop: "1px solid #f0f1f3" }}>
+                  <div style={{ fontSize: "11px", color: "#64676b", fontWeight: 500, marginBottom: "5px" }}>
+                    이상탐지 민감도 — {Math.round(contamination * 100)}%
+                  </div>
+                  <input
+                    type="range" min={1} max={20} step={1}
+                    value={Math.round(contamination * 100)}
+                    onChange={e => setContamination(parseInt(e.target.value) / 100)}
+                    style={{ width: "100%", accentColor: "#ef567c", cursor: "pointer" }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                  <div style={{ fontSize: "10px", color: "#a0a4ab", marginTop: "2px" }}>
+                    현재 상위 {Math.round(contamination * 100)}% 이상치 표시 중
+                  </div>
+                </div>
               </div>
             )}
             
@@ -1199,6 +1229,7 @@ export default function DiagnosisTab({
               hoverProductId={hoverProductId}
               setHoverProductId={setHoverProductId}
               config={matrixConfig}
+              anomalyIds={anomalyIds}
             />
           </div>
 
@@ -1696,6 +1727,20 @@ export default function DiagnosisTab({
           )}
         </div>
       </div>{/* /Matrix Card */}
+
+      {/* 고객 매트릭스 — 상품 매트릭스 바로 아래 */}
+      {mode === "sellfit" && storeId && (
+        <div style={{
+          background: "#ffffff",
+          border: "1px solid #e8eaed",
+          borderRadius: "8px",
+          padding: "20px 24px",
+          marginTop: "16px",
+        }}>
+          <CustomerMatrix storeId={storeId} />
+        </div>
+      )}
+
       </div>{/* /Right Column inner (maxWidth:1232px) */}
       </div>{/* /Right Column outer (flex:1) */}
     </div>
