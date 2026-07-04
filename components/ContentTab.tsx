@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import PolicyFilter from "@/components/PolicyFilter";
+import ImageEditTab from "@/components/ImageEditTab";
 
 const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
@@ -111,6 +112,7 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
   const [activeSection, setActiveSection] = useState("imageplan");
   const [copied, setCopied] = useState<string | null>(null);
   const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
+  const [mainView, setMainView] = useState<"content" | "imageedit">("content");
 
   const payload = () => ({ productName, category, features, targetCustomer, price, uniquePoint });
 
@@ -235,10 +237,32 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
             </div>
           );
         })}
+
+        <div style={{ borderTop: "1px solid #e5e7eb", margin: "10px 0 10px" }} />
+
+        {/* 수시 도구 */}
+        <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", marginBottom: "6px" }}>수시 도구</p>
+        {[{ label: "이미지 편집", id: "imageedit" }].map((f) => {
+          const isActive = mainView === f.id;
+          return (
+            <div key={f.id}
+              onClick={() => setMainView(mainView === f.id ? "content" : "imageedit" as "content" | "imageedit")}
+              style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: "pointer", borderRadius: 6, padding: "4px 6px", background: isActive ? "#fff3f6" : "transparent" }}>
+              <span style={{ fontSize: "10px", color: isActive ? "#ef567c" : "#c0c4cc", flexShrink: 0 }}>✓</span>
+              <span style={{ fontSize: "13px", color: isActive ? "#ef567c" : "#8f9399", fontWeight: isActive ? 700 : 400 }}>{f.label}</span>
+            </div>
+          );
+        })}
       </div>
 
       {/* 메인 콘텐츠 */}
       <div style={{ flex: 1, minWidth: 0 }}>
+
+        {/* 이미지 편집 뷰 */}
+        {mainView === "imageedit" && <ImageEditTab />}
+
+        {/* 콘텐츠 생성 뷰 */}
+        {mainView === "content" && (
         <div style={{ maxWidth: "840px", margin: "0 auto", paddingBottom: "80px" }}>
 
           {/* 헤더 */}
@@ -827,6 +851,7 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
           )}
 
         </div>
+        )}
       </div>
     </div>
   );
