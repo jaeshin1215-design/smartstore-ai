@@ -1045,6 +1045,7 @@ export default function DiagnosisTab({
             {mode === "sellfit" && storeId && (
               <button
                 onClick={async (e) => {
+                  if (!window.confirm("정말 초기화하시겠습니까?")) return;
                   const btn = e.currentTarget;
                   btn.disabled = true;
                   btn.textContent = "⏳...";

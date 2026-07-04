@@ -139,8 +139,8 @@ export default function MatrixBox({
       setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
       return;
     }
-    const xs = list.map(p => p.rawX || 0);
-    const ys = list.map(p => p.rawY || 0);
+    const xs = list.map(p => p.matrix_x ?? 50);
+    const ys = list.map(p => p.matrix_y ?? 50);
     const minX = Math.min(...xs, 0);
     const maxX = Math.max(...xs, 100);
     const minY = Math.min(...ys, 0);
