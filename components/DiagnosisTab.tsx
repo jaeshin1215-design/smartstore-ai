@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import * as XLSX from "xlsx";
 import MatrixBox, { getProductColor, MEZZANINE_CONFIG, SELLFIT_CONFIG } from "./MatrixBox";
 import PolicyFilter from "./PolicyFilter";
 import { DemoBadge } from "./DemoBadge";
@@ -94,6 +95,20 @@ export default function DiagnosisTab({
   const [offerLoading, setOfferLoading] = useState(false);
   const [offerErrors, setOfferErrors] = useState<Record<string, string>>({});
 
+  // 판매량 연결 (X축 업데이트)
+  const [salesPanelOpen, setSalesPanelOpen] = useState(false);
+  const salesFileRef = useRef<HTMLInputElement>(null);
+  const [salesRows, setSalesRows] = useState<Record<string, unknown>[]>([]);
+  const [salesCols, setSalesCols] = useState<string[]>([]);
+  const [colName, setColName] = useState("");
+  const [colQty, setColQty] = useState("");
+  const [colDate, setColDate] = useState("");
+  const [salesPreview, setSalesPreview] = useState<{ id: string; name: string; qty: number; score: number }[]>([]);
+  const [applyingSales, setApplyingSales] = useState(false);
+  // 스냅샷
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
+  const [snapshotDone, setSnapshotDone] = useState(false);
+
   // Live matrix states (mezzanine mode only)
   const [isLive, setIsLive] = useState(false);
   const [liveLoading, setLiveLoading] = useState(false);
@@ -141,12 +156,17 @@ export default function DiagnosisTab({
       const raw: Product[] = json.products || [];
       // ⑤ purchase_price 기반 matrix_y 실시간 계산 (Y축=마진율%, 상품별 독립 — min/max 정규화 없음)
       const list = raw.map(p => {
-        // matrix_y가 0이거나 없으면 purchase_price로 재계산 (0점 버그 방지)
-        if (p.price > 0 && p.purchase_price > 0 && !p.matrix_y) {
-          const marginY = Math.round(((p.price - p.purchase_price) / p.price) * 100);
-          return { ...p, matrix_y: Math.max(1, Math.min(100, marginY)) };
+        let updated = { ...p };
+        // matrix_y fallback: purchase_price 기반 재계산
+        if (updated.price > 0 && updated.purchase_price > 0 && !updated.matrix_y) {
+          const marginY = Math.round(((updated.price - updated.purchase_price) / updated.price) * 100);
+          updated = { ...updated, matrix_y: Math.max(1, Math.min(100, marginY)) };
         }
-        return p;
+        // matrix_x fallback: null/undefined/0 → 50 중앙값
+        if (!updated.matrix_x) {
+          updated = { ...updated, matrix_x: 50 };
+        }
+        return updated;
       });
       setProducts(list);
 
@@ -410,6 +430,104 @@ export default function DiagnosisTab({
     if (p.is_own === 1) return { label: "Planned", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" };
     if (p.is_own === 2) return { label: "Under consideration", bg: "#fdf2f8", border: "#f5d0e4", text: "#9d174d" };
     return { label: "In Development", bg: "#f5f3ff", border: "#ddd6fe", text: "#6d28d9" };
+  };
+
+  // 사분면 액션 문구 (규칙 기반)
+  const getQuadrantAction = (p: Product) => {
+    const mx = p.matrix_x ?? 50;
+    const my = p.matrix_y ?? 50;
+    if (mx >= 50 && my >= 50) return "확대 — 채널 추가 등록·광고비 증액 검토";
+    if (mx < 50  && my >= 50) return "개선 — 썸네일·키워드 최적화로 판매량 부스팅";
+    if (mx < 50  && my < 50)  return "드롭 — 관리 공수만 소모, 정리 검토";
+    return "단가조정 — 매입가 네고 또는 판매가 인상 검토";
+  };
+
+  // 판매량 연결: 파일 파싱
+  const handleSalesFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const buf = evt.target?.result;
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      setSalesRows(rows);
+      setSalesCols(rows.length > 0 ? Object.keys(rows[0]) : []);
+      setSalesPreview([]);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 판매량 연결: 미리보기 계산
+  const calcSalesPreview = () => {
+    if (!colName || !colQty || salesRows.length === 0) return;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const qtySums: Record<string, number> = {};
+    for (const row of salesRows) {
+      if (colDate) {
+        const d = new Date(String(row[colDate] ?? ""));
+        if (!isNaN(d.getTime()) && d < cutoff) continue;
+      }
+      const rawName = String(row[colName] ?? "").trim();
+      const qty = Number(row[colQty]) || 0;
+      if (rawName && qty > 0) qtySums[rawName] = (qtySums[rawName] ?? 0) + qty;
+    }
+    const ownProducts = products.filter(p => p.is_own === 1);
+    const matched = ownProducts.map(p => {
+      const key = Object.keys(qtySums).find(k => k.includes(p.name) || p.name.includes(k)) ?? "";
+      return { id: p.id, name: p.name, qty: key ? qtySums[key] : 0 };
+    });
+    const maxQty = Math.max(...matched.map(m => m.qty), 1);
+    setSalesPreview(matched.map(m => ({ ...m, score: Math.round((m.qty / maxQty) * 100) })));
+  };
+
+  // 판매량 연결: matrix_x 적용
+  const handleApplySales = async () => {
+    setApplyingSales(true);
+    for (const p of salesPreview) {
+      await handleUpdateProduct(p.id, { matrix_x: p.score > 0 ? p.score : 10 });
+    }
+    setApplyingSales(false);
+    setSalesPanelOpen(false);
+    setSalesRows([]);
+    setSalesCols([]);
+    setSalesPreview([]);
+    setColName(""); setColQty(""); setColDate("");
+    if (storeId) loadProducts(storeId);
+  };
+
+  // 스냅샷 저장
+  const handleSaveSnapshot = async () => {
+    if (!storeId || savingSnapshot) return;
+    setSavingSnapshot(true);
+    const today = new Date().toISOString().slice(0, 10);
+    await fetch("/api/matrix-snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        store_id: storeId,
+        date: today,
+        items: products.filter(p => p.is_own === 1).map(p => ({
+          product_id: p.id,
+          product_name: p.name,
+          matrix_x: p.matrix_x ?? 50,
+          matrix_y: p.matrix_y ?? 50,
+          quadrant: (() => {
+            const mx = p.matrix_x ?? 50; const my = p.matrix_y ?? 50;
+            if (mx >= 50 && my >= 50) return "expand";
+            if (mx < 50  && my >= 50) return "improve";
+            if (mx < 50  && my < 50)  return "drop";
+            return "reprice";
+          })(),
+          predicted_action: getQuadrantAction(p),
+        })),
+      }),
+    });
+    setSavingSnapshot(false);
+    setSnapshotDone(true);
+    setTimeout(() => setSnapshotDone(false), 3000);
   };
 
   const getProductQuadrant = (p: Product) => {
@@ -887,6 +1005,43 @@ export default function DiagnosisTab({
               )
             )}
 
+            {/* 판매량 업데이트 버튼 (sellfit 전용) */}
+            {mode === "sellfit" && storeId && (
+              <button
+                onClick={() => setSalesPanelOpen(v => !v)}
+                style={{
+                  background: salesPanelOpen ? "#f0fdf4" : "#ffffff",
+                  border: `1px solid ${salesPanelOpen ? "#86efac" : "#dededi"}`,
+                  borderRadius: "5px", padding: "5px 10px",
+                  fontSize: "11px", color: salesPanelOpen ? "#166534" : "#64676b",
+                  fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: "4px",
+                }}
+              >
+                <i className="ti ti-chart-bar" style={{ fontSize: "11px" }} />
+                판매량 연결
+              </button>
+            )}
+
+            {/* 스냅샷 저장 버튼 (sellfit 전용) */}
+            {mode === "sellfit" && storeId && (
+              <button
+                onClick={handleSaveSnapshot}
+                disabled={savingSnapshot}
+                style={{
+                  background: snapshotDone ? "#f0fdf4" : "#ffffff",
+                  border: `1px solid ${snapshotDone ? "#86efac" : "#dededi"}`,
+                  borderRadius: "5px", padding: "5px 10px",
+                  fontSize: "11px", color: snapshotDone ? "#166534" : "#64676b",
+                  fontWeight: 500, cursor: savingSnapshot ? "not-allowed" : "pointer",
+                  fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px",
+                }}
+              >
+                <i className="ti ti-camera" style={{ fontSize: "11px" }} />
+                {savingSnapshot ? "저장 중…" : snapshotDone ? "저장됨 ✓" : "스냅샷 저장"}
+              </button>
+            )}
+
             {mode === "sellfit" && storeId && (
               <button
                 onClick={async (e) => {
@@ -940,6 +1095,78 @@ export default function DiagnosisTab({
             </button>
           </div>
         </div>
+
+        {/* 판매량 연결 패널 */}
+        {salesPanelOpen && mode === "sellfit" && (
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f2a1e", marginBottom: 10 }}>
+              정산파일로 수요축(X) 업데이트
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div>
+                <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>파일 선택 (xlsx/xls/csv)</div>
+                <input
+                  ref={salesFileRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleSalesFile}
+                  style={{ fontSize: 12 }}
+                />
+              </div>
+              {salesCols.length > 0 && (
+                <>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>상품명 컬럼 *</div>
+                    <select value={colName} onChange={e => setColName(e.target.value)} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5, border: "1px solid #e0ede9" }}>
+                      <option value="">선택</option>
+                      {salesCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>수량 컬럼 *</div>
+                    <select value={colQty} onChange={e => setColQty(e.target.value)} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5, border: "1px solid #e0ede9" }}>
+                      <option value="">선택</option>
+                      {salesCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>날짜 컬럼 (최근 30일 필터, 선택)</div>
+                    <select value={colDate} onChange={e => setColDate(e.target.value)} style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5, border: "1px solid #e0ede9" }}>
+                      <option value="">전체 기간</option>
+                      {salesCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    onClick={calcSalesPreview}
+                    disabled={!colName || !colQty}
+                    style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#0f2a1e", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    미리보기
+                  </button>
+                </>
+              )}
+            </div>
+            {salesPreview.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>매핑 결과 — 자사 상품만 적용됩니다</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  {salesPreview.map(p => (
+                    <span key={p.id} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: p.qty > 0 ? "#f0fdf4" : "#f9fafb", border: `1px solid ${p.qty > 0 ? "#86efac" : "#e5e7eb"}`, color: p.qty > 0 ? "#166534" : "#9ca3af" }}>
+                      {p.name} → {p.qty}건 → X:{p.score}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  onClick={handleApplySales}
+                  disabled={applyingSales}
+                  style={{ padding: "7px 16px", borderRadius: 6, border: "none", background: "#ef567c", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                >
+                  {applyingSales ? "적용 중…" : "matrix_x 업데이트 →"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Main Work Area (Matrix Grid or Slide-in Drawer) */}
         <div style={{
@@ -1162,7 +1389,7 @@ export default function DiagnosisTab({
                         {getProductQuadrant(selectedProduct).label}
                       </span>
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
-                        {mode === "mezzanine" ? "공간 적합도" : "수요"} {selectedProduct.matrix_x ?? 50}
+                        {mode === "mezzanine" ? "공간 적합도" : "판매량(최근 30일)"} {selectedProduct.matrix_x ?? 50}
                       </span>
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
                         {mode === "mezzanine" ? "집객력" : "마진율"} {selectedProduct.matrix_y ?? 50}
@@ -1181,8 +1408,8 @@ export default function DiagnosisTab({
                               : `${getProductQuadrant(selectedProduct).label} 영역. 엔진이 다녀간 행사 이력을 읽고 뽑은 후보. 미접촉 상태 — 파일럿 기간에 컨택·검증 예정.`;
                           })()
                         : (selectedProduct.is_own === 1
-                          ? `현재 ${getProductQuadrant(selectedProduct).label} 영역. 마진율을 방어하며 검색지수가 급상승하도록 SEO 최적화를 즉각 수행하세요.`
-                          : `현재 ${getProductQuadrant(selectedProduct).label} 영역. 경쟁 키워드 입찰 한계선(CPC 350원 상한)을 고려하여 광고 효율을 모니터링하세요.`)}
+                          ? `${getProductQuadrant(selectedProduct).label} — ${getQuadrantAction(selectedProduct)}`
+                          : `${getProductQuadrant(selectedProduct).label} 영역 (경쟁사). 경쟁 키워드 입찰 한계선(CPC 350원 상한)을 고려하여 광고 효율을 모니터링하세요.`)}
                     </p>
                     {/* Attribute chips */}
                     {mode !== "mezzanine" && (

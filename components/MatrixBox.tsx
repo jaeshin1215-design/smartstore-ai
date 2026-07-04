@@ -57,7 +57,7 @@ export interface MatrixConfig {
 }
 
 export const SELLFIT_CONFIG: MatrixConfig = {
-  axisX: "수요(검색지수)",
+  axisX: "판매량(최근 30일)",
   axisY: "마진율",
   quadrants: {
     topLeft:     "Quick Wins",
@@ -473,7 +473,7 @@ export default function MatrixBox({
                       </text>
                       <text x={cx} y={cy - 24} textAnchor="middle" fill={dotColor} fontSize="9" fontWeight="600"
                         style={{ pointerEvents:"none", userSelect:"none", fontFamily:"'Pretendard', sans-serif" }}>
-                        마진 {my} · 수요 {mx}
+                        마진 {my} · 판매량 {mx}
                       </text>
                     </g>
                   )}

@@ -42,5 +42,51 @@ export async function POST() {
   // v5 — stores: PIN 코드 (6자리, 기기 간 스토어 공유)
   await runSafe("ALTER TABLE sellfit_stores ADD COLUMN pin TEXT");
 
+  // v6 — DB 훅 3개 (소급 불가 데이터 기반)
+  // 훅 1: daily_metrics에 product_id 는 이미 존재, daily_reports에 product_id 연결용 컬럼 추가
+  await runSafe("ALTER TABLE sellfit_daily_reports ADD COLUMN product_id TEXT");
+
+  // 훅 2: 고객 구매 이력 테이블 (K-Means 고객세분화 기반)
+  await runSafe(`CREATE TABLE IF NOT EXISTS sellfit_customer_orders (
+    id TEXT PRIMARY KEY,
+    store_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL,
+    product_id TEXT,
+    product_name TEXT,
+    order_no TEXT,
+    channel TEXT,
+    quantity INTEGER DEFAULT 1,
+    amount INTEGER,
+    order_date TEXT,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+
+  // 훅 3: 가격·광고비·프로모션 변경 이력 (다이내믹프라이싱 학습 기반)
+  await runSafe(`CREATE TABLE IF NOT EXISTS sellfit_events (
+    id TEXT PRIMARY KEY,
+    store_id TEXT NOT NULL,
+    product_id TEXT,
+    event_type TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    note TEXT,
+    event_date TEXT,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+
+  // v7 — 매트릭스 스냅샷 (2개월·7개월 예측 정확도 검증용)
+  await runSafe(`CREATE TABLE IF NOT EXISTS sellfit_matrix_snapshots (
+    id TEXT PRIMARY KEY,
+    store_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    product_name TEXT,
+    quadrant TEXT,
+    predicted_action TEXT,
+    matrix_x REAL,
+    matrix_y REAL,
+    snapshot_date TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`);
+
   return NextResponse.json({ ok: true, message: "마이그레이션 완료" });
 }
