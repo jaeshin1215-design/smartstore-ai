@@ -72,6 +72,11 @@ export default function StoreSetupTab() {
   const [storeName, setStoreName] = useState("");
   const [storeEmail, setStoreEmail] = useState("");
   const [storeKakao, setStoreKakao] = useState("");
+  // PIN 코드
+  const [newPin, setNewPin] = useState<string | null>(null); // 등록 직후 1회 표시
+  const [pinInput, setPinInput] = useState("");
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   // 상품 등록 폼
   const [pName, setPName] = useState("");
@@ -156,9 +161,28 @@ export default function StoreSetupTab() {
       const s = { id: data.id, name: storeName, email: storeEmail, kakao: storeKakao };
       localStorage.setItem(STORE_KEY, data.id);
       localStorage.setItem(STORE_INFO_KEY, JSON.stringify(s));
+      setNewPin(data.pin);
       setStore(s);
     } catch (e) { console.error(e); }
     setLoading(false);
+  }
+
+  async function handleLoadByPin() {
+    const code = pinInput.trim();
+    if (code.length !== 6) { setPinError("6자리 코드를 입력해주세요."); return; }
+    setPinLoading(true);
+    setPinError(null);
+    try {
+      const res = await fetch(`/api/stores?pin=${code}`);
+      const data = await res.json();
+      if (!data.store) { setPinError("코드가 맞지 않습니다."); setPinLoading(false); return; }
+      const s = { id: data.store.id, name: data.store.name, email: data.store.email, kakao: data.store.kakao };
+      localStorage.setItem(STORE_KEY, s.id);
+      localStorage.setItem(STORE_INFO_KEY, JSON.stringify(s));
+      setStore(s);
+      await loadProducts(s.id);
+    } catch (e) { console.error(e); setPinError("오류가 발생했습니다."); }
+    setPinLoading(false);
   }
 
   async function handleAddProduct() {
@@ -285,39 +309,97 @@ export default function StoreSetupTab() {
 
       {/* 스토어 미등록 */}
       {!store && (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "28px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 20 }}>
-            스토어 등록 (1회만)
-          </div>
-          <div style={{ display: "grid", gap: 14 }}>
-            <div>
-              <span style={S.label}>스토어 이름 *</span>
-              <input style={S.input} placeholder="예) 이지스토리"
-                value={storeName} onChange={e => setStoreName(e.target.value)} />
+        <div style={{ display: "grid", gap: 16 }}>
+          {/* 코드로 불러오기 */}
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "22px 28px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 14 }}>
+              기존 스토어 불러오기
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <span style={S.label}>이메일 (리포트 수신용)</span>
-                <input style={S.input} placeholder="예) idaseul@easystory.kr"
-                  value={storeEmail} onChange={e => setStoreEmail(e.target.value)} />
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <input
+                  style={{ ...S.input, letterSpacing: "0.15em", fontWeight: 600 }}
+                  placeholder="6자리 스토어 코드"
+                  maxLength={6}
+                  value={pinInput}
+                  onChange={e => { setPinInput(e.target.value.replace(/\D/g, "")); setPinError(null); }}
+                  onKeyDown={e => e.key === "Enter" && handleLoadByPin()}
+                />
+                {pinError && <p style={{ fontSize: 12, color: "#ef567c", margin: "6px 0 0" }}>{pinError}</p>}
               </div>
-              <div>
-                <span style={S.label}>카카오 전화번호 (알림용)</span>
-                <input style={S.input} placeholder="예) 01012345678"
-                  value={storeKakao} onChange={e => setStoreKakao(e.target.value)} />
-              </div>
+              <button
+                onClick={handleLoadByPin}
+                disabled={pinLoading}
+                style={{
+                  padding: "10px 20px", borderRadius: 8, border: "none",
+                  background: "#0f2a1e", color: "#fff", fontSize: 13,
+                  fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                {pinLoading ? "확인 중…" : "불러오기 →"}
+              </button>
             </div>
-            <button
-              onClick={handleRegisterStore}
-              style={{
-                padding: "12px", borderRadius: 8, border: "none",
-              background: "#ef567c", color: "#fff", fontSize: 14,
-                fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              등록하기 →
-            </button>
           </div>
+
+          {/* 신규 등록 */}
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "22px 28px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 20 }}>
+              스토어 신규 등록
+            </div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <div>
+                <span style={S.label}>스토어 이름 *</span>
+                <input style={S.input} placeholder="예) 이지스토리"
+                  value={storeName} onChange={e => setStoreName(e.target.value)} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <span style={S.label}>이메일 (리포트 수신용)</span>
+                  <input style={S.input} placeholder="예) idaseul@easystory.kr"
+                    value={storeEmail} onChange={e => setStoreEmail(e.target.value)} />
+                </div>
+                <div>
+                  <span style={S.label}>카카오 전화번호 (알림용)</span>
+                  <input style={S.input} placeholder="예) 01012345678"
+                    value={storeKakao} onChange={e => setStoreKakao(e.target.value)} />
+                </div>
+              </div>
+              <button
+                onClick={handleRegisterStore}
+                style={{
+                  padding: "12px", borderRadius: 8, border: "none",
+                  background: "#ef567c", color: "#fff", fontSize: 14,
+                  fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                등록하기 →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 등록 직후 PIN 코드 1회 표시 */}
+      {store && newPin && (
+        <div style={{
+          background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 12,
+          padding: "20px 24px", display: "flex", flexDirection: "column", gap: 8,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>스토어 코드 발급 완료</div>
+          <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "0.25em", color: "#0f2a1e" }}>{newPin}</div>
+          <div style={{ fontSize: 12, color: "#166534" }}>
+            이 코드로 언제든 다른 기기에서 스토어를 불러올 수 있습니다. 카카오 메모 등에 저장해두세요.
+          </div>
+          <button
+            onClick={() => setNewPin(null)}
+            style={{
+              alignSelf: "flex-start", marginTop: 4, padding: "6px 14px",
+              borderRadius: 6, border: "1px solid #86efac", background: "#fff",
+              fontSize: 12, color: "#166534", cursor: "pointer",
+            }}
+          >
+            확인했습니다
+          </button>
         </div>
       )}
 

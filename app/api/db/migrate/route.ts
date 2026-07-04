@@ -39,5 +39,8 @@ export async function POST() {
   await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN winner_target_price INTEGER");
   await runSafe("ALTER TABLE sellfit_competitor_tracking ADD COLUMN judgment_reason TEXT");
 
+  // v5 — stores: PIN 코드 (6자리, 기기 간 스토어 공유)
+  await runSafe("ALTER TABLE sellfit_stores ADD COLUMN pin TEXT");
+
   return NextResponse.json({ ok: true, message: "마이그레이션 완료" });
 }
