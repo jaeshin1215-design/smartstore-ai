@@ -21,7 +21,7 @@ const MONTHS   = ["1월 (JAN)","2월 (FEB)","3월 (MAR)","4월 (APR)","5월 (MAY
 type CandidateStatus = "신규" | "검토" | "실증" | "보류";
 interface Candidate { no: string; name: string; category: string; thumb?: string; sell_price: number; margin_pct: number; status: CandidateStatus; keyword: string; }
 interface ScoreAxis { score: number; label: string; evidence: string; }
-interface ScoreResult { seasonality: ScoreAxis; margin: ScoreAxis; competition: ScoreAxis; channel: ScoreAxis; total: number; verdict: "통과"|"검토"|"보류"; reason: string; }
+interface ScoreResult { seasonality: ScoreAxis; margin: ScoreAxis; competition: ScoreAxis; channel: ScoreAxis; total: number; verdict: "적극 추천"|"검토 필요"|"보류 권장"; reason: string; }
 interface HotKeyword { keyword: string; growth: number; comment: string; }
 interface GridCard { id: string; name: string; category: string; status: "실증"|"검토"|"발굴 예정"; reason: string; keyword?: string; matrix_x?: number; matrix_y?: number; }
 
@@ -36,7 +36,7 @@ const STATUS_STYLE: Record<CandidateStatus, {bg:string;color:string}> = {
   실증: {bg:PINK.light,color:PINK.main}, 보류: {bg:"#EFEFF1",color:"#9ca3af"},
 };
 const VERDICT_STYLE: Record<ScoreResult["verdict"],{bg:string;color:string}> = {
-  통과: {bg:PINK.light,color:PINK.main}, 검토: {bg:PINK.light,color:PINK.mid}, 보류: {bg:"#EFEFF1",color:"#9ca3af"},
+  "적극 추천": {bg:PINK.light,color:PINK.main}, "검토 필요": {bg:PINK.light,color:PINK.mid}, "보류 권장": {bg:"#EFEFF1",color:"#9ca3af"},
 };
 const GRID_STATUS_STYLE: Record<"실증"|"검토"|"발굴 예정",{bg:string;color:string}> = {
   실증: {bg:PINK.light,color:PINK.main}, 검토: {bg:PINK.light,color:PINK.mid},
@@ -62,6 +62,21 @@ const CHANNEL_RULES: Array<{re:RegExp;score:number;reason:string}> = [
 function getChannelScore(kw: string): ScoreAxis {
   for (const r of CHANNEL_RULES) if (r.re.test(kw)) return { score:r.score, label:r.score>=75?"우수":r.score>=55?"보통":"주의", evidence:r.reason };
   return { score:50, label:"미분류", evidence:"일반 카테고리 — 추가 검증 필요" };
+}
+
+// 채널적합 하이브리드: regex 우선 → 미스 시 LLM 폴백 + 세션 캐시
+const _channelCache = new Map<string, ScoreAxis>();
+async function getChannelScoreHybrid(kw: string): Promise<ScoreAxis> {
+  if (_channelCache.has(kw)) return _channelCache.get(kw)!;
+  const sync = getChannelScore(kw);
+  if (sync.evidence !== "일반 카테고리 — 추가 검증 필요") { _channelCache.set(kw, sync); return sync; }
+  try {
+    const res = await fetch("/api/channel-score", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({keyword:kw}) });
+    const d = await res.json() as {score:number;label:string;evidence:string};
+    const result:ScoreAxis = {score:d.score, label:d.label, evidence:d.evidence+" (AI 분류)"};
+    _channelCache.set(kw, result);
+    return result;
+  } catch { return sync; }
 }
 
 async function fetchSeasonality(keyword: string): Promise<ScoreAxis> {
@@ -118,7 +133,7 @@ async function fetchCompetition(keyword:string):Promise<ScoreAxis> {
 function buildVerdict(a:Pick<ScoreResult,"seasonality"|"margin"|"competition"|"channel">,track:"steady"|"season"="steady") {
   const w=track==="season"?{seasonality:0.35,margin:0.30,competition:0.25,channel:0.10}:{seasonality:0.10,margin:0.25,competition:0.30,channel:0.35};
   const total=Math.round(a.seasonality.score*w.seasonality+a.margin.score*w.margin+a.competition.score*w.competition+a.channel.score*w.channel);
-  return {total,verdict:(total>=68?"통과":total>=45?"검토":"보류") as ScoreResult["verdict"],reason:`${a.margin.evidence} · ${a.competition.evidence} · ${a.seasonality.evidence}`};
+  return {total,verdict:(total>=68?"적극 추천":total>=45?"검토 필요":"보류 권장") as ScoreResult["verdict"],reason:`${a.margin.evidence} · ${a.competition.evidence} · ${a.seasonality.evidence}`};
 }
 function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
   const o=track==="season"
@@ -152,6 +167,8 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [regMonth,setRegMonth]=useState(MONTHS[0]);
   const [regStatus,setRegStatus]=useState<"실증"|"검토">("실증");
   const [regDone,setRegDone]=useState(false);
+  const [adviceText,setAdviceText]=useState("");
+  const [generatingAdvice,setGeneratingAdvice]=useState(false);
 
   const inputRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{setCandidateScores({});setScoring(null);},[track]);
@@ -193,17 +210,23 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
 
   const scoreCandidate=useCallback(async(c:Candidate)=>{
     setSelected(c);setScoring(null);setScoreLoading(true);setShowRegForm(false);
+    setAdviceText("");setGeneratingAdvice(false);
     try{
-      const[detailRes,seasonality,competition]=await Promise.all([
+      const[detailRes,seasonality,competition,channel]=await Promise.all([
         fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"detail",no:c.no,searchKeyword:c.keyword})}).then(r=>r.json()) as Promise<{item?:{margin_pct:number;sell_price:number;margin_source?:MarginSource}}>,
         fetchSeasonality(c.keyword),fetchCompetition(c.keyword),
+        getChannelScoreHybrid(c.name+" "+c.keyword),
       ]);
       const ap=detailRes.item?.margin_pct??c.margin_pct,as_=detailRes.item?.margin_source??"unknown";
       if(detailRes.item&&ap!==c.margin_pct){setCandidates(prev=>prev.map(p=>p.no===c.no?{...p,margin_pct:ap,sell_price:detailRes.item!.sell_price}:p));setSelected(prev=>prev?{...prev,margin_pct:ap}:prev);}
-      const margin=marginAxis(ap,as_ as MarginSource),channel=getChannelScore(c.name+" "+c.keyword);
+      const margin=marginAxis(ap,as_ as MarginSource);
       const{total,verdict,reason}=buildVerdict({seasonality,margin,competition,channel},track);
       const result:ScoreResult={seasonality,margin,competition,channel,total,verdict,reason};
       setScoring(result);setCandidateScores(prev=>({...prev,[c.no]:result}));
+      // LLM 해설 자동 호출
+      setGeneratingAdvice(true);
+      fetch("/api/discover-advice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({verdict,total,reason,keyword:c.keyword})})
+        .then(r=>r.text()).then(t=>{if(t.trim())setAdviceText(t.trim());}).catch(()=>{}).finally(()=>setGeneratingAdvice(false));
     }catch{setScoring(null);}finally{setScoreLoading(false);}
   },[track]);
 
@@ -432,6 +455,15 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                         </div>
                         <p style={{ fontSize:"12px", color:"#6b7280", margin:0, lineHeight:1.5 }}>{scoring.reason}</p>
                       </div>
+                      {/* AI 해설 레이어 */}
+                      {(generatingAdvice||adviceText)&&(
+                        <div style={{ marginTop:"12px", padding:"12px 14px", background:"#f9fafb", borderRadius:"8px", border:"1px solid #e5e7eb" }}>
+                          <p style={{ fontSize:"11px", fontWeight:700, color:"#6b7280", margin:"0 0 6px", letterSpacing:"0.05em" }}>AI 코멘트</p>
+                          {generatingAdvice&&!adviceText
+                            ?<div style={{ display:"flex", alignItems:"center", gap:"6px" }}><span style={{ width:"10px",height:"10px",border:"2px solid #e5e7eb",borderTopColor:"#ef567c",borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite" }}/><span style={{ fontSize:"12px",color:"#9ca3af" }}>분석 중...</span></div>
+                            :<p style={{ fontSize:"13px", color:"#374151", margin:0, lineHeight:1.7 }}>{adviceText}</p>}
+                        </div>
+                      )}
                       {!showRegForm&&(
                         <div style={{ display:"flex", gap:"8px", marginTop:"16px" }}>
                           <button onClick={()=>openRegForm("실증")} style={{ flex:1, height:"36px", background:PINK.main, color:"#fff", border:"none", borderRadius:"8px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>채널 확정 ✓</button>

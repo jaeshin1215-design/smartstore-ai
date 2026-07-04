@@ -54,4 +54,17 @@ export async function initDB() {
       created_at INTEGER DEFAULT (unixepoch())
     );
   `);
+
+  // 컬럼 추가 마이그레이션 — 이미 있으면 무시
+  const migrations = [
+    "ALTER TABLE sellfit_products ADD COLUMN purchase_price INTEGER",
+    "ALTER TABLE sellfit_products ADD COLUMN shipping_cost INTEGER",
+    "ALTER TABLE sellfit_products ADD COLUMN stock INTEGER",
+    "ALTER TABLE sellfit_products ADD COLUMN matrix_x REAL",
+    "ALTER TABLE sellfit_products ADD COLUMN matrix_y REAL",
+    "ALTER TABLE sellfit_products ADD COLUMN is_price_confirmed INTEGER DEFAULT 0",
+  ];
+  for (const sql of migrations) {
+    try { await db.execute(sql); } catch { /* 이미 존재 */ }
+  }
 }

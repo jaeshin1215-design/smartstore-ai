@@ -13,6 +13,7 @@ interface Product {
   price: number;
   purchase_price: number;
   shipping_cost: number;
+  stock: number | null;
   is_own: number;
 }
 
@@ -80,6 +81,7 @@ export default function StoreSetupTab() {
   const [pUrl, setPUrl] = useState("");
   const [pPurchasePrice, setPPurchasePrice] = useState("");
   const [pShippingCost, setPShippingCost] = useState("");
+  const [pStock, setPStock] = useState("");
   const [pIsOwn, setPIsOwn] = useState(1); // 1=자사, 0=경쟁사, 2=소싱·위탁후보
   const [addingProduct, setAddingProduct] = useState(false);
   const [collecting, setCollecting] = useState(false);
@@ -170,12 +172,12 @@ export default function StoreSetupTab() {
           store_id: store.id, name: pName, url: pUrl,
           keyword: pKeyword, category: pCategory,
           price: pPrice, purchase_price: pPurchasePrice,
-          shipping_cost: pShippingCost, is_own: pIsOwn,
+          shipping_cost: pShippingCost, stock: pStock, is_own: pIsOwn,
         }),
       });
       await loadProducts(store.id);
       setPName(""); setPKeyword(""); setPPrice(""); setPPurchasePrice("");
-      setPShippingCost(""); setPUrl(""); setPCategory("압축팩"); setPIsOwn(1);
+      setPShippingCost(""); setPStock(""); setPUrl(""); setPCategory("압축팩"); setPIsOwn(1);
     } catch (e) { console.error(e); }
     setAddingProduct(false);
   }
@@ -737,7 +739,7 @@ export default function StoreSetupTab() {
                 </div>
               </div>
 
-              {/* 매입가 + 배송비 — 5/14 미팅 1순위: 상품 데이터 마스터 */}
+              {/* 매입가 + 배송비 */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <span style={S.label}>매입가 (원) *</span>
@@ -748,6 +750,18 @@ export default function StoreSetupTab() {
                   <span style={S.label}>배송비 (원)</span>
                   <input style={S.input} type="number" placeholder="예) 2500"
                     value={pShippingCost} onChange={e => setPShippingCost(e.target.value)} />
+                </div>
+              </div>
+
+              {/* 재고 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <span style={S.label}>현재 재고 (개)</span>
+                  <input style={S.input} type="number" placeholder="예) 50"
+                    value={pStock} onChange={e => setPStock(e.target.value)} />
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: "2px" }}>
+                  <span style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.5 }}>재고 0 + 광고비 집행 중이면 이상탐지 배지가 표시됩니다</span>
                 </div>
               </div>
 
@@ -776,6 +790,35 @@ export default function StoreSetupTab() {
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 16 }}>
                 등록된 상품 ({ownProducts.length}개 자사 · {compProducts.length}개 경쟁사 · {candidateProducts.length}개 소싱후보)
               </div>
+
+              {/* ⚠️ 이상탐지 배너 */}
+              {(() => {
+                const storeHasAdSpend = (yesterdaySales?.ad_cost ?? 0) > 0;
+                const flags: { name: string; reason: string }[] = [];
+                for (const p of ownProducts) {
+                  if (p.purchase_price && p.price && Number(p.purchase_price) > Number(p.price)) {
+                    flags.push({ name: p.name, reason: `원가(${Number(p.purchase_price).toLocaleString()}원) > 판매가(${Number(p.price).toLocaleString()}원) — 역마진` });
+                  }
+                  if (p.stock === 0 && storeHasAdSpend) {
+                    flags.push({ name: p.name, reason: `재고 0 + 광고비 집행 중(${Number(yesterdaySales!.ad_cost).toLocaleString()}원) — 광고 낭비 위험` });
+                  }
+                }
+                if (flags.length === 0) return null;
+                return (
+                  <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", marginBottom: 8 }}>
+                      ⚠️ 이상탐지 ({flags.length}건) — 즉시 확인 필요
+                    </div>
+                    {flags.map((f, i) => (
+                      <div key={i} style={{ fontSize: 12, color: "#b91c1c", padding: "4px 0", borderTop: i > 0 ? "1px solid #fecaca" : "none" }}>
+                        <span style={{ fontWeight: 600 }}>{f.name.length > 20 ? f.name.slice(0, 20) + "…" : f.name}</span>
+                        {" "}{f.reason}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <div style={{ maxHeight: "360px", overflowY: "auto", paddingRight: "4px" }}>
 
               {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }, { label: "소싱·위탁후보", list: candidateProducts }].map(group => (
@@ -796,6 +839,7 @@ export default function StoreSetupTab() {
                             {p.price ? ` · 판매가 ${Number(p.price).toLocaleString()}원` : ""}
                             {p.purchase_price ? ` · 매입가 ${Number(p.purchase_price).toLocaleString()}원` : ""}
                             {p.shipping_cost ? ` · 배송비 ${Number(p.shipping_cost).toLocaleString()}원` : ""}
+                            {p.stock != null ? ` · 재고 ${Number(p.stock)}개` : ""}
                           </span>
                         </div>
                         <button onClick={() => handleDeleteProduct(p.id)}

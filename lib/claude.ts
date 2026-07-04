@@ -54,6 +54,22 @@ export function createGeminiStream(prompt: string, maxTokens = 2000): ReadableSt
 
 import Anthropic from "@anthropic-ai/sdk";
 
+export async function callGemini(prompt: string, maxTokens = 500): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY!;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+}
+
 export async function callClaude(prompt: string, maxTokens = 2000): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
