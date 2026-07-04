@@ -281,7 +281,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
         <div style={{ width:"200px", flexShrink:0, background:"#F7F8FA", borderRadius:"8px", padding:"14px 12px", borderRight:"1px solid #e8eaed", alignSelf:"start", position:"sticky", top:"60px" }}>
           <p style={{ fontSize:"10px", fontWeight:500, textTransform:"uppercase", letterSpacing:"0.08em", color:"#9ca3af", marginBottom:"8px" }}>DISCOVER</p>
           <p style={{ fontSize:"14px", fontWeight:700, color:"#1a1a1a", lineHeight:1.4, marginBottom:"6px" }}>무엇을 팔지,<br/>먼저 찾는다</p>
-          <p style={{ fontSize:"13px", color:"#6b7280", marginBottom:"14px", lineHeight:1.5 }}>도매 발굴 → AI 4축 채점</p>
+          <p style={{ fontSize:"13px", color:"#6b7280", marginBottom:"14px", lineHeight:1.5 }}>도매 발굴 → 자동 4축 채점</p>
           {[
             `${track==="steady"?"① 채널적합":"① 시즌성"} (1순위)`,
             `${track==="steady"?"② 경쟁":"② 마진"}`,
