@@ -41,7 +41,7 @@ const S = {
 const STORE_KEY = "sellfit_store_id";
 const STORE_INFO_KEY = "sellfit_store_info";
 
-export default function StoreSetupTab() {
+export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: string) => void } = {}) {
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -181,6 +181,7 @@ export default function StoreSetupTab() {
       localStorage.setItem(STORE_INFO_KEY, JSON.stringify(s));
       setStore(s);
       await loadProducts(s.id);
+      onNavigate?.("diagnosis");
     } catch (e) { console.error(e); setPinError("오류가 발생했습니다."); }
     setPinLoading(false);
   }
