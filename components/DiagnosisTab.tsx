@@ -721,8 +721,8 @@ export default function DiagnosisTab({
       </div>
 
       {/* ── Right Column (Hero + Matrix Card) ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ maxWidth: "1232px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "16px", height: "100%" }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
+      <div style={{ maxWidth: "1232px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "16px" }}>
 
         {/* Hero */}
         <div style={{ paddingBottom: "20px", borderBottom: "1px solid #e8eaed" }}>
@@ -737,7 +737,7 @@ export default function DiagnosisTab({
 
         {/* Matrix Card */}
         <div style={{
-          flex: 1,
+          height: "520px",
           display: "flex",
           flexDirection: "column",
           background: "#ffffff",
