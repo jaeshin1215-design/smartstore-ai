@@ -5,12 +5,13 @@ export async function GET(req: NextRequest) {
   const store_id = req.nextUrl.searchParams.get("store_id");
   if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
 
-  // 고객별 집계: avg_order_value, order_count
+  // 고객별 집계: avg_order_value, order_count, order_nos
   const res = await db.execute({
     sql: `SELECT customer_id,
                  COUNT(DISTINCT order_no)           AS order_count,
                  CAST(SUM(amount) AS REAL) /
-                   COUNT(DISTINCT order_no)         AS avg_order_value
+                   COUNT(DISTINCT order_no)         AS avg_order_value,
+                 GROUP_CONCAT(DISTINCT order_no)    AS order_nos
           FROM   sellfit_customer_orders
           WHERE  store_id = ?
           GROUP  BY customer_id`,
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     customer_id:     String(r.customer_id),
     order_count:     Number(r.order_count),
     avg_order_value: Math.round(Number(r.avg_order_value)),
+    order_nos:       String(r.order_nos ?? "").split(",").filter(Boolean),
   }));
 
   // 중앙값 산출

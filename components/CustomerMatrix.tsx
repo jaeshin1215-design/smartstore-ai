@@ -6,6 +6,7 @@ interface CustomerPoint {
   customer_id: string;
   order_count: number;
   avg_order_value: number;
+  order_nos: string[];
 }
 
 interface ClusterInfo {
@@ -16,7 +17,6 @@ interface ClusterInfo {
 function kmeans(pts: [number, number][], k: number, iter = 120): { clusters: number[]; centroids: [number, number][] } {
   if (pts.length === 0) return { clusters: [], centroids: [] };
   const n = pts.length;
-  // 초기 centroid: 균등 간격
   let centroids: [number, number][] = Array.from({ length: k }, (_, i) => {
     const idx = Math.floor((i + 0.5) * n / k);
     return [...pts[idx]] as [number, number];
@@ -57,13 +57,12 @@ function elbowK(pts: [number, number][], maxK = 6): number {
     const { clusters, centroids } = kmeans(pts, k);
     ines.push(inertia(pts, clusters, centroids));
   }
-  // 이차 미분 최대점 = 엘보우
   let best = 0, bestVal = -Infinity;
   for (let i = 1; i < ines.length - 1; i++) {
     const d2 = ines[i - 1] - 2 * ines[i] + ines[i + 1];
     if (d2 > bestVal) { bestVal = d2; best = i; }
   }
-  return best + 2; // offset: K starts at 2
+  return best + 2;
 }
 
 // ── 색상 팔레트 ───────────────────────────────────────────
@@ -83,6 +82,8 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   const [sampleCount, setSampleCount] = useState(0);
   const [loading,     setLoading]     = useState(true);
   const [dims,        setDims]        = useState({ w: 640, h: 420 });
+  const [hoveredIdx,  setHoveredIdx]  = useState<number | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // 컨테이너 실제 크기 추적 → viewBox 동기화
@@ -127,10 +128,7 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   const PW = W - PL - PR, PH = H - PT - PB;
 
   const maxPrice = Math.max(...points.map(p => p.avg_order_value), medianPrice * 2);
-  const maxCount = Math.max(...points.map(p => p.order_count), 2);
 
-  // X: order_count 정규화 (0~1) 후 좌우 그룹에 배치
-  // 1회: [0.05, 0.45], 재구매: [0.55, 0.95]
   const hashJitter = (id: string, range: number) => {
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
@@ -150,7 +148,7 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
     };
   };
 
-  // K-Means 입력: 정규화된 [x, y]
+  // K-Means
   const kData: [number, number][] = points.map(p => {
     const xNorm = p.order_count > 1 ? 0.75 : 0.25;
     const yNorm = maxPrice > 0 ? p.avg_order_value / maxPrice : 0;
@@ -159,7 +157,7 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   const bestK = elbowK(kData, 6);
   const { clusters, centroids } = kmeans(kData, bestK);
 
-  // 클러스터 타원 계산 (표준편차 기반)
+  // 클러스터 타원
   const clusterEllipses: ClusterInfo[] = centroids.map(([kcx, kcy], ki) => {
     const members = kData.filter((_, i) => clusters[i] === ki);
     const stdX = members.length > 1
@@ -178,15 +176,101 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
     };
   });
 
-  // 4분면 구분선 SVG 좌표
-  const xSepSvg = PL + 0.5 * PW; // 1회 | 재구매 경계
+  const xSepSvg = PL + 0.5 * PW;
   const ySepSvg = PT + (1 - (maxPrice > 0 ? medianPrice / maxPrice : 0.5)) * PH;
 
-  // Y축 눈금 (3개)
   const yTicks = [0, medianPrice, maxPrice].map(v => ({
     y: PT + (1 - (maxPrice > 0 ? v / maxPrice : 0)) * PH,
     label: v >= 10000 ? `${Math.round(v / 1000)}k` : `${v}`,
   }));
+
+  // ── hover 툴팁 ────────────────────────────────────────────
+  const tooltip = hoveredIdx !== null && hoveredIdx !== selectedIdx ? (() => {
+    const p = points[hoveredIdx];
+    const { svgX, svgY } = toSvg(p);
+    const color = CLUSTER_COLORS[clusters[hoveredIdx] % CLUSTER_COLORS.length];
+    const TW = 148, TH = 64;
+    let tx = svgX + 12;
+    let ty = svgY - TH - 8;
+    if (tx + TW > W - PR) tx = svgX - TW - 12;
+    if (ty < PT) ty = svgY + 12;
+    return (
+      <g style={{ pointerEvents: "none" }}>
+        <rect x={tx} y={ty} width={TW} height={TH} rx={5}
+          fill="white" stroke="#e8eaed" strokeWidth={1}
+          filter="url(#cm-shadow)" />
+        <circle cx={tx + 13} cy={ty + 17} r={4} fill={color} />
+        <text x={tx + 23} y={ty + 17} dominantBaseline="middle"
+          style={{ fontSize: "11px", fill: "#0d0d0e", fontWeight: 700 }}>
+          그룹 {clusters[hoveredIdx] + 1}
+        </text>
+        <text x={tx + 10} y={ty + 35} dominantBaseline="middle"
+          style={{ fontSize: "10px", fill: "#4b5563" }}>
+          객단가 {p.avg_order_value.toLocaleString()}원
+        </text>
+        <text x={tx + 10} y={ty + 51} dominantBaseline="middle"
+          style={{ fontSize: "10px", fill: "#4b5563" }}>
+          구매 {p.order_count}회
+        </text>
+      </g>
+    );
+  })() : null;
+
+  // ── click 상세 패널 ───────────────────────────────────────
+  const detailPanel = selectedIdx !== null ? (() => {
+    const p = points[selectedIdx];
+    const color = CLUSTER_COLORS[clusters[selectedIdx] % CLUSTER_COLORS.length];
+    const DW = 196;
+    const visOrders = p.order_nos.slice(0, 8);
+    const hasMore = p.order_nos.length > 8;
+    const DH = 82 + visOrders.length * 18 + (hasMore ? 16 : 0);
+    const dx = W - PR - DW - 4;
+    const dy = PT + 4;
+    return (
+      <g>
+        <rect x={dx} y={dy} width={DW} height={DH} rx={7}
+          fill="white" stroke="#e8eaed" strokeWidth={1}
+          filter="url(#cm-shadow)" />
+        {/* 헤더 */}
+        <circle cx={dx + 14} cy={dy + 18} r={4} fill={color} />
+        <text x={dx + 24} y={dy + 18} dominantBaseline="middle"
+          style={{ fontSize: "11px", fill: "#0d0d0e", fontWeight: 700 }}>
+          그룹 {clusters[selectedIdx] + 1}
+        </text>
+        <text x={dx + DW - 14} y={dy + 18} dominantBaseline="middle" textAnchor="middle"
+          style={{ fontSize: "13px", fill: "#adb5bd", cursor: "pointer" }}
+          onClick={(e) => { e.stopPropagation(); setSelectedIdx(null); }}>
+          ✕
+        </text>
+        {/* 구분선 */}
+        <line x1={dx + 10} y1={dy + 32} x2={dx + DW - 10} y2={dy + 32}
+          stroke="#f0f2f5" strokeWidth={1} />
+        {/* 통계 */}
+        <text x={dx + 10} y={dy + 48} dominantBaseline="middle"
+          style={{ fontSize: "10px", fill: "#4b5563" }}>
+          구매 {p.order_count}회 · 객단가 {p.avg_order_value.toLocaleString()}원
+        </text>
+        {/* 주문번호 레이블 */}
+        <text x={dx + 10} y={dy + 64} dominantBaseline="middle"
+          style={{ fontSize: "9px", fill: "#8f9399", fontWeight: 600, letterSpacing: "0.06em" }}>
+          주문번호
+        </text>
+        {/* 주문번호 목록 */}
+        {visOrders.map((no, i) => (
+          <text key={no} x={dx + 10} y={dy + 80 + i * 18} dominantBaseline="middle"
+            style={{ fontSize: "10px", fill: "#1a1a1a", fontFamily: "'Courier New', monospace" }}>
+            {no}
+          </text>
+        ))}
+        {hasMore && (
+          <text x={dx + 10} y={dy + 80 + visOrders.length * 18} dominantBaseline="middle"
+            style={{ fontSize: "9px", fill: "#8f9399" }}>
+            +{p.order_nos.length - 8}개 더...
+          </text>
+        )}
+      </g>
+    );
+  })() : null;
 
   return (
     <div style={{ fontFamily: "'Pretendard', -apple-system, sans-serif", height: "100%", display: "flex", flexDirection: "column" }}>
@@ -196,9 +280,17 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
         <span style={{ fontSize: "11px", color: "#8f9399" }}>객단가 × 구매횟수 — 쿠폰 발송 기준</span>
       </div>
 
-      {/* SVG wrapper — flex: 1 로 남은 높이 채움, ref로 실제 크기 측정 */}
+      {/* SVG wrapper */}
       <div ref={containerRef} style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "100%", display: "block" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "100%", display: "block" }}
+        onClick={() => setSelectedIdx(null)}>
+
+        <defs>
+          <filter id="cm-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.10" />
+          </filter>
+        </defs>
+
         {/* 배경 4분면 */}
         {[
           { x: PL,       y: PT,       w: xSepSvg - PL, h: ySepSvg - PT, q: "high-one" },
@@ -209,7 +301,7 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
           <rect key={q} x={x} y={y} width={w} height={h} fill={QUADRANT_LABELS[q].color} />
         ))}
 
-        {/* 구분선 — 실선 */}
+        {/* 구분선 */}
         <line x1={xSepSvg} y1={PT} x2={xSepSvg} y2={H - PB} stroke="#c0c4cc" strokeWidth={1.2} />
         <line x1={PL} y1={ySepSvg} x2={W - PR} y2={ySepSvg} stroke="#c0c4cc" strokeWidth={1.2} />
 
@@ -226,24 +318,30 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
           </text>
         ))}
 
-        {/* K-Means 타원 — 점선 */}
+        {/* K-Means 타원 */}
         {clusterEllipses.map((e, ki) => (
           <ellipse key={ki} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry}
-            fill="none"
-            stroke={e.color}
-            strokeWidth={1.5}
-            strokeDasharray="5 3"
-            opacity={0.7}
+            fill="none" stroke={e.color} strokeWidth={1.5} strokeDasharray="5 3" opacity={0.7}
           />
         ))}
 
-        {/* 산점도 */}
+        {/* 산점도 — hover/click */}
         {points.map((p, i) => {
           const { svgX, svgY } = toSvg(p);
           const color = CLUSTER_COLORS[clusters[i] % CLUSTER_COLORS.length];
+          const isHov = hoveredIdx === i;
+          const isSel = selectedIdx === i;
           return (
-            <circle key={p.customer_id} cx={svgX} cy={svgY} r={4}
-              fill={color} fillOpacity={0.75} stroke={color} strokeWidth={0.5}
+            <circle key={p.customer_id} cx={svgX} cy={svgY}
+              r={isHov || isSel ? 6 : 4}
+              fill={color}
+              fillOpacity={isHov || isSel ? 1 : 0.75}
+              stroke={isSel ? "#1a1a1a" : color}
+              strokeWidth={isSel ? 2 : 0.5}
+              style={{ cursor: "pointer" }}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              onClick={(e) => { e.stopPropagation(); setSelectedIdx(prev => prev === i ? null : i); }}
             />
           );
         })}
@@ -275,6 +373,13 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
             <text x={PL + ki * 58 + 11} y={H - 7} style={{ fontSize: "10px", fill: "#8f9399" }}>그룹{ki + 1}</text>
           </g>
         ))}
+
+        {/* hover 툴팁 (최상단) */}
+        {tooltip}
+
+        {/* click 상세 패널 (최상단) */}
+        {detailPanel}
+
       </svg>
       </div>{/* /SVG wrapper */}
 
