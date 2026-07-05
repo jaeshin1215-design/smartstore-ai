@@ -82,7 +82,7 @@ async function getChannelScoreHybrid(kw: string): Promise<ScoreAxis> {
 async function fetchSeasonality(keyword: string): Promise<ScoreAxis> {
   try {
     const res = await fetch("/api/naver-trend", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({keyword}) });
-    if (!res.body) return {score:50,label:"데이터 없음",evidence:"DataLab 조회 실패"};
+    if (!res.body) return {score:50,label:"조회 실패",evidence:"DataLab 조회 실패"};
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
     while (true) {
       const {done,value} = await reader.read(); if (done) break;
@@ -95,7 +95,7 @@ async function fetchSeasonality(keyword: string): Promise<ScoreAxis> {
           if (evt.type==="naver" && evt.trend?.ratios?.length) {
             await reader.cancel();
             const r=evt.trend.ratios, n=r.length, mean=r.reduce((s,x)=>s+x,0)/n;
-            if (mean===0) return {score:50,label:"데이터 없음",evidence:"검색량 없음"};
+            if (mean===0) return {score:50,label:"검색량 없음",evidence:"검색량 없음"};
             const std=Math.sqrt(r.reduce((s,x)=>s+(x-mean)**2,0)/n), cv=std/mean;
             const r7=r.slice(-7),p7=r.slice(-14,-7);
             const rA=r7.reduce((s,x)=>s+x,0)/(r7.length||1), pA=p7.reduce((s,x)=>s+x,0)/(p7.length||1);
@@ -113,7 +113,7 @@ async function fetchSeasonality(keyword: string): Promise<ScoreAxis> {
       }
     }
   } catch {/**/}
-  return {score:50,label:"데이터 없음",evidence:"DataLab 조회 실패"};
+  return {score:50,label:"조회 실패",evidence:"DataLab 조회 실패"};
 }
 
 type MarginSource = "resale"|"naver_shop"|"supply"|"unknown";
@@ -127,7 +127,8 @@ async function fetchCompetition(keyword:string):Promise<ScoreAxis> {
     const res=await fetch("/api/searchad-cpc",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keyword})});
     const j=await res.json() as {competition?:number;monthlySearch?:number};
     const c=j.competition??0.5,score=Math.round((1-c)*100);
-    return {score,label:score>=70?"낮음":score>=40?"보통":"높음",evidence:`경쟁강도 ${(c*100).toFixed(0)}%${j.monthlySearch?` · 월검색 ${(j.monthlySearch/1000).toFixed(0)}K`:""}`};
+    const msLabel = j.monthlySearch && j.monthlySearch > 0 ? ` · 월검색 ${j.monthlySearch < 1000 ? "<1K" : (j.monthlySearch/1000).toFixed(0)+"K"}` : "";
+    return {score,label:score>=70?"낮음":score>=40?"보통":"높음",evidence:`경쟁강도 ${(c*100).toFixed(0)}%${msLabel}`};
   } catch {return {score:50,label:"데이터 없음",evidence:"SearchAd 조회 실패"};}
 }
 function buildVerdict(a:Pick<ScoreResult,"seasonality"|"margin"|"competition"|"channel">,track:"steady"|"season"="steady") {
@@ -225,7 +226,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
       setScoring(result);setCandidateScores(prev=>({...prev,[c.no]:result}));
       // LLM 해설 자동 호출
       setGeneratingAdvice(true);
-      fetch("/api/discover-advice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({verdict,total,reason,keyword:c.keyword})})
+      fetch("/api/discover-advice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({verdict,total,reason,keyword:c.keyword,seasonality_label:result.seasonality.label})})
         .then(r=>r.text()).then(t=>{if(t.trim())setAdviceText(t.trim());}).catch(()=>{}).finally(()=>setGeneratingAdvice(false));
     }catch{setScoring(null);}finally{setScoreLoading(false);}
   },[track]);
