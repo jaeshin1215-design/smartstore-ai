@@ -879,7 +879,9 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
                 const storeHasAdSpend = (yesterdaySales?.ad_cost ?? 0) > 0;
                 const flags: { name: string; reason: string }[] = [];
                 for (const p of ownProducts) {
-                  if (p.purchase_price && p.price && Number(p.purchase_price) > Number(p.price)) {
+                  if (p.price === null || p.price === 0) {
+                    flags.push({ name: p.name, reason: "판매가 미입력" });
+                  } else if (p.purchase_price && Number(p.purchase_price) > Number(p.price)) {
                     flags.push({ name: p.name, reason: `원가(${Number(p.purchase_price).toLocaleString()}원) > 판매가(${Number(p.price).toLocaleString()}원) — 역마진` });
                   }
                   if (p.stock === 0 && storeHasAdSpend) {
