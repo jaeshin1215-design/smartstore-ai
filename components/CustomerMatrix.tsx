@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 
 interface CustomerPoint {
   customer_id: string;
+  customer_name: string | null;
+  phone_masked: string | null;
   order_count: number;
   avg_order_value: number;
   order_nos: string[];
@@ -220,50 +222,68 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   const detailPanel = selectedIdx !== null ? (() => {
     const p = points[selectedIdx];
     const color = CLUSTER_COLORS[clusters[selectedIdx] % CLUSTER_COLORS.length];
-    const DW = 196;
+    const DW = 200;
+    const hasIdInfo = !!(p.customer_name || p.phone_masked);
     const visOrders = p.order_nos.slice(0, 8);
     const hasMore = p.order_nos.length > 8;
-    const DH = 82 + visOrders.length * 18 + (hasMore ? 16 : 0);
     const dx = W - PR - DW - 4;
     const dy = PT + 4;
+    // y 위치 미리 계산
+    const yHeader  = dy + 18;
+    const yDivider = dy + 30;
+    const yName    = dy + 48;                            // 이름행 (hasIdInfo 때만)
+    const yStats   = hasIdInfo ? dy + 66 : dy + 48;
+    const yLabel   = yStats + 18;
+    const yOrders0 = yLabel + 16;
+    const DH = yOrders0 + visOrders.length * 18 + (hasMore ? 16 : 0) + 8 - dy;
     return (
       <g>
         <rect x={dx} y={dy} width={DW} height={DH} rx={7}
           fill="white" stroke="#e8eaed" strokeWidth={1}
           filter="url(#cm-shadow)" />
         {/* 헤더 */}
-        <circle cx={dx + 14} cy={dy + 18} r={4} fill={color} />
-        <text x={dx + 24} y={dy + 18} dominantBaseline="middle"
+        <circle cx={dx + 14} cy={yHeader} r={4} fill={color} />
+        <text x={dx + 24} y={yHeader} dominantBaseline="middle"
           style={{ fontSize: "11px", fill: "#0d0d0e", fontWeight: 700 }}>
           그룹 {clusters[selectedIdx] + 1}
         </text>
-        <text x={dx + DW - 14} y={dy + 18} dominantBaseline="middle" textAnchor="middle"
+        <text x={dx + DW - 14} y={yHeader} dominantBaseline="middle" textAnchor="middle"
           style={{ fontSize: "13px", fill: "#adb5bd", cursor: "pointer" }}
           onClick={(e) => { e.stopPropagation(); setSelectedIdx(null); }}>
           ✕
         </text>
         {/* 구분선 */}
-        <line x1={dx + 10} y1={dy + 32} x2={dx + DW - 10} y2={dy + 32}
+        <line x1={dx + 10} y1={yDivider} x2={dx + DW - 10} y2={yDivider}
           stroke="#f0f2f5" strokeWidth={1} />
+        {/* 이름 + 전화번호 */}
+        {hasIdInfo && (
+          <text x={dx + 10} y={yName} dominantBaseline="middle"
+            style={{ fontSize: "11px", fill: "#0d0d0e", fontWeight: 600 }}>
+            {p.customer_name ?? "—"}
+            {p.phone_masked && (
+              <tspan style={{ fontSize: "10px", fill: "#8f9399", fontWeight: 400 }}> · {p.phone_masked}</tspan>
+            )}
+          </text>
+        )}
         {/* 통계 */}
-        <text x={dx + 10} y={dy + 48} dominantBaseline="middle"
+        <text x={dx + 10} y={yStats} dominantBaseline="middle"
           style={{ fontSize: "10px", fill: "#4b5563" }}>
           구매 {p.order_count}회 · 객단가 {p.avg_order_value.toLocaleString()}원
         </text>
         {/* 주문번호 레이블 */}
-        <text x={dx + 10} y={dy + 64} dominantBaseline="middle"
+        <text x={dx + 10} y={yLabel} dominantBaseline="middle"
           style={{ fontSize: "9px", fill: "#8f9399", fontWeight: 600, letterSpacing: "0.06em" }}>
           주문번호
         </text>
         {/* 주문번호 목록 */}
         {visOrders.map((no, i) => (
-          <text key={no} x={dx + 10} y={dy + 80 + i * 18} dominantBaseline="middle"
+          <text key={no} x={dx + 10} y={yOrders0 + i * 18} dominantBaseline="middle"
             style={{ fontSize: "10px", fill: "#1a1a1a", fontFamily: "'Courier New', monospace" }}>
             {no}
           </text>
         ))}
         {hasMore && (
-          <text x={dx + 10} y={dy + 80 + visOrders.length * 18} dominantBaseline="middle"
+          <text x={dx + 10} y={yOrders0 + visOrders.length * 18} dominantBaseline="middle"
             style={{ fontSize: "9px", fill: "#8f9399" }}>
             +{p.order_nos.length - 8}개 더...
           </text>

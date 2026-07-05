@@ -63,6 +63,10 @@ export async function initDB() {
     "ALTER TABLE sellfit_products ADD COLUMN matrix_x REAL",
     "ALTER TABLE sellfit_products ADD COLUMN matrix_y REAL",
     "ALTER TABLE sellfit_products ADD COLUMN is_price_confirmed INTEGER DEFAULT 0",
+    // 고객 식별 재설계 (2026-07-05): 해시 대신 이름 평문 + 마스킹 저장
+    "ALTER TABLE sellfit_customer_orders ADD COLUMN customer_name TEXT",
+    "ALTER TABLE sellfit_customer_orders ADD COLUMN phone_masked TEXT",
+    "ALTER TABLE sellfit_customer_orders ADD COLUMN address_masked TEXT",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch { /* 이미 존재 */ }

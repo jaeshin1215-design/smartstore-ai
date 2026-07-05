@@ -435,17 +435,6 @@ export default function DiagnosisTab({
       })
     : allProducts;
 
-  /* Frill 파스텔 칩 */
-  const getProductStatus = (p: Product) => {
-    if (mode === "mezzanine") {
-      if (p.is_own === 1) return { label: "★ 공간 이력", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" };
-      return { label: "○ 엔진 후보", bg: "#f5f3ff", border: "#ddd6fe", text: "#6d28d9" };
-    }
-    if (p.is_own === 1) return { label: "Planned", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" };
-    if (p.is_own === 2) return { label: "Under consideration", bg: "#fdf2f8", border: "#f5d0e4", text: "#9d174d" };
-    return { label: "In Development", bg: "#f5f3ff", border: "#ddd6fe", text: "#6d28d9" };
-  };
-
   // 사분면 액션 문구 (규칙 기반)
   const getQuadrantAction = (p: Product) => {
     const mx = p.matrix_x ?? 50;
@@ -1258,74 +1247,8 @@ export default function DiagnosisTab({
                 flexDirection: "column",
                 gap: "24px"
               }}>
-                <h3 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#0d0d0e",
-                  margin: 0
-                }}>
-                  Admin
-                </h3>
-
                 {/* Meta list parameters */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  {/* Status row */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "#64676b", fontWeight: 600 }}>
-                      <i className="ti ti-circle-dot" style={{ fontSize: "12px" }}></i>
-                      <span>Status</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{
-                        fontSize: "10px",
-                        fontWeight: 500,
-                        padding: "2px 8px",
-                        borderRadius: "6px",
-                        background: getProductStatus(selectedProduct).bg,
-                        border: `1px solid ${getProductStatus(selectedProduct).border}`,
-                        color: getProductStatus(selectedProduct).text,
-                        whiteSpace: "nowrap"
-                      }}>
-                        {getProductStatus(selectedProduct).label}
-                      </span>
-                      <i className="ti ti-chevron-right" style={{ fontSize: "10px", color: "#8f9399" }}></i>
-                    </div>
-                  </div>
-
-                  {/* Priority / Quadrant row */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "#64676b", fontWeight: 600 }}>
-                      <i className="ti ti-layout-grid" style={{ fontSize: "12px" }}></i>
-                      <span>Priority</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{
-                        fontSize: "10px",
-                        fontWeight: 500,
-                        padding: "2px 8px",
-                        borderRadius: "6px",
-                        background: getProductQuadrant(selectedProduct).bg,
-                        border: `1px solid ${getProductQuadrant(selectedProduct).border}`,
-                        color: getProductQuadrant(selectedProduct).text,
-                        whiteSpace: "nowrap"
-                      }}>
-                        {getProductQuadrant(selectedProduct).label}
-                      </span>
-                      <i className="ti ti-chevron-right" style={{ fontSize: "10px", color: "#8f9399" }}></i>
-                    </div>
-                  </div>
-
-                  {/* Visibility row */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "#64676b", fontWeight: 600 }}>
-                      <i className="ti ti-eye" style={{ fontSize: "12px" }}></i>
-                      <span>Visibility</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{ fontSize: "11px", color: "#0d0d0e", fontWeight: 500 }}>Public</span>
-                      <i className="ti ti-chevron-right" style={{ fontSize: "10px", color: "#8f9399" }}></i>
-                    </div>
-                  </div>
                   {/* Contact status row (MANUAL 등록 브랜드 전용) */}
                   {mode === "mezzanine" && selectedProduct.source_type === "MANUAL" && (
                     <div>

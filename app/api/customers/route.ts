@@ -5,9 +5,11 @@ export async function GET(req: NextRequest) {
   const store_id = req.nextUrl.searchParams.get("store_id");
   if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
 
-  // 고객별 집계: avg_order_value, order_count, order_nos
+  // 고객별 집계: avg_order_value, order_count, order_nos, 식별 정보
   const res = await db.execute({
     sql: `SELECT customer_id,
+                 MAX(customer_name)                 AS customer_name,
+                 MAX(phone_masked)                  AS phone_masked,
                  COUNT(DISTINCT order_no)           AS order_count,
                  CAST(SUM(amount) AS REAL) /
                    COUNT(DISTINCT order_no)         AS avg_order_value,
@@ -24,6 +26,8 @@ export async function GET(req: NextRequest) {
 
   const points = res.rows.map(r => ({
     customer_id:     String(r.customer_id),
+    customer_name:   r.customer_name ? String(r.customer_name) : null,
+    phone_masked:    r.phone_masked  ? String(r.phone_masked)  : null,
     order_count:     Number(r.order_count),
     avg_order_value: Math.round(Number(r.avg_order_value)),
     order_nos:       String(r.order_nos ?? "").split(",").filter(Boolean),
