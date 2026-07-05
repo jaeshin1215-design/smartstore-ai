@@ -57,7 +57,7 @@ export interface MatrixConfig {
 }
 
 export const SELLFIT_CONFIG: MatrixConfig = {
-  axisX: "판매량(최근 30일)",
+  axisX: "판매량(누적)",
   axisY: "마진율",
   quadrants: {
     topLeft:     "Quick Wins",

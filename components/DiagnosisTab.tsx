@@ -1344,7 +1344,7 @@ export default function DiagnosisTab({
                         {getProductQuadrant(selectedProduct).label}
                       </span>
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
-                        {mode === "mezzanine" ? "공간 적합도" : "판매량(최근 30일)"} {selectedProduct.matrix_x ?? 50}
+                        {mode === "mezzanine" ? "공간 적합도" : "판매량(누적)"} {selectedProduct.matrix_x ?? 50}
                       </span>
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #e8eaed", color: "#4a4f57" }}>
                         {mode === "mezzanine" ? "집객력" : "마진율"} {selectedProduct.matrix_y ?? 50}
