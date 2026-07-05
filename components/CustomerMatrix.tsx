@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface CustomerPoint {
   customer_id: string;
@@ -82,6 +82,20 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   const [medianPrice, setMedianPrice] = useState(0);
   const [sampleCount, setSampleCount] = useState(0);
   const [loading,     setLoading]     = useState(true);
+  const [dims,        setDims]        = useState({ w: 640, h: 420 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 컨테이너 실제 크기 추적 → viewBox 동기화
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 10 && height > 10) setDims({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!storeId) return;
@@ -108,7 +122,7 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
   );
 
   // ── 좌표 계산 ────────────────────────────────────────────
-  const W = 640, H = 420;
+  const W = dims.w, H = dims.h;
   const PL = 64, PR = 24, PT = 28, PB = 52;
   const PW = W - PL - PR, PH = H - PT - PB;
 
@@ -182,8 +196,8 @@ export default function CustomerMatrix({ storeId }: { storeId: string }) {
         <span style={{ fontSize: "11px", color: "#8f9399" }}>객단가 × 구매횟수 — 쿠폰 발송 기준</span>
       </div>
 
-      {/* SVG wrapper — flex: 1 로 남은 높이 채움 */}
-      <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
+      {/* SVG wrapper — flex: 1 로 남은 높이 채움, ref로 실제 크기 측정 */}
+      <div ref={containerRef} style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "100%", display: "block" }}>
         {/* 배경 4분면 */}
         {[
