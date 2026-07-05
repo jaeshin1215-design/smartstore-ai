@@ -165,11 +165,13 @@ export default function MatrixBox({
     
     // 기본 좌표 계산
     list.forEach(p => {
-      const mx = p.matrix_x !== null && p.matrix_x !== undefined ? p.matrix_x : 
+      const rawMx = p.matrix_x !== null && p.matrix_x !== undefined ? p.matrix_x :
         Math.round(((p.rawX! - bounds.minX) / Math.max(bounds.maxX - bounds.minX, 1)) * 100);
+      const mx = Math.min(100, Math.max(0, rawMx));
 
-      const my = p.matrix_y !== null && p.matrix_y !== undefined ? p.matrix_y : 
+      const rawMy = p.matrix_y !== null && p.matrix_y !== undefined ? p.matrix_y :
         Math.round(((p.rawY! - bounds.minY) / Math.max(bounds.maxY - bounds.minY, 1)) * 100);
+      const my = Math.min(100, Math.max(0, rawMy));
 
       const cx = PX + (mx / 100) * PLOT_W;
       const cy = PY + (1 - my / 100) * PLOT_H;
