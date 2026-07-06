@@ -146,72 +146,137 @@ function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
   return o.map((a,i)=>({...a,label:`${"①②③④"[i]} ${a.key}`,highlight:i===0}));
 }
 
-// ── XGBoost 교차판매 예측 미리보기 (정적 목업) ────────────────────────────────
-function XGBoostNetworkPreview() {
-  const nodes:[string,number,number,number,boolean][] = [
-    ["압축팩",    230, 130, 30, true],
-    ["다리미판",  370,  60, 22, false],
-    ["빨래건조대",370, 195, 20, false],
-    ["분리수거함",  90, 195, 19, false],
-    ["화분",       90,  60, 17, false],
-  ];
-  const edges:[string,string,number][] = [
-    ["압축팩","다리미판",34],
-    ["압축팩","분리수거함",21],
-    ["압축팩","빨래건조대",18],
-    ["압축팩","화분",12],
-    ["다리미판","빨래건조대",9],
-  ];
-  const nm = Object.fromEntries(nodes.map(([id,x,y])=>[id,{x,y}]));
+// ── DiscoverMatrix: 마진 × 채널적합 4분면 산점도 ──────────────────────────────
+function DiscoverMatrix({
+  candidates, candidateScores, selected, onSelect,
+}: {
+  candidates: Candidate[];
+  candidateScores: Record<string, ScoreResult>;
+  selected: Candidate | null;
+  onSelect: (c: Candidate) => void;
+}) {
+  const W=500, H=260, PX=36, PY=24;
+  const pw=W-PX*2, ph=H-PY*2;
+  const midX=PX+pw/2, midY=PY+ph/2;
+  const xFn=(s:number)=>PX+(s/100)*pw;
+  const yFn=(s:number)=>PY+(1-s/100)*ph;
+  const scored=candidates.filter(c=>candidateScores[c.no]);
+  function getAnomaly(sc:ScoreResult):{is:boolean;reason:string} {
+    const v=[sc.seasonality.score,sc.margin.score,sc.competition.score,sc.channel.score];
+    const gap=Math.max(...v)-Math.min(...v);
+    if(gap<=38) return {is:false,reason:""};
+    if(sc.seasonality.score>72&&sc.margin.score<42) return {is:true,reason:"검색↑·마진↓"};
+    if(sc.channel.score>72&&sc.competition.score<38) return {is:true,reason:"경쟁↑·채널↑"};
+    return {is:true,reason:"괴리 신호"};
+  }
+  const anomalyIds=new Set<string>(
+    scored
+      .filter(c=>getAnomaly(candidateScores[c.no]).is)
+      .sort((a,b)=>{
+        const gap=(c:Candidate)=>{const v=[candidateScores[c.no].seasonality.score,candidateScores[c.no].margin.score,candidateScores[c.no].competition.score,candidateScores[c.no].channel.score];return Math.max(...v)-Math.min(...v);};
+        return gap(b)-gap(a);
+      })
+      .slice(0,3)
+      .map(c=>c.no)
+  );
   return (
-    <div style={{ ...CARD_STYLE, padding:"24px 28px" }}>
-      {/* 예시 배너 — 제거 금지 */}
-      <div style={{ padding:"6px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"16px" }}>
-        <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"24px", alignItems:"center" }}>
-        {/* SVG 네트워크 그래프 */}
-        <svg viewBox="0 0 460 260" style={{ width:"100%", maxHeight:"260px" }}>
-          {edges.map(([from,to,pct])=>{
-            const a=nm[from], b=nm[to];
-            const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-            const op=pct>=25?1:pct>=15?0.7:0.45;
-            const sw=pct>=25?2.5:pct>=15?1.8:1.2;
-            return (
-              <g key={`${from}-${to}`}>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={PINK.mid} strokeWidth={sw} opacity={op}/>
-                <rect x={mx-14} y={my-8} width="28" height="14" rx="4" fill="white" stroke={PINK.light} strokeWidth="1"/>
-                <text x={mx} y={my+4} textAnchor="middle" fontSize="9" fill={PINK.text} fontWeight="600">{pct}%</text>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:H,display:"block"}}>
+      <rect x={PX} y={PY} width={pw/2} height={ph/2} fill="#e8eef8"/>
+      <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
+      <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
+      <rect x={midX} y={midY} width={pw/2} height={ph/2} fill="#f3eddf"/>
+      <text x={PX+7} y={PY+15} fontSize="11" fill="#6b82a0" fontWeight="500">검토중</text>
+      <text x={W-PX-7} y={PY+15} fontSize="11" fill="#b05878" fontWeight="500" textAnchor="end">적극추천</text>
+      <text x={PX+7} y={H-PY-6} fontSize="11" fill="#888" fontWeight="500">제외</text>
+      <text x={W-PX-7} y={H-PY-6} fontSize="11" fill="#a09060" fontWeight="500" textAnchor="end">보류</text>
+      <line x1={midX} y1={PY} x2={midX} y2={H-PY} stroke="#c8d0dc" strokeWidth="1" strokeDasharray="4,3"/>
+      <line x1={PX} y1={midY} x2={W-PX} y2={midY} stroke="#c8d0dc" strokeWidth="1" strokeDasharray="4,3"/>
+      {scored.length===0&&(
+        <text x={W/2} y={H/2+5} textAnchor="middle" fontSize="11" fill="#c0c4cc">후보를 클릭하면 점수가 채워집니다</text>
+      )}
+      {scored.map(c=>{
+        const sc=candidateScores[c.no];
+        const cx=xFn(sc.margin.score), cy=yFn(sc.channel.score);
+        const isSel=selected?.no===c.no, isAnom=anomalyIds.has(c.no);
+        const {reason}=getAnomaly(sc);
+        const sn=c.name.length>9?c.name.slice(0,9)+"…":c.name;
+        const toRight=cx<=midX;
+        const lx=toRight?cx+14:cx-74;
+        const ly=cy<PY+32?cy+10:cy-30;
+        return(
+          <g key={c.no} onClick={()=>onSelect(c)} style={{cursor:"pointer"}}>
+            {isAnom&&<circle cx={cx} cy={cy} r="11" fill="none" stroke="#e07060" strokeWidth="1.5" strokeDasharray="4,3"/>}
+            <circle cx={cx} cy={cy} r={isSel?7:5} fill={isAnom?"#e07060":"#5b8db8"} stroke="white" strokeWidth="1.5"/>
+            {isAnom&&(
+              <g>
+                <line x1={toRight?cx+7:cx-7} y1={cy} x2={toRight?lx:lx+60} y2={ly+11} stroke="#d4a0a0" strokeWidth="0.8" strokeDasharray="3,2"/>
+                <rect x={lx} y={ly} width="60" height="22" rx="4" fill="rgba(255,255,255,0.97)" stroke="#e0c8c8" strokeWidth="0.8"/>
+                <text x={lx+30} y={ly+9} textAnchor="middle" fontSize="9.5" fill="#1a1a1a" fontWeight="700">{sn}</text>
+                <text x={lx+30} y={ly+18} textAnchor="middle" fontSize="8.5" fill="#c05050">{reason}</text>
               </g>
-            );
-          })}
-          {nodes.map(([id,x,y,r,main])=>(
-            <g key={id}>
-              <circle cx={x} cy={y} r={r} fill={main?PINK.main:PINK.light} stroke={main?PINK.text:PINK.mid} strokeWidth={main?2:1.5}/>
-              <text x={x} y={y+r+13} textAnchor="middle" fontSize={main?"11":"10"} fill="#374151" fontWeight={main?"700":"500"}>{id}</text>
-            </g>
-          ))}
-        </svg>
-        {/* 우측 패널: TOP 3 + 안내 */}
-        <div>
-          <p style={{ fontSize:"11px", fontWeight:700, color:"#9ca3af", letterSpacing:"0.05em", textTransform:"uppercase", marginBottom:"12px" }}>동시 구매율 TOP 3</p>
-          {edges.slice(0,3).map(([from,to,pct],i)=>(
-            <div key={i} style={{ marginBottom:"12px" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px" }}>
-                <span style={{ fontSize:"13px", fontWeight:600, color:"#111" }}>{from} × {to}</span>
-                <span style={{ fontSize:"14px", fontWeight:800, color:PINK.main }}>{pct}%</span>
-              </div>
-              <div style={{ height:"5px", background:"#f1f5f9", borderRadius:"3px", overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${pct*2.5}%`, background:PINK.main, borderRadius:"3px" }}/>
-              </div>
-            </div>
-          ))}
-          <p style={{ fontSize:"11px", color:"#9ca3af", marginTop:"16px", lineHeight:1.6 }}>
-            사방넷 주문 데이터 500건+ 누적 후<br/>실제 XGBoost 모델 가동 예정
-          </p>
-        </div>
-      </div>
-    </div>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── ProductTimeHeatmap: 상품 × 시간 수요 히트맵 ────────────────────────────────
+function ProductTimeHeatmap() {
+  const PRODS=["화분","압축팩","다리미판","전기장판","캠핑 아이스박스"];
+  const PAST=8, FUTURE=4, TOTAL=PAST+FUTURE;
+  const CW=40,CH=36,GAP=2,LPAD=92,THEAD=32,BPAD=28;
+  const W=LPAD+TOTAL*(CW+GAP)-GAP+16;
+  const H=THEAD+PRODS.length*(CH+GAP)-GAP+BPAD;
+  const HEAT:number[][]=[
+    [0.30,0.40,0.85,0.72,0.50,0.35,0.30,0.22, 0.20,0.15,0.18,0.20],
+    [0.28,0.32,0.40,0.58,0.90,0.80,0.50,0.35, 0.32,0.28,0.30,0.25],
+    [0.40,0.45,0.50,0.60,0.55,0.50,0.45,0.40, 0.42,0.40,0.42,0.40],
+    [0.10,0.10,0.10,0.10,0.12,0.15,0.20,0.28, 0.40,0.55,0.78,0.92],
+    [0.72,0.90,0.85,0.75,0.60,0.50,0.40,0.30, 0.25,0.20,0.18,0.15],
+  ];
+  function fill(v:number,future:boolean):string {
+    if(future){return v>0.7?"#f4a899":v>0.4?"#fad0c8":"#fde8e4";}
+    return v>0.7?"#d96050":v>0.4?"#eba090":v>0.2?"#f4bdb4":"#fde8e4";
+  }
+  const sepX=LPAD+PAST*(CW+GAP)-GAP/2;
+  const aSX=LPAD+2*(CW+GAP)+CW/2, aSY=THEAD+0*(CH+GAP)+CH/2;
+  const aEX=LPAD+4*(CW+GAP)+CW/2, aEY=THEAD+1*(CH+GAP)+CH/2;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:H,display:"block"}}>
+      <defs>
+        <marker id="hma" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <polygon points="0 0, 7 3.5, 0 7" fill="#8b7355"/>
+        </marker>
+      </defs>
+      <line x1={sepX} y1={THEAD-6} x2={sepX} y2={H-BPAD+4} stroke="#aaa" strokeWidth="1.2" strokeDasharray="4,3"/>
+      <text x={sepX} y={THEAD-8} textAnchor="middle" fontSize="10" fill="#888">오늘</text>
+      <text x={sepX+8} y={12} fontSize="9.5" fill="#b0987a" fontWeight="500">예측(가상) 구간</text>
+      <line x1={sepX+6} y1={14} x2={W-14} y2={14} stroke="#c8b090" strokeWidth="0.8" strokeDasharray="3,2"/>
+      {PRODS.flatMap((_,ri)=>Array.from({length:PAST},(_2,ci)=>(
+        <rect key={`p${ri}-${ci}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(HEAT[ri][ci],false)}/>
+      )))}
+      {PRODS.flatMap((_,ri)=>Array.from({length:FUTURE},(_2,fi)=>{
+        const ci=PAST+fi;
+        return <rect key={`f${ri}-${fi}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(HEAT[ri][ci],true)} stroke="#d4b8b0" strokeWidth={1} strokeDasharray="4,3"/>;
+      }))}
+      {PRODS.map((prod,ri)=>(
+        <text key={prod} x={LPAD-6} y={THEAD+ri*(CH+GAP)+CH/2+4} textAnchor="end" fontSize={prod.length>4?"10.5":"11.5"} fill="#374151" fontWeight="500">{prod}</text>
+      ))}
+      <line x1={aSX} y1={aSY} x2={aEX-5} y2={aEY-5} stroke="#8b7355" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#hma)"/>
+      <text x={(aSX+aEX)/2+10} y={(aSY+aEY)/2-4} fontSize="9" fill="#8b7355" fontWeight="600">선행 2주</text>
+      {[
+        {c:"#d96050",l:"구매확률 높음",d:false},
+        {c:"#f4bdb4",l:"낮음",d:false},
+        {c:"#fde8e4",l:"예측(가상)",d:true},
+      ].map((item,i)=>(
+        <g key={i} transform={`translate(${LPAD+i*110},${H-BPAD+12})`}>
+          <circle cx="6" cy="5" r="5" fill={item.c} stroke={item.d?"#d4b8b0":"none"} strokeWidth={item.d?1:0}/>
+          <text x="16" y="9" fontSize="9.5" fill="#6b7280">{item.l}</text>
+        </g>
+      ))}
+    </svg>
   );
 }
 
@@ -474,6 +539,18 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
 
             {/* Right: scoring card + reg form + SEO */}
             <div>
+              {/* DiscoverMatrix: 마진×채널적합 4분면 — 클릭하면 점수 채워짐 */}
+              {candidates.length>0&&(
+                <div style={{ ...CARD_STYLE, padding:"14px 14px 10px", marginBottom:"12px" }}>
+                  <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 6px 2px" }}>발굴 매트릭스 · 마진 × 채널적합</p>
+                  <DiscoverMatrix
+                    candidates={visibleCandidates}
+                    candidateScores={candidateScores}
+                    selected={selected}
+                    onSelect={scoreCandidate}
+                  />
+                </div>
+              )}
               {!selected&&!scoreLoading?(
                 <div style={{ ...CARD_STYLE, padding:"56px 24px", textAlign:"center" }}>
                   <div style={{ fontSize:"28px", marginBottom:"12px" }}>📊</div>
@@ -642,15 +719,20 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
             )}
           </div>
 
-          {/* ── XGBoost 교차판매 예측 미리보기 ── */}
+          {/* ── 상품 수요 예측 히트맵 ── */}
           <div style={{ marginTop:"48px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"20px" }}>
               <div>
-                <h2 style={{ fontSize:"20px", fontWeight:800, margin:"0 0 4px", letterSpacing:"-0.01em" }}>교차판매 예측</h2>
-                <p style={{ fontSize:"13px", color:"#9ca3af", margin:0 }}>함께 자주 구매되는 상품 조합을 AI로 예측합니다</p>
+                <h2 style={{ fontSize:"20px", fontWeight:800, margin:"0 0 4px", letterSpacing:"-0.01em" }}>상품 수요 예측</h2>
+                <p style={{ fontSize:"13px", color:"#9ca3af", margin:0 }}>상품별 구매확률과 시즌 선행 신호를 미리 봅니다</p>
               </div>
             </div>
-            <XGBoostNetworkPreview />
+            <div style={{ ...CARD_STYLE, padding:"24px 28px" }}>
+              <div style={{ padding:"6px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"16px" }}>
+                <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
+              </div>
+              <ProductTimeHeatmap />
+            </div>
           </div>
 
         </div>{/* /Right column inner 1232px */}

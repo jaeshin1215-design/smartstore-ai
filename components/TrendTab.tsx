@@ -122,60 +122,6 @@ function LineChart({ dates, ratios }: TrendData) {
   );
 }
 
-/* ── Prophet 예측 차트: 과거 실데이터 + 12주 가상 예측선 ── */
-function ProphetForecastChart({ ratios, label }: { ratios: number[]; label: string }) {
-  const W=560, H=130, PX=8, PY=12, FC=12;
-  const n=ratios.length;
-  const mean=ratios.reduce((s,x)=>s+x,0)/n;
-  const std=Math.sqrt(ratios.reduce((s,x)=>s+(x-mean)**2,0)/n);
-  const avg4=ratios.slice(-4).reduce((s,x)=>s+x,0)/Math.max(ratios.slice(-4).length,1);
-  const fc=Array.from({length:FC},(_,i)=>{
-    const t=(i+1)/FC;
-    return Math.max(1, avg4*(1-t*0.45)+mean*t*0.45+Math.sin(i*Math.PI/5)*std*0.3);
-  });
-  const upper=fc.map(v=>Math.min(100,v*1.22));
-  const lower=fc.map(v=>Math.max(0,v*0.80));
-  const maxV=Math.max(...ratios,...upper,...lower,1);
-  const tot=n+FC;
-  const xF=(i:number)=>PX+(i/(tot-1))*(W-PX*2);
-  const yF=(v:number)=>PY+(1-v/maxV)*(H-PY*2);
-  const rP=ratios.map((r,i)=>[xF(i),yF(r)] as [number,number]);
-  const rPoly=rP.map(([x,y])=>`${x},${y}`).join(" ");
-  const fP=fc.map((r,i)=>[xF(n+i),yF(r)] as [number,number]);
-  const fPoly=fP.map(([x,y])=>`${x},${y}`).join(" ");
-  const uP=upper.map((r,i)=>[xF(n+i),yF(r)] as [number,number]);
-  const lP=lower.map((r,i)=>[xF(n+i),yF(r)] as [number,number]);
-  const band=`M ${uP.map(([x,y])=>`${x},${y}`).join(" L ")} L ${[...lP].reverse().map(([x,y])=>`${x},${y}`).join(" L ")} Z`;
-  const sepX=xF(n-1);
-  const [lrX,lrY]=rP[n-1];
-  const [f0X,f0Y]=fP[0];
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:130}}>
-        <defs>
-          <linearGradient id="pgProphet" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7b9ea8" stopOpacity="0.18"/>
-            <stop offset="100%" stopColor="#7b9ea8" stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        {[0.25,0.5,0.75].map(v=>(
-          <line key={v} x1={PX} x2={W-PX} y1={PY+(1-v)*(H-PY*2)} y2={PY+(1-v)*(H-PY*2)} stroke="#f0f1f3" strokeWidth="1"/>
-        ))}
-        <path d={band} fill="#dbeafe" opacity="0.65"/>
-        <polygon points={`${rP[0][0]},${H-PY} ${rPoly} ${rP[n-1][0]},${H-PY}`} fill="url(#pgProphet)"/>
-        <polyline points={rPoly} fill="none" stroke="#7b9ea8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <polyline points={`${lrX},${lrY} ${f0X},${f0Y} ${fPoly}`} fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4,3" strokeLinecap="round" strokeLinejoin="round"/>
-        <line x1={sepX} x2={sepX} y1={PY} y2={H-PY} stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3,2"/>
-        <circle cx={lrX} cy={lrY} r="3.5" fill="#7b9ea8" stroke="white" strokeWidth="1.5"/>
-      </svg>
-      <div style={{display:"flex",justifyContent:"space-between",fontSize:"10px",color:"#9ca3af",padding:"0 4px",marginTop:"2px"}}>
-        <span>← {label} 실데이터</span>
-        <span>12주 예측 →</span>
-      </div>
-    </div>
-  );
-}
-
 function BarRow({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -225,8 +171,6 @@ export default function TrendTab({ onSeoNavigate, initialKeyword }: { onSeoNavig
   const [error, setError] = useState("");
   const [autoData, setAutoData] = useState<AutoResult | null>(null);
   const [loadingAuto, setLoadingAuto] = useState(false);
-  const [forecastRatios, setForecastRatios] = useState<{ratios:number[];label:string}|null>(null);
-  const [forecastLoading, setForecastLoading] = useState(false);
   const resultCardRef = useRef<HTMLDivElement>(null);
   const autoSelectFired = useRef(false);
 
@@ -267,15 +211,6 @@ export default function TrendTab({ onSeoNavigate, initialKeyword }: { onSeoNavig
     if (!target) return;
     if (!kw) setKeyword(target);
     setLoading(true); setResult(null); setError(""); setAiStreaming(false);
-    setForecastRatios(null); setForecastLoading(true);
-    // 52주 Prophet 예측용 데이터 — 메인 30일 fetch와 병렬로 실행
-    fetch("/api/naver-trend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keyword:target,weeks:52})})
-      .then(async wRes=>{
-        if(!wRes.body){setForecastLoading(false);return;}
-        const rdr=wRes.body.getReader();const wDec=new TextDecoder();let b="";
-        outer:while(true){const{done,value}=await rdr.read();if(done)break;b+=wDec.decode(value,{stream:true});const ls=b.split("\n");b=ls.pop()??"";for(const l of ls){if(!l.trim())continue;try{const e=JSON.parse(l);if(e.type==="naver"&&e.trend?.ratios?.length){await rdr.cancel();setForecastRatios({ratios:e.trend.ratios,label:"52주"});setForecastLoading(false);break outer;}}catch{/**/}}}
-        setForecastLoading(false);
-      }).catch(()=>setForecastLoading(false));
     try {
       const res = await fetch("/api/naver-trend", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -652,45 +587,6 @@ export default function TrendTab({ onSeoNavigate, initialKeyword }: { onSeoNavig
           </div>
         )}
 
-        {/* ── Prophet 시즌 예측 미리보기 ── */}
-        {result && !loading && (
-          <div style={{ ...CARD, marginTop:"12px" }} className="p-5">
-            <div style={{ padding:"6px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px" }}>
-              <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
-            </div>
-            <p style={{ fontSize:"10px", color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:"4px" }}>
-              PROPHET 시즌 예측&nbsp;<span style={{ textTransform:"none", color:"#4a4f57" }}>&quot;{result.keyword}&quot;</span>
-            </p>
-            <p style={{ fontSize:"12px", color:"#6b7280", marginBottom:"12px", lineHeight:1.5 }}>
-              과거 수요 패턴을 학습해 향후 12주를 예측합니다
-            </p>
-            {forecastLoading && !forecastRatios && (
-              <div style={{ height:"130px", background:"#f9fafb", borderRadius:"8px", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <p style={{ fontSize:"12px", color:"#9ca3af" }}>예측 데이터 로딩 중...</p>
-              </div>
-            )}
-            {forecastRatios && <ProphetForecastChart ratios={forecastRatios.ratios} label={forecastRatios.label} />}
-            <div style={{ display:"flex", gap:"16px", marginTop:"10px", flexWrap:"wrap" }}>
-              {([
-                {color:"#7b9ea8", dash:false, label:"실데이터"},
-                {color:"#3b82f6", dash:true,  label:"예측선 (예시)"},
-              ] as {color:string;dash:boolean;label:string}[]).map(l=>(
-                <div key={l.label} style={{ display:"flex", alignItems:"center", gap:"5px" }}>
-                  <svg width="24" height="4" style={{ flexShrink:0 }}>
-                    <line x1="0" y1="2" x2="24" y2="2" stroke={l.color} strokeWidth="2" strokeDasharray={l.dash?"4,3":undefined}/>
-                  </svg>
-                  <span style={{ fontSize:"11px", color:"#6b7280" }}>{l.label}</span>
-                </div>
-              ))}
-              <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
-                <svg width="14" height="10" style={{ flexShrink:0 }}>
-                  <rect x="0" y="0" width="14" height="10" fill="#dbeafe" opacity="0.7" rx="2"/>
-                </svg>
-                <span style={{ fontSize:"11px", color:"#6b7280" }}>신뢰구간 (예시)</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
