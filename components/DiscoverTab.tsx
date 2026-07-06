@@ -326,41 +326,28 @@ function DiscoverMatrix({
 
 // ── ProductTimeHeatmap: 상품 × 시간 수요 히트맵 ────────────────────────────────
 function ProductTimeHeatmap() {
-  // 이지스토리 실제 4개 카테고리
   const PRODS=["압축팩","다리미판","화분","유아매트"];
   const PAST=8, FUTURE=4, TOTAL=PAST+FUTURE;
-  const CW=44,CH=44,GAP=10,LPAD=92,THEAD=32,BPAD=28;
+  const CW=44,CH=44,GAP=10,LPAD=92,THEAD=32,BPAD=42;
   const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 730
-  const W=CELLS_W+72; // 802
+  const W=CELLS_W+24; // 754 — 브라켓 제거로 우측 여백만
   const H=THEAD+PRODS.length*(CH+GAP)-GAP+BPAD;
-  // 카테고리 특성 기반 예시 패턴 (과거8주 | 예측4주)
-  // 압축팩: 이사·장마 2피크 — 봄 이사철 높고 미래 장마 재상승
-  // 다리미판: 상시 평탄
-  // 화분: 봄 피크 선행 (col2 정점)
-  // 유아매트: 이사·출산 피크, 화분 대비 2주 지연 (col4 정점) → 선행 2주 표시
+  // 카테고리별 독립 수요 패턴 (과거8주 | 예측4주) — 상품 간 인과관계 없음
   const HEAT:number[][]=[
     [0.32,0.42,0.62,0.82,0.90,0.78,0.62,0.48, 0.45,0.52,0.62,0.72],
     [0.55,0.58,0.60,0.62,0.60,0.58,0.55,0.52, 0.52,0.54,0.55,0.57],
     [0.35,0.52,0.88,0.80,0.65,0.50,0.38,0.28, 0.24,0.22,0.20,0.22],
     [0.30,0.38,0.52,0.68,0.90,0.85,0.68,0.50, 0.45,0.48,0.52,0.60],
   ];
+  // 과거 4단계: v>0.7 높음 / v>0.4 중간 / v>0.2 낮음 / else 최저
+  // 예측(가상): 동일 4단계 색상 + 점선 테두리로 구분
   function fill(v:number,future:boolean):string {
-    if(future){return v>0.7?"#f4a899":v>0.4?"#fad0c8":"#fde8e4";}
+    if(future){return v>0.7?"#f4a899":v>0.4?"#fad0c8":v>0.2?"#fde8e4":"#fde8e4";}
     return v>0.7?"#d96050":v>0.4?"#eba090":v>0.2?"#f4bdb4":"#fde8e4";
   }
   const sepX=LPAD+PAST*(CW+GAP)-GAP/2;
-  // 우측 브라켓 주석: 화분(row2) → 유아매트(row3) = "선행 2주" (봄 피크 선행 신호)
-  const annY1=THEAD+2*(CH+GAP)+CH/2; // 화분 중심 Y
-  const annY2=THEAD+3*(CH+GAP)+CH/2; // 유아매트 중심 Y
-  const bX1=CELLS_W+6;  // 브라켓 시작 x = 600
-  const bX2=CELLS_W+20; // 브라켓 꺾임 x = 614
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
-      <defs>
-        <marker id="hma" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-          <polygon points="0 0, 7 3.5, 0 7" fill="#8b7355"/>
-        </marker>
-      </defs>
       <line x1={sepX} y1={THEAD-6} x2={sepX} y2={H-BPAD+4} stroke="#aaa" strokeWidth="1.2" strokeDasharray="4,3"/>
       <text x={sepX} y={THEAD-8} textAnchor="middle" fontSize="10" fill="#888">오늘</text>
       <text x={sepX+8} y={12} fontSize="9.5" fill="#b0987a" fontWeight="500">예측(가상) 구간</text>
@@ -375,22 +362,19 @@ function ProductTimeHeatmap() {
       {PRODS.map((prod,ri)=>(
         <text key={prod} x={LPAD-6} y={THEAD+ri*(CH+GAP)+CH/2+4} textAnchor="end" fontSize={prod.length>6?"9":prod.length>3?"10.5":"11.5"} fill="#374151" fontWeight="500">{prod}</text>
       ))}
-      {/* 우측 브라켓 주석 — 셀과 겹치지 않음 */}
-      <line x1={bX1} y1={annY1} x2={bX2} y2={annY1} stroke="#8b7355" strokeWidth="1" strokeDasharray="3,2"/>
-      <line x1={bX2} y1={annY1} x2={bX2} y2={annY2} stroke="#8b7355" strokeWidth="1.2"/>
-      <line x1={bX2} y1={annY2} x2={bX1+3} y2={annY2} stroke="#8b7355" strokeWidth="1.5" markerEnd="url(#hma)"/>
-      <text x={bX2+5} y={(annY1+annY2)/2} fontSize="9" fill="#8b7355" fontWeight="600">선행</text>
-      <text x={bX2+5} y={(annY1+annY2)/2+12} fontSize="9" fill="#8b7355" fontWeight="600">2주</text>
+      {/* 범례: 과거 4단계 실제 색상 */}
       {[
-        {c:"#d96050",l:"구매확률 높음",d:false},
-        {c:"#f4bdb4",l:"낮음",d:false},
-        {c:"#fde8e4",l:"예측(가상)",d:true},
+        {c:"#d96050",l:"구매확률 높음",border:false},
+        {c:"#eba090",l:"중간",border:false},
+        {c:"#f4bdb4",l:"낮음",border:false},
+        {c:"#fde8e4",l:"최저·예측(가상)",border:true},
       ].map((item,i)=>(
         <g key={i} transform={`translate(${LPAD+i*110},${H-BPAD+12})`}>
-          <circle cx="6" cy="5" r="5" fill={item.c} stroke={item.d?"#d4b8b0":"none"} strokeWidth={item.d?1:0}/>
+          <circle cx="6" cy="5" r="5" fill={item.c} stroke={item.border?"#d4b8b0":"none"} strokeWidth={item.border?1.2:0}/>
           <text x="16" y="9" fontSize="9.5" fill="#6b7280">{item.l}</text>
         </g>
       ))}
+      <text x={LPAD} y={H-BPAD+30} fontSize="8.5" fill="#9ca3af">· 점선 테두리 = 예측(가상) 구간 / 실선 없음 = 과거 실적</text>
     </svg>
   );
 }
