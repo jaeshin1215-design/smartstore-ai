@@ -189,14 +189,14 @@ function DiscoverMatrix({
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
       <rect x={midX} y={midY} width={pw/2} height={ph/2} fill="#f3eddf"/>
-      <text x={PX+7} y={PY+22} fontSize="18" fill="#9ca3af" fontWeight="400">검토중</text>
-      <text x={W-PX-7} y={PY+22} fontSize="18" fill="#9ca3af" fontWeight="400" textAnchor="end">적극추천</text>
-      <text x={PX+7} y={H-PY-8} fontSize="18" fill="#9ca3af" fontWeight="400">제외</text>
-      <text x={W-PX-7} y={H-PY-8} fontSize="18" fill="#9ca3af" fontWeight="400" textAnchor="end">보류</text>
-      <line x1={midX} y1={PY} x2={midX} y2={H-PY} stroke="#c8d0dc" strokeWidth="1.5" strokeDasharray="6,4"/>
-      <line x1={PX} y1={midY} x2={W-PX} y2={midY} stroke="#c8d0dc" strokeWidth="1.5" strokeDasharray="6,4"/>
+      <text x={PX+7} y={PY+14} fontSize="11" fill="#9ca3af" fontWeight="400">검토중</text>
+      <text x={W-PX-7} y={PY+14} fontSize="11" fill="#9ca3af" fontWeight="400" textAnchor="end">적극추천</text>
+      <text x={PX+7} y={H-PY-5} fontSize="11" fill="#9ca3af" fontWeight="400">제외</text>
+      <text x={W-PX-7} y={H-PY-5} fontSize="11" fill="#9ca3af" fontWeight="400" textAnchor="end">보류</text>
+      <line x1={midX} y1={PY} x2={midX} y2={H-PY} stroke="#c8d0dc" strokeWidth="1" strokeDasharray="4,3"/>
+      <line x1={PX} y1={midY} x2={W-PX} y2={midY} stroke="#c8d0dc" strokeWidth="1" strokeDasharray="4,3"/>
       {scored.length===0&&(
-        <text x={W/2} y={H/2+5} textAnchor="middle" fontSize="18" fill="#c0c4cc">
+        <text x={W/2} y={H/2+5} textAnchor="middle" fontSize="11" fill="#c0c4cc">
           {autoScoring?`채점 중… (${scoredSoFar??0}/${candidates.length})`:"채점 결과가 표시됩니다"}
         </text>
       )}
@@ -208,17 +208,16 @@ function DiscoverMatrix({
           if(!cats[k])cats[k]={sumX:0,sumY:0,cnt:0};
           cats[k].sumX+=item.margin_score; cats[k].sumY+=item.channel_score; cats[k].cnt++;
         }
-        // 겹침 방지: rawCy 오름차순 정렬 → 이전 라벨과 18px 이내면 아래로 밀기
-        const LBLW=58, LBLH=22;
+        const LBLW=36, LBLH=14;
         const rawPos=Object.entries(cats)
           .map(([cat,v])=>({cat,cx:xFn(v.sumX/v.cnt),rawCy:yFn(v.sumY/v.cnt)}))
           .sort((a,b)=>a.rawCy-b.rawCy);
         const placed:{cx:number;boxY:number}[]=[];
         const finalPos=rawPos.map(p=>{
-          let boxY=p.rawCy-LBLH-6;
+          let boxY=p.rawCy-LBLH-4;
           for(const prev of placed){
-            if(Math.abs(p.cx-prev.cx)<LBLW&&Math.abs(boxY-prev.boxY)<LBLH+4){
-              boxY=prev.boxY+LBLH+4;
+            if(Math.abs(p.cx-prev.cx)<LBLW&&Math.abs(boxY-prev.boxY)<LBLH+3){
+              boxY=prev.boxY+LBLH+3;
             }
           }
           placed.push({cx:p.cx,boxY});
@@ -228,14 +227,14 @@ function DiscoverMatrix({
           <>
             {bl.map(item=>{
               const cx=xFn(item.margin_score), cy=yFn(item.channel_score);
-              return(<circle key={`bl-${item.id}`} cx={cx} cy={cy} r="5.5" fill="#d1d5db" stroke="white" strokeWidth="1.5" opacity="0.6"/>);
+              return(<circle key={`bl-${item.id}`} cx={cx} cy={cy} r="3.5" fill="#d1d5db" stroke="white" strokeWidth="1" opacity="0.6"/>);
             })}
             {finalPos.map(({cat,cx,boxY})=>{
               const short=cat.length>4?cat.slice(0,4):cat;
               return(
                 <g key={`lbl-${cat}`}>
-                  <rect x={cx-29} y={boxY} width="58" height="22" rx="5" fill="rgba(255,255,255,0.88)" stroke="#d1d5db" strokeWidth="1"/>
-                  <text x={cx} y={boxY+15} textAnchor="middle" fontSize="14" fill="#6b7280" fontWeight="600">{short}</text>
+                  <rect x={cx-18} y={boxY} width="36" height="14" rx="3" fill="rgba(255,255,255,0.88)" stroke="#d1d5db" strokeWidth="0.8"/>
+                  <text x={cx} y={boxY+9} textAnchor="middle" fontSize="9" fill="#6b7280" fontWeight="500">{short}</text>
                 </g>
               );
             })}
@@ -248,31 +247,30 @@ function DiscoverMatrix({
         const isSel=selected?.no===c.no, isAnom=anomalyIds.has(c.no);
         const {reason}=getAnomaly(sc);
         const sn=c.name.length>9?c.name.slice(0,9)+"…":c.name;
-        // 우측 경계 보정: 라벨박스(96px)가 SVG 밖으로 나가지 않도록 방향 결정
-        const ALBLW=96;
-        const rightFits=cx+20+ALBLW<W-4;
-        const leftFits=cx-20-ALBLW>4;
+        const ALBLW=60;
+        const rightFits=cx+14+ALBLW<W-4;
+        const leftFits=cx-14-ALBLW>4;
         const toRight=(cx<=midX||!leftFits)&&rightFits;
-        const lx=toRight?cx+20:Math.max(4,cx-ALBLW-20);
-        const ly=cy<PY+50?cy+16:cy-42;
+        const lx=toRight?cx+14:Math.max(4,cx-ALBLW-14);
+        const ly=cy<PY+32?cy+10:cy-30;
         return(
           <g key={c.no} onClick={()=>onSelect(c)} style={{cursor:"pointer"}}>
-            {isAnom&&<circle cx={cx} cy={cy} r="18" fill="none" stroke="#e07060" strokeWidth="2.5" strokeDasharray="6,4"/>}
-            <circle cx={cx} cy={cy} r={isSel?11:8} fill={isAnom?"#e07060":"#5b8db8"} stroke="white" strokeWidth="2.5"/>
+            {isAnom&&<circle cx={cx} cy={cy} r="11" fill="none" stroke="#e07060" strokeWidth="1.5" strokeDasharray="4,3"/>}
+            <circle cx={cx} cy={cy} r={isSel?7:5} fill={isAnom?"#e07060":"#5b8db8"} stroke="white" strokeWidth="1.5"/>
             {isAnom&&(
               <g>
-                <line x1={toRight?cx+10:cx-10} y1={cy} x2={toRight?lx:lx+ALBLW} y2={ly+17} stroke="#d4a0a0" strokeWidth="1.2" strokeDasharray="4,3"/>
-                <rect x={lx} y={ly} width={ALBLW} height="35" rx="6" fill="rgba(255,255,255,0.97)" stroke="#e0c8c8" strokeWidth="1.2"/>
-                <text x={lx+ALBLW/2} y={ly+14} textAnchor="middle" fontSize="15" fill="#1a1a1a" fontWeight="700">{sn}</text>
-                <text x={lx+ALBLW/2} y={ly+28} textAnchor="middle" fontSize="13" fill="#c05050">{reason}</text>
+                <line x1={toRight?cx+7:cx-7} y1={cy} x2={toRight?lx:lx+ALBLW} y2={ly+11} stroke="#d4a0a0" strokeWidth="0.8" strokeDasharray="3,2"/>
+                <rect x={lx} y={ly} width={ALBLW} height="22" rx="4" fill="rgba(255,255,255,0.97)" stroke="#e0c8c8" strokeWidth="0.8"/>
+                <text x={lx+ALBLW/2} y={ly+9} textAnchor="middle" fontSize="9.5" fill="#1a1a1a" fontWeight="700">{sn}</text>
+                <text x={lx+ALBLW/2} y={ly+18} textAnchor="middle" fontSize="8.5" fill="#c05050">{reason}</text>
               </g>
             )}
           </g>
         );
       })}
       {/* 축 라벨 */}
-      <text x={W/2} y={H-PY+32} textAnchor="middle" fontSize="21" fill="#9ca3af" fontWeight="600">마진 →</text>
-      <text transform="rotate(-90)" x={-(H/2)} y={56} textAnchor="middle" fontSize="21" fill="#9ca3af" fontWeight="600">채널적합 ↑</text>
+      <text x={W/2} y={H-PY+20} textAnchor="middle" fontSize="12" fill="#9ca3af" fontWeight="500">마진 →</text>
+      <text transform="rotate(-90)" x={-(H/2)} y={40} textAnchor="middle" fontSize="12" fill="#9ca3af" fontWeight="500">채널적합 ↑</text>
     </svg>
   );
 }
