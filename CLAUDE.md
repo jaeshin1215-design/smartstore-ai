@@ -49,7 +49,7 @@ return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
 ## 결제 시스템
 - Toss Payments (빌링/정기결제) — 월요일 1544-7772 문의 필요
 
-## Tom 재개 명령 (최종 업데이트 2026-07-06)
+## Tom 재개 명령 (최종 업데이트 2026-07-07)
 
 ### 완료 목록 (2026-07-06~07)
 - **완료**: 이지스토리 61개 상품 전체 삭제 후 재등록 (scratch/seed_izstory_v2.mjs, 매입가=원가×EA÷1.1)
@@ -59,15 +59,17 @@ return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
 - **완료**: StoreSetupTab.tsx 이상탐지 배너 price=0/null falsy 버그 수정 → "판매가 미입력" 경고
 - **완료**: Discover 탭 검색량 라벨 구분 (조회 실패 / 검색량 없음) + monthlySearch "<1K" 버그 수정
 - **완료**: AI 코멘트(/api/discover-advice) 추세 방향(하강/시즌종료/급상승) 프롬프트 명시 반영
-- **완료**: Phase 1 — DiscoverMatrix (마진×채널적합 4분면 산점도, 이상신호 괴리 감지, 클릭 채점) (DiscoverTab.tsx)
-- **완료**: Phase 3 — ProductTimeHeatmap (상품×시간 수요 히트맵, 오늘 구분선, 선행2주 화살표, 예측가상 구간) (DiscoverTab.tsx)
-- **완료**: Prophet/XGBoost 프리뷰 섹션 제거 → 히트맵으로 교체 (TrendTab.tsx, DiscoverTab.tsx)
-- **완료**: 판매 195건 날짜 범위 재확인 — 2026-06-26~06-30, 5일치 확정 (check_order_dates.mjs)
-- **완료 (2026-07-07)**: Discover 6개 항목 — 축 라벨·명칭·square cells·baseline API·disclaimer·D-60 인프라·Prophet 스캐폴드 (커밋 c5121c8)
+- **완료**: Discover Matrix + ProductTimeHeatmap 전체 피니시 (커밋 831f158, 2026-07-07)
+  - SVG 텍스트 통일, 채널점수 세분화(±20/±8), PATCH 라우트, 카테고리 색상, 이지스토리 사이드바
+  - DataLab 연결 + Prophet fallback + X축 주단위 날짜 라벨
+  - 히트맵 범례 "구매확률" → "검색 관심도" 정정
+  - 실판매 보조 지표(압축팩 130, 다리미판 23, 화분 0) + 괴리 배지(화분 !)
+  - 발굴현황 카드 중복 제거 (hotKeywords dedup + allGridCards 최종 dedup)
+  - baseline 점 3겹 구조 (광채 링 r+6 opacity0.15 + 본체 r5/8, 불투명도 1.0)
+  - main pb-16 추가 (fixed notice bar 겹침 해소)
 
 ### 다음 자리
-- **#1**: sellfit.kr 접속 후 Discover 탭 화면 확인 + Jae 피드백 반영
-- **#2 (D-60 활성화)**: POST /api/db/migrate-discover-v1 실행 → 테이블 생성 → POST /api/cron/discover-engine 수동 테스트
-- **#3 (Prophet 실제 연동)**: modal.com 계정 생성 → `modal deploy scripts/prophet_app.py` → MODAL_PROPHET_URL 환경변수 등록
-- **#4 (실제 XGBoost)**: Sabangnet 개통 후 바스켓 500건+ 누적 → XGBoost 모델 (Sabangnet 승인 선행)
+- **#1 (D-60 활성화)**: POST /api/db/migrate-discover-v1 실행 → 테이블 생성 → POST /api/cron/discover-engine 수동 테스트
+- **#2 (Prophet 실제 연동)**: modal.com 계정 생성 → `modal deploy scripts/prophet_app.py` → MODAL_PROPHET_URL 환경변수 등록
+- **#3 (실제 XGBoost)**: Sabangnet 개통 후 바스켓 500건+ 누적 → XGBoost 모델 (Sabangnet 승인 선행)
 - **보류 중**: /demo ContentTab Google Flow 이미지/영상 프롬프트 탭 (Jae OK, 실행 대기)
