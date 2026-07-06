@@ -23,7 +23,7 @@ interface Candidate { no: string; name: string; category: string; thumb?: string
 interface ScoreAxis { score: number; label: string; evidence: string; }
 interface ScoreResult { seasonality: ScoreAxis; margin: ScoreAxis; competition: ScoreAxis; channel: ScoreAxis; total: number; verdict: "적극 추천"|"검토 필요"|"보류 권장"; reason: string; }
 interface HotKeyword { keyword: string; growth: number; comment: string; }
-interface GridCard { id: string; name: string; category: string; status: "실증"|"검토"|"발굴 예정"; reason: string; keyword?: string; matrix_x?: number; matrix_y?: number; }
+interface GridCard { id: string; name: string; category: string; status: "실증"|"검토"|"발굴 예정"|"D-60"; reason: string; keyword?: string; matrix_x?: number; matrix_y?: number; }
 
 // ── Scoring helpers ───────────────────────────────────────────────────────────
 function scoreBarColor(s: number) { return s >= 70 ? PINK.main : s >= 40 ? PINK.mid : "#F3C9D9"; }
@@ -38,9 +38,10 @@ const STATUS_STYLE: Record<CandidateStatus, {bg:string;color:string}> = {
 const VERDICT_STYLE: Record<ScoreResult["verdict"],{bg:string;color:string}> = {
   "적극 추천": {bg:PINK.light,color:PINK.main}, "검토 필요": {bg:PINK.light,color:PINK.mid}, "보류 권장": {bg:"#EFEFF1",color:"#9ca3af"},
 };
-const GRID_STATUS_STYLE: Record<"실증"|"검토"|"발굴 예정",{bg:string;color:string}> = {
+const GRID_STATUS_STYLE: Record<"실증"|"검토"|"발굴 예정"|"D-60",{bg:string;color:string}> = {
   실증: {bg:PINK.light,color:PINK.main}, 검토: {bg:PINK.light,color:PINK.mid},
   "발굴 예정": {bg:"rgba(255,255,255,0.6)",color:"#6b7280"},
+  "D-60": {bg:"rgba(212,83,126,0.18)",color:PINK.main},
 };
 
 const SEASONALITY = { CV_EVERGREEN_THRESHOLD:0.15, SCORE_SURGE:88, SCORE_RISING:74, SCORE_PEAK:58, SCORE_FALLING:35, SCORE_OFF:18, EVERGREEN_MIN:60 };
@@ -148,7 +149,7 @@ function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
 
 // ── DiscoverMatrix: 마진 × 채널적합 4분면 산점도 ──────────────────────────────
 function DiscoverMatrix({
-  candidates, candidateScores, selected, onSelect, autoScoring, scoredSoFar,
+  candidates, candidateScores, selected, onSelect, autoScoring, scoredSoFar, baseline,
 }: {
   candidates: Candidate[];
   candidateScores: Record<string, ScoreResult>;
@@ -156,6 +157,7 @@ function DiscoverMatrix({
   onSelect: (c: Candidate) => void;
   autoScoring?: boolean;
   scoredSoFar?: number;
+  baseline?: Array<{id:string; name:string; margin_score:number; channel_score:number}>;
 }) {
   const W=500, H=420, PX=44, PY=40;
   const pw=W-PX*2, ph=H-PY*2;
@@ -198,6 +200,10 @@ function DiscoverMatrix({
           {autoScoring?`채점 중… (${scoredSoFar??0}/${candidates.length})`:"채점 결과가 표시됩니다"}
         </text>
       )}
+      {(baseline??[]).map(item=>{
+        const cx=xFn(item.margin_score), cy=yFn(item.channel_score);
+        return(<circle key={`bl-${item.id}`} cx={cx} cy={cy} r="3.5" fill="#d1d5db" stroke="white" strokeWidth="1" opacity="0.6"/>);
+      })}
       {scored.map(c=>{
         const sc=candidateScores[c.no];
         const cx=xFn(sc.margin.score), cy=yFn(sc.channel.score);
@@ -222,6 +228,9 @@ function DiscoverMatrix({
           </g>
         );
       })}
+      {/* 축 라벨 — 아이템 1 */}
+      <text x={W/2} y={H-PY+20} textAnchor="middle" fontSize="10" fill="#b0b8c4" fontWeight="500">마진 →</text>
+      <text transform="rotate(-90)" x={-(H/2)} y={14} textAnchor="middle" fontSize="10" fill="#b0b8c4" fontWeight="500">채널적합 ↑</text>
     </svg>
   );
 }
@@ -231,9 +240,9 @@ function ProductTimeHeatmap() {
   // 이지스토리 실제 4개 카테고리
   const PRODS=["압축팩","다리미판","화분","유아매트"];
   const PAST=8, FUTURE=4, TOTAL=PAST+FUTURE;
-  const CW=40,CH=52,GAP=8,LPAD=92,THEAD=32,BPAD=28;
-  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 660
-  const W=CELLS_W+72; // 732
+  const CW=44,CH=44,GAP=10,LPAD=92,THEAD=32,BPAD=28;
+  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 730
+  const W=CELLS_W+72; // 802
   const H=THEAD+PRODS.length*(CH+GAP)-GAP+BPAD;
   // 카테고리 특성 기반 예시 패턴 (과거8주 | 예측4주)
   // 압축팩: 이사·장마 2피크 — 봄 이사철 높고 미래 장마 재상승
@@ -327,9 +336,21 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [regDone,setRegDone]=useState(false);
   const [adviceText,setAdviceText]=useState("");
   const [generatingAdvice,setGeneratingAdvice]=useState(false);
+  const [baselineItems,setBaselineItems]=useState<{id:string;name:string;margin_score:number;channel_score:number}[]>([]);
+  const [d60Cards,setD60Cards]=useState<GridCard[]>([]);
 
   const inputRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{setCandidateScores({});candidateScoresRef.current={};setScoring(null);},[track]);
+  useEffect(()=>{
+    const sid=typeof window!=="undefined"?localStorage.getItem("sellfit_store_id"):null;
+    if(!sid)return;
+    fetch(`/api/discover/baseline?store_id=${encodeURIComponent(sid)}`).then(r=>r.json()).then(j=>{if(j.items)setBaselineItems(j.items);}).catch(()=>{});
+  },[]);
+  useEffect(()=>{
+    const sid=typeof window!=="undefined"?localStorage.getItem("sellfit_store_id"):null;
+    if(!sid)return;
+    fetch(`/api/discover/cards?store_id=${encodeURIComponent(sid)}`).then(r=>r.json()).then(j=>{if(j.cards)setD60Cards(j.cards);}).catch(()=>{});
+  },[]);
   useEffect(()=>{
     if(mode!=="auto"||hotKeywords.length>0)return;
     setAutoLoading(true);
@@ -445,7 +466,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const scoredCount=Object.keys(candidateScores).length;
   const visibleCandidates=candidates.filter(c=>c.status!=="보류").sort((a,b)=>(candidateScores[b.no]?.total??-1)-(candidateScores[a.no]?.total??-1));
   const discoveryCards:GridCard[]=hotKeywords.filter(kw=>!gridCards.some(c=>c.keyword===kw.keyword)).slice(0,Math.max(0,6-gridCards.length)).map(kw=>({id:`hot-${kw.keyword}`,name:kw.keyword,category:"시즌 키워드",status:"발굴 예정" as const,reason:kw.growth!==0?`${kw.growth>0?"▲":"▼"}${Math.abs(kw.growth)}% 트렌드${kw.comment?` · ${kw.comment}`:""}`:kw.comment||"시즌 추천",keyword:kw.keyword}));
-  const allGridCards:GridCard[]=[...gridCards,...discoveryCards];
+  const allGridCards:GridCard[]=[...gridCards,...d60Cards,...discoveryCards];
 
   const selectStyle:React.CSSProperties={width:"100%",height:"36px",padding:"0 10px",fontSize:"13px",border:`1.5px solid ${PINK.mid}`,borderRadius:"8px",background:"#fff",color:"#111",fontFamily:"inherit",outline:"none"};
 
@@ -541,9 +562,9 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
           {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭, 항상 표시) ── */}
           <div style={{ marginBottom:"24px" }}>
             <div style={{ ...CARD_STYLE, padding:"16px 18px 14px", marginBottom:"16px" }}>
-              <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>
-                발굴 매트릭스 · 마진 × 채널적합
-                {autoScoring&&<span style={{ marginLeft:"8px", color:PINK.mid }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
+              <p style={{ fontSize:"14px", color:"#1a1a1a", fontWeight:700, margin:"0 0 10px 2px" }}>
+                Discover Matrix
+                {autoScoring&&<span style={{ fontSize:"11px", marginLeft:"10px", color:PINK.mid }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
               </p>
               <DiscoverMatrix
                 candidates={visibleCandidates}
@@ -552,12 +573,13 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                 onSelect={scoreCandidate}
                 autoScoring={autoScoring}
                 scoredSoFar={autoScoredCount}
+                baseline={baselineItems}
               />
             </div>
             <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
-              <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>상품 수요 예측 · 상품 × 시간</p>
+              <p style={{ fontSize:"14px", color:"#1a1a1a", fontWeight:700, margin:"0 0 10px 2px" }}>Demand Forecast</p>
               <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
-                <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
+                <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>잠정값 · 사방넷 연동 후 실제 매출 데이터로 교체 예정</p>
               </div>
               <ProductTimeHeatmap />
             </div>
@@ -741,7 +763,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                 <h2 style={{ fontSize:"20px", fontWeight:800, margin:"0 0 4px", letterSpacing:"-0.01em" }}>발굴 현황</h2>
                 <p style={{ fontSize:"13px", color:"#9ca3af", margin:0 }}>발굴·채점된 상품이 쌓입니다 — 클릭하면 분석 진입</p>
               </div>
-              <span style={{ fontSize:"13px", fontWeight:600, color:"#6b7280" }}>실증 {gridCards.filter(c=>c.status==="실증").length} · 검토 {gridCards.filter(c=>c.status==="검토").length} · 발굴 예정 {allGridCards.filter(c=>c.status==="발굴 예정").length}</span>
+              <span style={{ fontSize:"13px", fontWeight:600, color:"#6b7280" }}>실증 {gridCards.filter(c=>c.status==="실증").length} · 검토 {gridCards.filter(c=>c.status==="검토").length}{d60Cards.length>0?` · D-60 ${d60Cards.length}`:""} · 발굴 예정 {allGridCards.filter(c=>c.status==="발굴 예정").length}</span>
             </div>
             {allGridCards.length===0?(
               <div style={{ padding:"48px 24px", textAlign:"center", background:"#fff", borderRadius:"12px", border:"1px dashed #e5e7eb" }}>
