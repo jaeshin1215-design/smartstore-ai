@@ -153,7 +153,7 @@ export default function Home() {
 
 
       {/* ── Main content ── */}
-      <main className="w-full px-6 py-6">
+      <main className="w-full px-6 py-6 pb-16">
         {activeTab === "discover" && (
           <DiscoverTab onNavigateToContent={(kw) => { setSeoKeyword(kw); setActiveTab("content"); }} />
         )}

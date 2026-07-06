@@ -263,18 +263,23 @@ function DiscoverMatrix({
               const ms=ov?.ms??item.margin_score, cs_=ov?.cs??item.channel_score;
               const cx=xFn(ms), cy=yFn(cs_);
               const isH=blHover===item.id, isS=blSel===item.id, isDrag=dragging===item.id;
-              const r_=isS||isDrag?6:isH?4.5:3.5;
+              const r_=isS||isDrag?8:isH?6:5;
               const fill_=blColor(item.category||"기타");
-              const op=(blHover||blSel||dragging)?(isH||isS||isDrag?1:0.25):0.7;
+              const op=(blHover||blSel||dragging)?(isH||isS||isDrag?1:0.25):1.0;
               return(
-                <circle key={`bl-${item.id}`} cx={cx} cy={cy} r={r_}
-                  fill={fill_} stroke="white" strokeWidth="1" opacity={op}
+                <g key={`bl-${item.id}`}
                   style={{cursor:isDrag?"grabbing":"grab"}}
                   onMouseDown={(e)=>{e.preventDefault();e.stopPropagation();setDragging(item.id);}}
                   onMouseEnter={()=>onBlHover?.(item.id)}
                   onMouseLeave={()=>{if(!dragging)onBlHover?.(null);}}
                   onClick={()=>{if(!dragging)onBlClick?.(blSel===item.id?null:item.id);}}
-                />
+                  opacity={op}
+                >
+                  {/* 바깥 광채 링 */}
+                  <circle cx={cx} cy={cy} r={r_+6} fill={fill_} opacity="0.15"/>
+                  {/* 본체 점 */}
+                  <circle cx={cx} cy={cy} r={r_} fill={fill_} stroke="white" strokeWidth="1.2"/>
+                </g>
               );
             })}
             {finalPos.map(({cat,cx,boxY})=>{
