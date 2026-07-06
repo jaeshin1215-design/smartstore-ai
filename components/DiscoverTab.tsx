@@ -81,7 +81,9 @@ async function getChannelScoreHybrid(kw: string): Promise<ScoreAxis> {
 
 async function fetchSeasonality(keyword: string): Promise<ScoreAxis> {
   try {
-    const res = await fetch("/api/naver-trend", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({keyword}) });
+    // 52주 주별 데이터 요청 — 30일 일별로는 겨울 상품의 여름 저점이 균일하게 나와
+    // CV가 낮아 "상시"로 오분류됨. 52주면 연간 계절 진폭을 제대로 포착함.
+    const res = await fetch("/api/naver-trend", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({keyword, weeks: 52}) });
     if (!res.body) return {score:50,label:"조회 실패",evidence:"DataLab 조회 실패"};
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
     while (true) {
@@ -97,8 +99,9 @@ async function fetchSeasonality(keyword: string): Promise<ScoreAxis> {
             const r=evt.trend.ratios, n=r.length, mean=r.reduce((s,x)=>s+x,0)/n;
             if (mean===0) return {score:50,label:"검색량 없음",evidence:"검색량 없음"};
             const std=Math.sqrt(r.reduce((s,x)=>s+(x-mean)**2,0)/n), cv=std/mean;
-            const r7=r.slice(-7),p7=r.slice(-14,-7);
-            const rA=r7.reduce((s,x)=>s+x,0)/(r7.length||1), pA=p7.reduce((s,x)=>s+x,0)/(p7.length||1);
+            // 주별 데이터: 최근 4주 vs 이전 4주로 추세 계산
+            const rW=r.slice(-4), pW=r.slice(-8,-4);
+            const rA=rW.reduce((s,x)=>s+x,0)/(rW.length||1), pA=pW.reduce((s,x)=>s+x,0)/(pW.length||1);
             const g=pA>0?(rA-pA)/pA:0, cvP=Math.round(cv*100), gS=`${g>=0?"▲":"▼"}${Math.abs(Math.round(g*100))}%`;
             if (cv<SEASONALITY.CV_EVERGREEN_THRESHOLD) return {score:Math.round(Math.max(SEASONALITY.EVERGREEN_MIN,Math.min(100,(1-cv)*110))),label:"상시",evidence:`상시 수요 · CV ${cvP}% · 추세 ${gS}`};
             let score:number,label:string;

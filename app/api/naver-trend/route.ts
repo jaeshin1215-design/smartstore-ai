@@ -7,19 +7,21 @@ const NAVER_API = "https://openapi.naver.com/v1/datalab/search";
 const CLIENT_ID = process.env.NAVER_DATALAB_CLIENT_ID!;
 const CLIENT_SECRET = process.env.NAVER_DATALAB_CLIENT_SECRET!;
 
-function getDateRange() {
+function getDateRange(days = 29) {
   const end = new Date();
   const start = new Date();
-  start.setDate(start.getDate() - 29);
+  start.setDate(start.getDate() - days);
   const fmt = (d: Date) => d.toISOString().split("T")[0];
   return { startDate: fmt(start), endDate: fmt(end) };
 }
 
 async function naverSearch(
   keywordGroups: { groupName: string; keywords: string[] }[],
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
+  opts: { days?: number; timeUnit?: string } = {}
 ) {
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = getDateRange(opts.days ?? 29);
+  const timeUnit = opts.timeUnit ?? "date";
   const res = await fetch(NAVER_API, {
     method: "POST",
     headers: {
@@ -27,7 +29,7 @@ async function naverSearch(
       "X-Naver-Client-Secret": CLIENT_SECRET,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ startDate, endDate, timeUnit: "date", keywordGroups, ...extra }),
+    body: JSON.stringify({ startDate, endDate, timeUnit, keywordGroups, ...extra }),
   });
   if (!res.ok) throw new Error(`Naver API ${res.status}`);
   return res.json();
@@ -162,8 +164,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   if (body.mode === "auto") return handleAutoMode();
 
-  const { keyword } = body;
+  const { keyword, weeks } = body;
   if (!keyword) return NextResponse.json({ error: "키워드를 입력해주세요." }, { status: 400 });
+
+  // weeks 지정 시 주별 데이터 (seasonality 채점용), 없으면 기본 30일 일별
+  const queryOpts = (typeof weeks === "number" && weeks > 0)
+    ? { days: weeks * 7, timeUnit: "week" }
+    : {};
 
   const encoder = new TextEncoder();
   const send = (obj: object) => encoder.encode(JSON.stringify(obj) + "\n");
@@ -187,13 +194,13 @@ export async function POST(req: NextRequest) {
 
         // Step 2: Naver API 병렬 호출
         const settledResults = await Promise.allSettled([
-          naverSearch(mainGroup),
-          naverSearch(mainGroup, { gender: "m" }),
-          naverSearch(mainGroup, { gender: "f" }),
-          naverSearch(mainGroup, { ages: ["2", "3", "4"] }),
-          naverSearch(mainGroup, { ages: ["5"] }),
-          naverSearch(mainGroup, { ages: ["6", "7", "8"] }),
-          ...(relatedKeywords.length > 0 ? [naverSearch(top5Groups)] : []),
+          naverSearch(mainGroup, {}, queryOpts),
+          naverSearch(mainGroup, { gender: "m" }, queryOpts),
+          naverSearch(mainGroup, { gender: "f" }, queryOpts),
+          naverSearch(mainGroup, { ages: ["2", "3", "4"] }, queryOpts),
+          naverSearch(mainGroup, { ages: ["5"] }, queryOpts),
+          naverSearch(mainGroup, { ages: ["6", "7", "8"] }, queryOpts),
+          ...(relatedKeywords.length > 0 ? [naverSearch(top5Groups, {}, queryOpts)] : []),
         ]);
         const [mainR, maleR, femaleR, age2030R, age40R, age50R] = settledResults;
         const relatedR = settledResults[6];
