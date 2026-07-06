@@ -157,7 +157,7 @@ function DiscoverMatrix({
   autoScoring?: boolean;
   scoredSoFar?: number;
 }) {
-  const W=500, H=260, PX=36, PY=24;
+  const W=500, H=420, PX=44, PY=40;
   const pw=W-PX*2, ph=H-PY*2;
   const midX=PX+pw/2, midY=PY+ph/2;
   const xFn=(s:number)=>PX+(s/100)*pw;
@@ -182,7 +182,7 @@ function DiscoverMatrix({
       .map(c=>c.no)
   );
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:"680px",display:"block"}}>
       <rect x={PX} y={PY} width={pw/2} height={ph/2} fill="#e8eef8"/>
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
@@ -230,9 +230,9 @@ function DiscoverMatrix({
 function ProductTimeHeatmap() {
   const PRODS=["화분","압축팩","다리미판","전기장판","캠핑 아이스박스"];
   const PAST=8, FUTURE=4, TOTAL=PAST+FUTURE;
-  const CW=40,CH=36,GAP=2,LPAD=92,THEAD=32,BPAD=28;
-  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 594 — 셀 오른쪽 끝
-  const W=CELLS_W+72; // 666 — 오른쪽 브라켓 주석 공간 확보
+  const CW=40,CH=52,GAP=8,LPAD=92,THEAD=32,BPAD=28;
+  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 92+12*48-8 = 660
+  const W=CELLS_W+72; // 732 — 오른쪽 브라켓 주석 공간
   const H=THEAD+PRODS.length*(CH+GAP)-GAP+BPAD;
   const HEAT:number[][]=[
     [0.30,0.40,0.85,0.72,0.50,0.35,0.30,0.22, 0.20,0.15,0.18,0.20],
