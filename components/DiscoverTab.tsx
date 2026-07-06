@@ -533,32 +533,30 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
             </div>
           )}
 
-          {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭) ── */}
-          {candidates.length>0&&(
-            <div style={{ marginBottom:"24px" }}>
-              <div style={{ ...CARD_STYLE, padding:"16px 18px 14px", marginBottom:"16px" }}>
-                <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>
-                  발굴 매트릭스 · 마진 × 채널적합
-                  {autoScoring&&<span style={{ marginLeft:"8px", color:PINK.mid }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
-                </p>
-                <DiscoverMatrix
-                  candidates={visibleCandidates}
-                  candidateScores={candidateScores}
-                  selected={selected}
-                  onSelect={scoreCandidate}
-                  autoScoring={autoScoring}
-                  scoredSoFar={autoScoredCount}
-                />
-              </div>
-              <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
-                <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>상품 수요 예측 · 상품 × 시간</p>
-                <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
-                  <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
-                </div>
-                <ProductTimeHeatmap />
-              </div>
+          {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭, 항상 표시) ── */}
+          <div style={{ marginBottom:"24px" }}>
+            <div style={{ ...CARD_STYLE, padding:"16px 18px 14px", marginBottom:"16px" }}>
+              <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>
+                발굴 매트릭스 · 마진 × 채널적합
+                {autoScoring&&<span style={{ marginLeft:"8px", color:PINK.mid }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
+              </p>
+              <DiscoverMatrix
+                candidates={visibleCandidates}
+                candidateScores={candidateScores}
+                selected={selected}
+                onSelect={scoreCandidate}
+                autoScoring={autoScoring}
+                scoredSoFar={autoScoredCount}
+              />
             </div>
-          )}
+            <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
+              <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>상품 수요 예측 · 상품 × 시간</p>
+              <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
+                <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
+              </div>
+              <ProductTimeHeatmap />
+            </div>
+          </div>
 
           {/* Board: 34fr 66fr */}
           <div style={{ display:"grid", gridTemplateColumns:"34fr 66fr", gap:"24px", alignItems:"start" }}>
