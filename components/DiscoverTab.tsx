@@ -604,7 +604,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
           {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭, 항상 표시) ── */}
           <div style={{ marginBottom:"24px" }}>
             <div style={{ ...CARD_STYLE, padding:"18px 20px 16px", marginBottom:"16px" }}>
-              <p style={{ fontSize:"18px", color:"#0d0d0e", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>
+              <p style={{ fontSize:"20px", color:"#111", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>
                 Discover Matrix
                 {autoScoring&&<span style={{ fontSize:"12px", marginLeft:"12px", color:PINK.mid, fontWeight:500 }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
               </p>
@@ -619,7 +619,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
               />
             </div>
             <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
-              <p style={{ fontSize:"18px", color:"#0d0d0e", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>Demand Forecast</p>
+              <p style={{ fontSize:"20px", color:"#111", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>Demand Forecast</p>
               <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
                 <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>잠정값 · 사방넷 연동 후 실제 매출 데이터로 교체 예정</p>
               </div>
