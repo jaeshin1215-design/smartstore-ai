@@ -184,7 +184,7 @@ function DiscoverMatrix({
       .map(c=>c.no)
   );
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:"802px",display:"block"}}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
       <rect x={PX} y={PY} width={pw/2} height={ph/2} fill="#e8eef8"/>
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
@@ -585,7 +585,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
 
           {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭, 항상 표시) ── */}
           <div style={{ marginBottom:"24px" }}>
-            <div style={{ ...CARD_STYLE, padding:"16px 18px 14px", marginBottom:"16px" }}>
+            <div style={{ ...CARD_STYLE, padding:"18px 20px 16px", marginBottom:"16px" }}>
               <p style={{ fontSize:"18px", color:"#0d0d0e", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>
                 Discover Matrix
                 {autoScoring&&<span style={{ fontSize:"12px", marginLeft:"12px", color:PINK.mid, fontWeight:500 }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
