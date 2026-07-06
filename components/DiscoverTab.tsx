@@ -146,6 +146,75 @@ function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
   return o.map((a,i)=>({...a,label:`${"①②③④"[i]} ${a.key}`,highlight:i===0}));
 }
 
+// ── XGBoost 교차판매 예측 미리보기 (정적 목업) ────────────────────────────────
+function XGBoostNetworkPreview() {
+  const nodes:[string,number,number,number,boolean][] = [
+    ["압축팩",    230, 130, 30, true],
+    ["다리미판",  370,  60, 22, false],
+    ["빨래건조대",370, 195, 20, false],
+    ["분리수거함",  90, 195, 19, false],
+    ["화분",       90,  60, 17, false],
+  ];
+  const edges:[string,string,number][] = [
+    ["압축팩","다리미판",34],
+    ["압축팩","분리수거함",21],
+    ["압축팩","빨래건조대",18],
+    ["압축팩","화분",12],
+    ["다리미판","빨래건조대",9],
+  ];
+  const nm = Object.fromEntries(nodes.map(([id,x,y])=>[id,{x,y}]));
+  return (
+    <div style={{ ...CARD_STYLE, padding:"24px 28px" }}>
+      {/* 예시 배너 — 제거 금지 */}
+      <div style={{ padding:"6px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"16px" }}>
+        <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"24px", alignItems:"center" }}>
+        {/* SVG 네트워크 그래프 */}
+        <svg viewBox="0 0 460 260" style={{ width:"100%", maxHeight:"260px" }}>
+          {edges.map(([from,to,pct])=>{
+            const a=nm[from], b=nm[to];
+            const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+            const op=pct>=25?1:pct>=15?0.7:0.45;
+            const sw=pct>=25?2.5:pct>=15?1.8:1.2;
+            return (
+              <g key={`${from}-${to}`}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={PINK.mid} strokeWidth={sw} opacity={op}/>
+                <rect x={mx-14} y={my-8} width="28" height="14" rx="4" fill="white" stroke={PINK.light} strokeWidth="1"/>
+                <text x={mx} y={my+4} textAnchor="middle" fontSize="9" fill={PINK.text} fontWeight="600">{pct}%</text>
+              </g>
+            );
+          })}
+          {nodes.map(([id,x,y,r,main])=>(
+            <g key={id}>
+              <circle cx={x} cy={y} r={r} fill={main?PINK.main:PINK.light} stroke={main?PINK.text:PINK.mid} strokeWidth={main?2:1.5}/>
+              <text x={x} y={y+r+13} textAnchor="middle" fontSize={main?"11":"10"} fill="#374151" fontWeight={main?"700":"500"}>{id}</text>
+            </g>
+          ))}
+        </svg>
+        {/* 우측 패널: TOP 3 + 안내 */}
+        <div>
+          <p style={{ fontSize:"11px", fontWeight:700, color:"#9ca3af", letterSpacing:"0.05em", textTransform:"uppercase", marginBottom:"12px" }}>동시 구매율 TOP 3</p>
+          {edges.slice(0,3).map(([from,to,pct],i)=>(
+            <div key={i} style={{ marginBottom:"12px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px" }}>
+                <span style={{ fontSize:"13px", fontWeight:600, color:"#111" }}>{from} × {to}</span>
+                <span style={{ fontSize:"14px", fontWeight:800, color:PINK.main }}>{pct}%</span>
+              </div>
+              <div style={{ height:"5px", background:"#f1f5f9", borderRadius:"3px", overflow:"hidden" }}>
+                <div style={{ height:"100%", width:`${pct*2.5}%`, background:PINK.main, borderRadius:"3px" }}/>
+              </div>
+            </div>
+          ))}
+          <p style={{ fontSize:"11px", color:"#9ca3af", marginTop:"16px", lineHeight:1.6 }}>
+            사방넷 주문 데이터 500건+ 누적 후<br/>실제 XGBoost 모델 가동 예정
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DiscoverTab({ onNavigateToContent }: { onNavigateToContent?: (keyword: string) => void } = {}) {
   const [track,setTrack]=useState<"steady"|"season">("steady");
@@ -571,6 +640,17 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                 })}
               </div>
             )}
+          </div>
+
+          {/* ── XGBoost 교차판매 예측 미리보기 ── */}
+          <div style={{ marginTop:"48px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"20px" }}>
+              <div>
+                <h2 style={{ fontSize:"20px", fontWeight:800, margin:"0 0 4px", letterSpacing:"-0.01em" }}>교차판매 예측</h2>
+                <p style={{ fontSize:"13px", color:"#9ca3af", margin:0 }}>함께 자주 구매되는 상품 조합을 AI로 예측합니다</p>
+              </div>
+            </div>
+            <XGBoostNetworkPreview />
           </div>
 
         </div>{/* /Right column inner 1232px */}
