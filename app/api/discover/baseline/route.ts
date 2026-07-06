@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       const ms   = Math.min(100, Math.round(pct * 2));
       const kw   = String(r.keyword || r.name || "");
       const cs   = channelScore(kw);
-      return { id: String(r.id), name: String(r.name || ""), margin_score: ms, channel_score: cs };
+      return { id: String(r.id), name: String(r.name || ""), category: String(r.category || ""), margin_score: ms, channel_score: cs };
     });
     return NextResponse.json({ items });
   } catch (e) {

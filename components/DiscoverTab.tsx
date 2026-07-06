@@ -157,7 +157,7 @@ function DiscoverMatrix({
   onSelect: (c: Candidate) => void;
   autoScoring?: boolean;
   scoredSoFar?: number;
-  baseline?: Array<{id:string; name:string; margin_score:number; channel_score:number}>;
+  baseline?: Array<{id:string; name:string; category:string; margin_score:number; channel_score:number}>;
 }) {
   const W=500, H=420, PX=44, PY=40;
   const pw=W-PX*2, ph=H-PY*2;
@@ -184,7 +184,7 @@ function DiscoverMatrix({
       .map(c=>c.no)
   );
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:"680px",display:"block"}}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:"802px",display:"block"}}>
       <rect x={PX} y={PY} width={pw/2} height={ph/2} fill="#e8eef8"/>
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
@@ -200,10 +200,34 @@ function DiscoverMatrix({
           {autoScoring?`채점 중… (${scoredSoFar??0}/${candidates.length})`:"채점 결과가 표시됩니다"}
         </text>
       )}
-      {(baseline??[]).map(item=>{
-        const cx=xFn(item.margin_score), cy=yFn(item.channel_score);
-        return(<circle key={`bl-${item.id}`} cx={cx} cy={cy} r="3.5" fill="#d1d5db" stroke="white" strokeWidth="1" opacity="0.6"/>);
-      })}
+      {(()=>{
+        const bl=baseline??[];
+        // 카테고리별 센트로이드 계산
+        const cats:Record<string,{sumX:number;sumY:number;cnt:number}>={};
+        for(const item of bl){
+          const k=item.category||"기타";
+          if(!cats[k])cats[k]={sumX:0,sumY:0,cnt:0};
+          cats[k].sumX+=item.margin_score; cats[k].sumY+=item.channel_score; cats[k].cnt++;
+        }
+        return(
+          <>
+            {bl.map(item=>{
+              const cx=xFn(item.margin_score), cy=yFn(item.channel_score);
+              return(<circle key={`bl-${item.id}`} cx={cx} cy={cy} r="3.5" fill="#d1d5db" stroke="white" strokeWidth="1" opacity="0.6"/>);
+            })}
+            {Object.entries(cats).map(([cat,v])=>{
+              const cx=xFn(v.sumX/v.cnt), cy=yFn(v.sumY/v.cnt);
+              const short=cat.length>4?cat.slice(0,4):cat;
+              return(
+                <g key={`lbl-${cat}`}>
+                  <rect x={cx-18} y={cy-20} width="36" height="14" rx="3" fill="rgba(255,255,255,0.88)" stroke="#d1d5db" strokeWidth="0.8"/>
+                  <text x={cx} y={cy-9} textAnchor="middle" fontSize="9" fill="#6b7280" fontWeight="600">{short}</text>
+                </g>
+              );
+            })}
+          </>
+        );
+      })()}
       {scored.map(c=>{
         const sc=candidateScores[c.no];
         const cx=xFn(sc.margin.score), cy=yFn(sc.channel.score);
@@ -228,9 +252,9 @@ function DiscoverMatrix({
           </g>
         );
       })}
-      {/* 축 라벨 — 아이템 1 */}
-      <text x={W/2} y={H-PY+20} textAnchor="middle" fontSize="10" fill="#b0b8c4" fontWeight="500">마진 →</text>
-      <text transform="rotate(-90)" x={-(H/2)} y={14} textAnchor="middle" fontSize="10" fill="#b0b8c4" fontWeight="500">채널적합 ↑</text>
+      {/* 축 라벨 */}
+      <text x={W/2} y={H-PY+22} textAnchor="middle" fontSize="13" fill="#9ca3af" fontWeight="600">마진 →</text>
+      <text transform="rotate(-90)" x={-(H/2)} y={16} textAnchor="middle" fontSize="13" fill="#9ca3af" fontWeight="600">채널적합 ↑</text>
     </svg>
   );
 }
@@ -336,7 +360,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [regDone,setRegDone]=useState(false);
   const [adviceText,setAdviceText]=useState("");
   const [generatingAdvice,setGeneratingAdvice]=useState(false);
-  const [baselineItems,setBaselineItems]=useState<{id:string;name:string;margin_score:number;channel_score:number}[]>([]);
+  const [baselineItems,setBaselineItems]=useState<{id:string;name:string;category:string;margin_score:number;channel_score:number}[]>([]);
   const [d60Cards,setD60Cards]=useState<GridCard[]>([]);
 
   const inputRef=useRef<HTMLInputElement>(null);
@@ -562,9 +586,9 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
           {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭, 항상 표시) ── */}
           <div style={{ marginBottom:"24px" }}>
             <div style={{ ...CARD_STYLE, padding:"16px 18px 14px", marginBottom:"16px" }}>
-              <p style={{ fontSize:"14px", color:"#1a1a1a", fontWeight:700, margin:"0 0 10px 2px" }}>
+              <p style={{ fontSize:"18px", color:"#0d0d0e", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>
                 Discover Matrix
-                {autoScoring&&<span style={{ fontSize:"11px", marginLeft:"10px", color:PINK.mid }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
+                {autoScoring&&<span style={{ fontSize:"12px", marginLeft:"12px", color:PINK.mid, fontWeight:500 }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
               </p>
               <DiscoverMatrix
                 candidates={visibleCandidates}
@@ -577,7 +601,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
               />
             </div>
             <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
-              <p style={{ fontSize:"14px", color:"#1a1a1a", fontWeight:700, margin:"0 0 10px 2px" }}>Demand Forecast</p>
+              <p style={{ fontSize:"18px", color:"#0d0d0e", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>Demand Forecast</p>
               <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
                 <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>잠정값 · 사방넷 연동 후 실제 매출 데이터로 교체 예정</p>
               </div>
