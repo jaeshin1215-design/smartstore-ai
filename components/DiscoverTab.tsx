@@ -325,17 +325,23 @@ function DiscoverMatrix({
 }
 
 // ── ProductTimeHeatmap: 상품 × 시간 수요 히트맵 ────────────────────────────────
-type HeatRow = {name:string;past:number[];future:number[];trend:string;src:string};
+type HeatRow = {name:string;past:number[];future:number[];trend:string;src:string;rawPast?:number[]};
 type HeatPayload = {products:HeatRow[];weekLabels:string[];source:string};
 
-function ProductTimeHeatmap() {
+function ProductTimeHeatmap({storeId}:{storeId?:string}) {
   const [heatData,setHeatData]=useState<HeatPayload|null>(null);
+  const [salesData,setSalesData]=useState<Record<string,number>>({});
   const [loading,setLoading]=useState(true);
   useEffect(()=>{
     fetch("/api/discover/heatmap")
       .then(r=>r.json()).then((d:HeatPayload)=>{setHeatData(d);setLoading(false);})
       .catch(()=>setLoading(false));
-  },[]);
+    if(storeId){
+      fetch(`/api/discover/sales?store_id=${storeId}`)
+        .then(r=>r.json()).then((d:{sales:Record<string,number>})=>setSalesData(d.sales||{}))
+        .catch(()=>{});
+    }
+  },[storeId]);
 
   const PRODS=["압축팩","다리미판","화분","유아매트"];
   const PAST=8,FUTURE=4,TOTAL=PAST+FUTURE;
@@ -394,10 +400,22 @@ function ProductTimeHeatmap() {
         const ci=PAST+fi;
         return<rect key={`f${ri}-${fi}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(heatVal(ri,ci),true)} stroke="#d4b8b0" strokeWidth={1} strokeDasharray="4,3"/>;
       }))}
-      {/* Y축 상품명 */}
-      {PRODS.map((prod,ri)=>(
-        <text key={prod} x={LPAD-6} y={THEAD+ri*(CH+GAP)+CH/2+4} textAnchor="end" fontSize={prod.length>6?"9":prod.length>3?"10.5":"11.5"} fill="#374151" fontWeight="500">{prod}</text>
-      ))}
+      {/* Y축 상품명 + 판매수 + 괴리 배지 */}
+      {PRODS.map((prod,ri)=>{
+        const cy=THEAD+ri*(CH+GAP)+CH/2;
+        const salesCnt=salesData[prod]??-1;
+        const avgSearch=Array.from({length:PAST},(_,ci)=>heatVal(ri,ci)).reduce((s,v)=>s+v,0)/PAST;
+        const isGap=avgSearch>0.6&&salesCnt===0;
+        return(
+          <g key={prod}>
+            <text x={LPAD-6} y={cy-2} textAnchor="end" fontSize={prod.length>4?"9.5":"11"} fill="#374151" fontWeight="500">{prod}</text>
+            {salesCnt>=0&&(
+              <text x={LPAD-6} y={cy+11} textAnchor="end" fontSize="8" fill={isGap?"#dc2626":"#9ca3af"}>{salesCnt>0?`${salesCnt}건`:"판매0"}</text>
+            )}
+            {isGap&&<text x={LPAD-1} y={cy-4} textAnchor="end" fontSize="9" fill="#dc2626" fontWeight="700">!</text>}
+          </g>
+        );
+      })}
       {/* X축 주 단위 날짜 라벨 */}
       {weekLabels.map((lbl,ci)=>(
         <text key={`wl-${ci}`} x={LPAD+ci*(CW+GAP)+CW/2} y={gridBottom+13} textAnchor="middle" fontSize="7.5" fill={ci===PAST-1?"#888":"#b0b8c4"}>{lbl}</text>
@@ -410,7 +428,7 @@ function ProductTimeHeatmap() {
       )}
       {/* 범례: 과거 4단계 */}
       {[
-        {c:"#d96050",l:"구매확률 높음",border:false},
+        {c:"#d96050",l:"검색 관심도 높음",border:false},
         {c:"#eba090",l:"중간",border:false},
         {c:"#f4bdb4",l:"낮음",border:false},
         {c:"#fde8e4",l:"최저·예측(가상)",border:true},
@@ -743,7 +761,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
               <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
                 <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>잠정값 · 사방넷 연동 후 실제 매출 데이터로 교체 예정</p>
               </div>
-              <ProductTimeHeatmap />
+              <ProductTimeHeatmap storeId="984f8d32-6d13-402a-b251-9bedaf0b1f6a" />
             </div>
           </div>
 

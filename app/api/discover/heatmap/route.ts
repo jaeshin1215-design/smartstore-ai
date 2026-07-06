@@ -122,7 +122,7 @@ export async function GET() {
           avg(last4) > avg(prev4) * 1.1 ? "rising" :
           avg(last4) < avg(prev4) * 0.9 ? "falling" : "stable";
 
-        return { name, past, future, trend, src };
+        return { name, past, future, trend, src, rawPast: allRatios.slice(-PAST) };
       })
     );
 
