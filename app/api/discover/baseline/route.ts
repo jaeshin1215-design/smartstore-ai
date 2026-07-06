@@ -24,16 +24,16 @@ function channelScore(kw: string, price: number): number {
   for (const r of CH_RULES) {
     if (r.re.test(kw)) { base = r.score; break; }
   }
-  // 가격대 조정: 고가 상품은 채널 적합도↑, 저가는↓
+  // 가격대 조정: 고가 상품은 채널 적합도↑, 저가는↓ (±20 확대)
   const priceAdj =
-    price >= 50000 ? 7 :
-    price >= 30000 ? 4 :
-    price >= 15000 ? 2 :
+    price >= 50000 ? 20 :
+    price >= 30000 ? 12 :
+    price >= 15000 ? 5 :
     price >= 8000  ? 0 :
-    price >= 4000  ? -3 :
-    -6;
-  // 결정적 미세 분산: price 끝 두 자리로 ±3 범위 흩어짐
-  const micro = ((price % 100) / 100) * 6 - 3;
+    price >= 4000  ? -10 :
+    -18;
+  // 결정적 미세 분산: price 끝 두 자리로 ±8 범위 흩어짐
+  const micro = ((price % 100) / 100) * 16 - 8;
   return Math.max(5, Math.min(98, Math.round(base + priceAdj + micro)));
 }
 

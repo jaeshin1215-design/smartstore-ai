@@ -606,8 +606,15 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
 
   const scoredCount=Object.keys(candidateScores).length;
   const visibleCandidates=candidates.filter(c=>c.status!=="보류").sort((a,b)=>(candidateScores[b.no]?.total??-1)-(candidateScores[a.no]?.total??-1));
-  const discoveryCards:GridCard[]=hotKeywords.filter(kw=>!gridCards.some(c=>c.keyword===kw.keyword)).slice(0,Math.max(0,6-gridCards.length)).map(kw=>({id:`hot-${kw.keyword}`,name:kw.keyword,category:"시즌 키워드",status:"발굴 예정" as const,reason:kw.growth!==0?`${kw.growth>0?"▲":"▼"}${Math.abs(kw.growth)}% 트렌드${kw.comment?` · ${kw.comment}`:""}`:kw.comment||"시즌 추천",keyword:kw.keyword}));
-  const allGridCards:GridCard[]=[...gridCards,...d60Cards,...discoveryCards];
+  // hotKeywords 중복 제거 (같은 keyword 첫 번째 우선 — 정반대 메시지 방지)
+  const uniqueHotKws=hotKeywords.reduce<HotKeyword[]>((acc,kw)=>{if(!acc.some(k=>k.keyword===kw.keyword))acc.push(kw);return acc;},[]);
+  const discoveryCards:GridCard[]=uniqueHotKws
+    .filter(kw=>!gridCards.some(c=>c.keyword===kw.keyword)&&!d60Cards.some(c=>c.keyword===kw.keyword))
+    .slice(0,Math.max(0,6-gridCards.length))
+    .map(kw=>({id:`hot-${kw.keyword}`,name:kw.keyword,category:"시즌 키워드",status:"발굴 예정" as const,reason:kw.growth!==0?`${kw.growth>0?"▲":"▼"}${Math.abs(kw.growth)}% 트렌드${kw.comment?` · ${kw.comment}`:""}`:kw.comment||"시즌 추천",keyword:kw.keyword}));
+  // keyword 기반 최종 dedup (소스 간 중복 완전 제거)
+  const seenKws=new Set<string>();
+  const allGridCards:GridCard[]=[...gridCards,...d60Cards,...discoveryCards].filter(c=>{const k=c.keyword||c.id;if(seenKws.has(k))return false;seenKws.add(k);return true;});
 
   const selectStyle:React.CSSProperties={width:"100%",height:"36px",padding:"0 10px",fontSize:"13px",border:`1.5px solid ${PINK.mid}`,borderRadius:"8px",background:"#fff",color:"#111",fontFamily:"inherit",outline:"none"};
 
