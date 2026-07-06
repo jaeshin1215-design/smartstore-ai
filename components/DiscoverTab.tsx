@@ -585,6 +585,40 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
               <span style={{ fontSize:"13px", color:"#8f9399" }}>{f}</span>
             </div>
           ))}
+          {baselineItems.length>0&&(
+            <>
+              <div style={{ borderTop:"1px solid #e8eaed", margin:"12px 0 8px" }}/>
+              <p style={{ fontSize:"10px", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", color:"#9ca3af", margin:"0 0 6px" }}>이지스토리 상품</p>
+              <div style={{ maxHeight:"320px", overflowY:"auto" }}>
+                {(()=>{
+                  const groups=baselineItems.reduce((acc,item)=>{
+                    const k=item.category||"기타";
+                    if(!acc[k])acc[k]=[];
+                    acc[k].push(item);
+                    return acc;
+                  },{} as Record<string,{id:string;name:string;category:string;margin_score:number;channel_score:number}[]>);
+                  return Object.entries(groups).map(([cat,items])=>(
+                    <div key={cat}>
+                      <div style={{ fontSize:"9px", color:"#9ca3af", fontWeight:700, letterSpacing:"0.04em", textTransform:"uppercase", padding:"4px 0 2px" }}>{cat}</div>
+                      {items.map(item=>{
+                        const isH=blHover===item.id, isS=blSel===item.id;
+                        return(
+                          <div key={item.id}
+                            onMouseEnter={()=>setBlHover(item.id)}
+                            onMouseLeave={()=>setBlHover(null)}
+                            onClick={()=>setBlSel(blSel===item.id?null:item.id)}
+                            style={{ padding:"3px 4px 3px 6px", fontSize:"11px", color:isS?"#1a1a1a":isH?"#374151":"#6b7280", background:isS?"#eef2ff":isH?"#f9fafb":"transparent", cursor:"pointer", borderLeft:isS?"2px solid #5b8db8":"2px solid transparent", lineHeight:"1.5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", borderRadius:"3px" }}
+                          >
+                            {item.name.length>13?item.name.slice(0,13)+"…":item.name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right: all content */}
@@ -659,57 +693,20 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                 Discover Matrix
                 {autoScoring&&<span style={{ fontSize:"12px", marginLeft:"12px", color:PINK.mid, fontWeight:500 }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
               </p>
-              <div style={{ display:"flex", gap:"10px", alignItems:"flex-start" }}>
-                {/* 이지스토리 상품 사이드바 */}
-                <div style={{ width:"148px", flexShrink:0, maxHeight:"480px", overflowY:"auto", border:"1px solid #e8eaed", borderRadius:"8px" }}>
-                  <div style={{ padding:"6px 8px 5px", fontSize:"10px", color:"#9ca3af", fontWeight:600, borderBottom:"1px solid #f0f0f0", letterSpacing:"0.04em" }}>이지스토리 상품</div>
-                  {baselineItems.length===0?(
-                    <div style={{ padding:"12px 8px", fontSize:"10px", color:"#c0c4cc", textAlign:"center" }}>상품 없음</div>
-                  ):(()=>{
-                    const groups=baselineItems.reduce((acc,item)=>{
-                      const k=item.category||"기타";
-                      if(!acc[k])acc[k]=[];
-                      acc[k].push(item);
-                      return acc;
-                    },{} as Record<string,{id:string;name:string;category:string;margin_score:number;channel_score:number}[]>);
-                    return Object.entries(groups).map(([cat,items])=>(
-                      <div key={cat}>
-                        <div style={{ padding:"5px 8px 2px", fontSize:"9px", color:"#9ca3af", fontWeight:700, letterSpacing:"0.04em", textTransform:"uppercase" }}>{cat}</div>
-                        {items.map(item=>{
-                          const isH=blHover===item.id, isS=blSel===item.id;
-                          return(
-                            <div key={item.id}
-                              onMouseEnter={()=>setBlHover(item.id)}
-                              onMouseLeave={()=>setBlHover(null)}
-                              onClick={()=>setBlSel(blSel===item.id?null:item.id)}
-                              style={{ padding:"3px 8px", fontSize:"11px", color:isS?"#1a1a1a":isH?"#374151":"#6b7280", background:isS?"#eef2ff":isH?"#f9fafb":"transparent", cursor:"pointer", borderLeft:isS?"2px solid #5b8db8":"2px solid transparent", lineHeight:"1.5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
-                            >
-                              {item.name.length>10?item.name.slice(0,10)+"…":item.name}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ));
-                  })()}
-                </div>
-                {/* 매트릭스 */}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <DiscoverMatrix
-                    candidates={visibleCandidates}
-                    candidateScores={candidateScores}
-                    selected={selected}
-                    onSelect={scoreCandidate}
-                    autoScoring={autoScoring}
-                    scoredSoFar={autoScoredCount}
-                    baseline={baselineItems}
-                    blHover={blHover}
-                    blSel={blSel}
-                    onBlHover={setBlHover}
-                    onBlClick={setBlSel}
-                    storeId={storeId}
-                  />
-                </div>
-              </div>
+              <DiscoverMatrix
+                candidates={visibleCandidates}
+                candidateScores={candidateScores}
+                selected={selected}
+                onSelect={scoreCandidate}
+                autoScoring={autoScoring}
+                scoredSoFar={autoScoredCount}
+                baseline={baselineItems}
+                blHover={blHover}
+                blSel={blSel}
+                onBlHover={setBlHover}
+                onBlClick={setBlSel}
+                storeId={storeId}
+              />
             </div>
             <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
               <p style={{ fontSize:"20px", color:"#111", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>Demand Forecast</p>
