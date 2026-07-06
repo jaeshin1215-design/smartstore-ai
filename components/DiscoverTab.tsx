@@ -189,10 +189,10 @@ function DiscoverMatrix({
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
       <rect x={midX} y={midY} width={pw/2} height={ph/2} fill="#f3eddf"/>
-      <text x={PX+7} y={PY+22} fontSize="18" fill="#6b82a0" fontWeight="500">검토중</text>
-      <text x={W-PX-7} y={PY+22} fontSize="18" fill="#b05878" fontWeight="500" textAnchor="end">적극추천</text>
-      <text x={PX+7} y={H-PY-8} fontSize="18" fill="#888" fontWeight="500">제외</text>
-      <text x={W-PX-7} y={H-PY-8} fontSize="18" fill="#a09060" fontWeight="500" textAnchor="end">보류</text>
+      <text x={PX+7} y={PY+22} fontSize="18" fill="#9ca3af" fontWeight="400">검토중</text>
+      <text x={W-PX-7} y={PY+22} fontSize="18" fill="#9ca3af" fontWeight="400" textAnchor="end">적극추천</text>
+      <text x={PX+7} y={H-PY-8} fontSize="18" fill="#9ca3af" fontWeight="400">제외</text>
+      <text x={W-PX-7} y={H-PY-8} fontSize="18" fill="#9ca3af" fontWeight="400" textAnchor="end">보류</text>
       <line x1={midX} y1={PY} x2={midX} y2={H-PY} stroke="#c8d0dc" strokeWidth="1.5" strokeDasharray="6,4"/>
       <line x1={PX} y1={midY} x2={W-PX} y2={midY} stroke="#c8d0dc" strokeWidth="1.5" strokeDasharray="6,4"/>
       {scored.length===0&&(
@@ -272,7 +272,7 @@ function DiscoverMatrix({
       })}
       {/* 축 라벨 */}
       <text x={W/2} y={H-PY+32} textAnchor="middle" fontSize="21" fill="#9ca3af" fontWeight="600">마진 →</text>
-      <text transform="rotate(-90)" x={-(H/2)} y={22} textAnchor="middle" fontSize="21" fill="#9ca3af" fontWeight="600">채널적합 ↑</text>
+      <text transform="rotate(-90)" x={-(H/2)} y={56} textAnchor="middle" fontSize="21" fill="#9ca3af" fontWeight="600">채널적합 ↑</text>
     </svg>
   );
 }
