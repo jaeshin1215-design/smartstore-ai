@@ -148,12 +148,14 @@ function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
 
 // ── DiscoverMatrix: 마진 × 채널적합 4분면 산점도 ──────────────────────────────
 function DiscoverMatrix({
-  candidates, candidateScores, selected, onSelect,
+  candidates, candidateScores, selected, onSelect, autoScoring, scoredSoFar,
 }: {
   candidates: Candidate[];
   candidateScores: Record<string, ScoreResult>;
   selected: Candidate | null;
   onSelect: (c: Candidate) => void;
+  autoScoring?: boolean;
+  scoredSoFar?: number;
 }) {
   const W=500, H=260, PX=36, PY=24;
   const pw=W-PX*2, ph=H-PY*2;
@@ -180,7 +182,7 @@ function DiscoverMatrix({
       .map(c=>c.no)
   );
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:H,display:"block"}}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
       <rect x={PX} y={PY} width={pw/2} height={ph/2} fill="#e8eef8"/>
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
@@ -192,7 +194,9 @@ function DiscoverMatrix({
       <line x1={midX} y1={PY} x2={midX} y2={H-PY} stroke="#c8d0dc" strokeWidth="1" strokeDasharray="4,3"/>
       <line x1={PX} y1={midY} x2={W-PX} y2={midY} stroke="#c8d0dc" strokeWidth="1" strokeDasharray="4,3"/>
       {scored.length===0&&(
-        <text x={W/2} y={H/2+5} textAnchor="middle" fontSize="11" fill="#c0c4cc">후보를 클릭하면 점수가 채워집니다</text>
+        <text x={W/2} y={H/2+5} textAnchor="middle" fontSize="11" fill="#c0c4cc">
+          {autoScoring?`채점 중… (${scoredSoFar??0}/${candidates.length})`:"채점 결과가 표시됩니다"}
+        </text>
       )}
       {scored.map(c=>{
         const sc=candidateScores[c.no];
@@ -227,7 +231,8 @@ function ProductTimeHeatmap() {
   const PRODS=["화분","압축팩","다리미판","전기장판","캠핑 아이스박스"];
   const PAST=8, FUTURE=4, TOTAL=PAST+FUTURE;
   const CW=40,CH=36,GAP=2,LPAD=92,THEAD=32,BPAD=28;
-  const W=LPAD+TOTAL*(CW+GAP)-GAP+16;
+  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 594 — 셀 오른쪽 끝
+  const W=CELLS_W+72; // 666 — 오른쪽 브라켓 주석 공간 확보
   const H=THEAD+PRODS.length*(CH+GAP)-GAP+BPAD;
   const HEAT:number[][]=[
     [0.30,0.40,0.85,0.72,0.50,0.35,0.30,0.22, 0.20,0.15,0.18,0.20],
@@ -241,10 +246,13 @@ function ProductTimeHeatmap() {
     return v>0.7?"#d96050":v>0.4?"#eba090":v>0.2?"#f4bdb4":"#fde8e4";
   }
   const sepX=LPAD+PAST*(CW+GAP)-GAP/2;
-  const aSX=LPAD+2*(CW+GAP)+CW/2, aSY=THEAD+0*(CH+GAP)+CH/2;
-  const aEX=LPAD+4*(CW+GAP)+CW/2, aEY=THEAD+1*(CH+GAP)+CH/2;
+  // 우측 브라켓 주석: 화분(row0) → 압축팩(row1) = "선행 2주"
+  const annY1=THEAD+0*(CH+GAP)+CH/2; // 화분 중심 Y = 50
+  const annY2=THEAD+1*(CH+GAP)+CH/2; // 압축팩 중심 Y = 88
+  const bX1=CELLS_W+6;  // 브라켓 시작 x = 600
+  const bX2=CELLS_W+20; // 브라켓 꺾임 x = 614
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:H,display:"block"}}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
       <defs>
         <marker id="hma" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
           <polygon points="0 0, 7 3.5, 0 7" fill="#8b7355"/>
@@ -253,7 +261,7 @@ function ProductTimeHeatmap() {
       <line x1={sepX} y1={THEAD-6} x2={sepX} y2={H-BPAD+4} stroke="#aaa" strokeWidth="1.2" strokeDasharray="4,3"/>
       <text x={sepX} y={THEAD-8} textAnchor="middle" fontSize="10" fill="#888">오늘</text>
       <text x={sepX+8} y={12} fontSize="9.5" fill="#b0987a" fontWeight="500">예측(가상) 구간</text>
-      <line x1={sepX+6} y1={14} x2={W-14} y2={14} stroke="#c8b090" strokeWidth="0.8" strokeDasharray="3,2"/>
+      <line x1={sepX+6} y1={14} x2={CELLS_W} y2={14} stroke="#c8b090" strokeWidth="0.8" strokeDasharray="3,2"/>
       {PRODS.flatMap((_,ri)=>Array.from({length:PAST},(_2,ci)=>(
         <rect key={`p${ri}-${ci}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(HEAT[ri][ci],false)}/>
       )))}
@@ -262,10 +270,14 @@ function ProductTimeHeatmap() {
         return <rect key={`f${ri}-${fi}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(HEAT[ri][ci],true)} stroke="#d4b8b0" strokeWidth={1} strokeDasharray="4,3"/>;
       }))}
       {PRODS.map((prod,ri)=>(
-        <text key={prod} x={LPAD-6} y={THEAD+ri*(CH+GAP)+CH/2+4} textAnchor="end" fontSize={prod.length>4?"10.5":"11.5"} fill="#374151" fontWeight="500">{prod}</text>
+        <text key={prod} x={LPAD-6} y={THEAD+ri*(CH+GAP)+CH/2+4} textAnchor="end" fontSize={prod.length>6?"9":prod.length>3?"10.5":"11.5"} fill="#374151" fontWeight="500">{prod}</text>
       ))}
-      <line x1={aSX} y1={aSY} x2={aEX-5} y2={aEY-5} stroke="#8b7355" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#hma)"/>
-      <text x={(aSX+aEX)/2+10} y={(aSY+aEY)/2-4} fontSize="9" fill="#8b7355" fontWeight="600">선행 2주</text>
+      {/* 우측 브라켓 주석 — 셀과 겹치지 않음 */}
+      <line x1={bX1} y1={annY1} x2={bX2} y2={annY1} stroke="#8b7355" strokeWidth="1" strokeDasharray="3,2"/>
+      <line x1={bX2} y1={annY1} x2={bX2} y2={annY2} stroke="#8b7355" strokeWidth="1.2"/>
+      <line x1={bX2} y1={annY2} x2={bX1+3} y2={annY2} stroke="#8b7355" strokeWidth="1.5" markerEnd="url(#hma)"/>
+      <text x={bX2+5} y={(annY1+annY2)/2} fontSize="9" fill="#8b7355" fontWeight="600">선행</text>
+      <text x={bX2+5} y={(annY1+annY2)/2+12} fontSize="9" fill="#8b7355" fontWeight="600">2주</text>
       {[
         {c:"#d96050",l:"구매확률 높음",d:false},
         {c:"#f4bdb4",l:"낮음",d:false},
@@ -292,6 +304,9 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [searchError,setSearchError]=useState("");
   const [candidates,setCandidates]=useState<Candidate[]>([]);
   const [candidateScores,setCandidateScores]=useState<Record<string,ScoreResult>>({});
+  const candidateScoresRef=useRef<Record<string,ScoreResult>>({});
+  const [autoScoring,setAutoScoring]=useState(false);
+  const [autoScoredCount,setAutoScoredCount]=useState(0);
   const [selected,setSelected]=useState<Candidate|null>(null);
   const [scoring,setScoring]=useState<ScoreResult|null>(null);
   const [scoreLoading,setScoreLoading]=useState(false);
@@ -309,7 +324,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [generatingAdvice,setGeneratingAdvice]=useState(false);
 
   const inputRef=useRef<HTMLInputElement>(null);
-  useEffect(()=>{setCandidateScores({});setScoring(null);},[track]);
+  useEffect(()=>{setCandidateScores({});candidateScoresRef.current={};setScoring(null);},[track]);
   useEffect(()=>{
     if(mode!=="auto"||hotKeywords.length>0)return;
     setAutoLoading(true);
@@ -323,32 +338,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
     };run();
   },[mode,hotKeywords.length]);
 
-  const prefetchMargins=useCallback((items:Candidate[])=>{
-    items.forEach(async(c)=>{
-      try{
-        const r=await fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"detail",no:c.no,searchKeyword:c.keyword})});
-        const j=await r.json() as {item?:{margin_pct:number;sell_price:number;margin_source?:string}};
-        if(j.item){setCandidates(prev=>prev.map(p=>p.no===c.no?{...p,margin_pct:j.item!.margin_pct,sell_price:j.item!.sell_price}:p));}
-      }catch{/*무시*/}
-    });
-  },[]);
-
-  const searchDomeggook=useCallback(async(kw:string)=>{
-    if(!kw.trim())return;
-    setSearchLoading(true);setSearchError("");setSelected(null);setScoring(null);setCandidateScores({});setShowRegForm(false);
-    try{
-      const res=await fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"search",keyword:kw})});
-      const j=await res.json() as {items?:Omit<Candidate,"status"|"keyword">[];error?:string};
-      if(j.error){setSearchError(j.error);setCandidates([]);return;}
-      const items=(j.items??[]).map(i=>({...i,keyword:kw,status:"신규"} as Candidate));
-      setCandidates(items);
-      prefetchMargins(items);
-    }catch{setSearchError("도매꾹 연결 오류");}finally{setSearchLoading(false);}
-  },[prefetchMargins]);
-
-  const scoreCandidate=useCallback(async(c:Candidate)=>{
-    setSelected(c);setScoring(null);setScoreLoading(true);setShowRegForm(false);
-    setAdviceText("");setGeneratingAdvice(false);
+  const scoreOne=useCallback(async(c:Candidate):Promise<ScoreResult|null>=>{
     try{
       const[detailRes,seasonality,competition,channel]=await Promise.all([
         fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"detail",no:c.no,searchKeyword:c.keyword})}).then(r=>r.json()) as Promise<{item?:{margin_pct:number;sell_price:number;margin_source?:MarginSource}}>,
@@ -356,17 +346,62 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
         getChannelScoreHybrid(c.name+" "+c.keyword),
       ]);
       const ap=detailRes.item?.margin_pct??c.margin_pct,as_=detailRes.item?.margin_source??"unknown";
-      if(detailRes.item&&ap!==c.margin_pct){setCandidates(prev=>prev.map(p=>p.no===c.no?{...p,margin_pct:ap,sell_price:detailRes.item!.sell_price}:p));setSelected(prev=>prev?{...prev,margin_pct:ap}:prev);}
+      if(detailRes.item&&ap!==c.margin_pct){setCandidates(prev=>prev.map(p=>p.no===c.no?{...p,margin_pct:ap,sell_price:detailRes.item!.sell_price}:p));}
       const margin=marginAxis(ap,as_ as MarginSource);
       const{total,verdict,reason}=buildVerdict({seasonality,margin,competition,channel},track);
       const result:ScoreResult={seasonality,margin,competition,channel,total,verdict,reason};
-      setScoring(result);setCandidateScores(prev=>({...prev,[c.no]:result}));
-      // LLM 해설 자동 호출
-      setGeneratingAdvice(true);
-      fetch("/api/discover-advice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({verdict,total,reason,keyword:c.keyword,seasonality_label:result.seasonality.label})})
-        .then(r=>r.text()).then(t=>{if(t.trim())setAdviceText(t.trim());}).catch(()=>{}).finally(()=>setGeneratingAdvice(false));
-    }catch{setScoring(null);}finally{setScoreLoading(false);}
+      setCandidateScores(prev=>{const next={...prev,[c.no]:result};candidateScoresRef.current=next;return next;});
+      return result;
+    }catch{return null;}
   },[track]);
+
+  const autoScoreAll=useCallback(async(items:Candidate[])=>{
+    setAutoScoring(true);setAutoScoredCount(0);
+    const BATCH=5;
+    for(let i=0;i<items.length;i+=BATCH){
+      const batch=items.slice(i,i+BATCH);
+      await Promise.all(batch.map(c=>scoreOne(c)));
+      setAutoScoredCount(prev=>Math.min(prev+batch.length,items.length));
+      if(i+BATCH<items.length)await new Promise<void>(r=>setTimeout(r,200));
+    }
+    setAutoScoring(false);
+  },[scoreOne]);
+
+  const searchDomeggook=useCallback(async(kw:string)=>{
+    if(!kw.trim())return;
+    setSearchLoading(true);setSearchError("");setSelected(null);setScoring(null);
+    setCandidateScores({});candidateScoresRef.current={};
+    setAutoScoredCount(0);setShowRegForm(false);
+    try{
+      const res=await fetch("/api/domeggook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"search",keyword:kw})});
+      const j=await res.json() as {items?:Omit<Candidate,"status"|"keyword">[];error?:string};
+      if(j.error){setSearchError(j.error);setCandidates([]);return;}
+      const items=(j.items??[]).map(i=>({...i,keyword:kw,status:"신규"} as Candidate));
+      setCandidates(items);
+      autoScoreAll(items); // fire-and-forget: 배치 5개씩 병렬, 배치 간 200ms
+    }catch{setSearchError("도매꾹 연결 오류");}finally{setSearchLoading(false);}
+  },[autoScoreAll]);
+
+  const scoreCandidate=useCallback(async(c:Candidate)=>{
+    setSelected(c);setShowRegForm(false);setAdviceText("");setGeneratingAdvice(false);
+    const existing=candidateScoresRef.current[c.no];
+    if(existing){
+      setScoring(existing);setScoreLoading(false);
+      setGeneratingAdvice(true);
+      fetch("/api/discover-advice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({verdict:existing.verdict,total:existing.total,reason:existing.reason,keyword:c.keyword,seasonality_label:existing.seasonality.label})})
+        .then(r=>r.text()).then(t=>{if(t.trim())setAdviceText(t.trim());}).catch(()=>{}).finally(()=>setGeneratingAdvice(false));
+      return;
+    }
+    setScoring(null);setScoreLoading(true);
+    const result=await scoreOne(c);
+    if(result){
+      setScoring(result);
+      setGeneratingAdvice(true);
+      fetch("/api/discover-advice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({verdict:result.verdict,total:result.total,reason:result.reason,keyword:c.keyword,seasonality_label:result.seasonality.label})})
+        .then(r=>r.text()).then(t=>{if(t.trim())setAdviceText(t.trim());}).catch(()=>{}).finally(()=>setGeneratingAdvice(false));
+    }else{setScoring(null);}
+    setScoreLoading(false);
+  },[scoreOne]);
 
   const openRegForm=useCallback((ds:"실증"|"검토")=>{
     setRegChannel((scoring?.channel.score??0)>=70?"스마트스토어":CHANNELS[0]);
@@ -498,6 +533,33 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
             </div>
           )}
 
+          {/* ── 발굴 매트릭스 + 수요 히트맵 (검색창 바로 아래, 전체폭) ── */}
+          {candidates.length>0&&(
+            <div style={{ marginBottom:"24px" }}>
+              <div style={{ ...CARD_STYLE, padding:"16px 18px 14px", marginBottom:"16px" }}>
+                <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>
+                  발굴 매트릭스 · 마진 × 채널적합
+                  {autoScoring&&<span style={{ marginLeft:"8px", color:PINK.mid }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
+                </p>
+                <DiscoverMatrix
+                  candidates={visibleCandidates}
+                  candidateScores={candidateScores}
+                  selected={selected}
+                  onSelect={scoreCandidate}
+                  autoScoring={autoScoring}
+                  scoredSoFar={autoScoredCount}
+                />
+              </div>
+              <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
+                <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 8px 2px" }}>상품 수요 예측 · 상품 × 시간</p>
+                <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
+                  <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
+                </div>
+                <ProductTimeHeatmap />
+              </div>
+            </div>
+          )}
+
           {/* Board: 34fr 66fr */}
           <div style={{ display:"grid", gridTemplateColumns:"34fr 66fr", gap:"24px", alignItems:"start" }}>
 
@@ -529,7 +591,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                         </div>
                         <p style={{ fontSize:"13px", fontWeight:600, color:"#111", margin:"4px 0 2px", lineHeight:1.3 }}>{c.name.length>28?c.name.slice(0,28)+"…":c.name}</p>
                         {c.sell_price>0&&<p style={{ fontSize:"12px", color:"#9ca3af", margin:0 }}>{c.sell_price.toLocaleString()}원</p>}
-                        {!cs&&c.margin_pct>0&&<p style={{ fontSize:"11px", color:"#bfbfbf", margin:"4px 0 0" }}>나머지 3축은 분석 버튼 클릭</p>}
+                        {!cs&&<p style={{ fontSize:"11px", color:"#bfbfbf", margin:"4px 0 0" }}>{autoScoring?"채점 중…":"클릭하여 상세 분석"}</p>}
                       </button>
                     );
                   })}
@@ -539,18 +601,6 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
 
             {/* Right: scoring card + reg form + SEO */}
             <div>
-              {/* DiscoverMatrix: 마진×채널적합 4분면 — 클릭하면 점수 채워짐 */}
-              {candidates.length>0&&(
-                <div style={{ ...CARD_STYLE, padding:"14px 14px 10px", marginBottom:"12px" }}>
-                  <p style={{ fontSize:"10px", color:"#9ca3af", fontWeight:600, letterSpacing:"0.05em", textTransform:"uppercase", margin:"0 0 6px 2px" }}>발굴 매트릭스 · 마진 × 채널적합</p>
-                  <DiscoverMatrix
-                    candidates={visibleCandidates}
-                    candidateScores={candidateScores}
-                    selected={selected}
-                    onSelect={scoreCandidate}
-                  />
-                </div>
-              )}
               {!selected&&!scoreLoading?(
                 <div style={{ ...CARD_STYLE, padding:"56px 24px", textAlign:"center" }}>
                   <div style={{ fontSize:"28px", marginBottom:"12px" }}>📊</div>
@@ -719,21 +769,6 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
             )}
           </div>
 
-          {/* ── 상품 수요 예측 히트맵 ── */}
-          <div style={{ marginTop:"48px" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"20px" }}>
-              <div>
-                <h2 style={{ fontSize:"20px", fontWeight:800, margin:"0 0 4px", letterSpacing:"-0.01em" }}>상품 수요 예측</h2>
-                <p style={{ fontSize:"13px", color:"#9ca3af", margin:0 }}>상품별 구매확률과 시즌 선행 신호를 미리 봅니다</p>
-              </div>
-            </div>
-            <div style={{ ...CARD_STYLE, padding:"24px 28px" }}>
-              <div style={{ padding:"6px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"16px" }}>
-                <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>예시 화면 — 사방넷 연동 후 실제 데이터로 작동</p>
-              </div>
-              <ProductTimeHeatmap />
-            </div>
-          </div>
 
         </div>{/* /Right column inner 1232px */}
         </div>{/* /Right column flex:1 */}
