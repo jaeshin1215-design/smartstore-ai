@@ -150,6 +150,7 @@ function getAxisOrder(s:ScoreResult,track:"steady"|"season") {
 // ── DiscoverMatrix: 마진 × 채널적합 4분면 산점도 ──────────────────────────────
 function DiscoverMatrix({
   candidates, candidateScores, selected, onSelect, autoScoring, scoredSoFar, baseline,
+  blHover, blSel, onBlHover, onBlClick, storeId,
 }: {
   candidates: Candidate[];
   candidateScores: Record<string, ScoreResult>;
@@ -158,12 +159,42 @@ function DiscoverMatrix({
   autoScoring?: boolean;
   scoredSoFar?: number;
   baseline?: Array<{id:string; name:string; category:string; margin_score:number; channel_score:number}>;
+  blHover?: string|null;
+  blSel?: string|null;
+  onBlHover?: (id:string|null)=>void;
+  onBlClick?: (id:string|null)=>void;
+  storeId?: string|null;
 }) {
   const W=800, H=640, PX=60, PY=52;
   const pw=W-PX*2, ph=H-PY*2;
   const midX=PX+pw/2, midY=PY+ph/2;
   const xFn=(s:number)=>PX+(s/100)*pw;
   const yFn=(s:number)=>PY+(1-s/100)*ph;
+  const svgRef=useRef<SVGSVGElement>(null);
+  const [dragging,setDragging]=useState<string|null>(null);
+  const [localOv,setLocalOv]=useState<Record<string,{ms:number;cs:number}>>({});
+  const BL_COLOR:Record<string,string>={압축팩:"#4e86c0",다리미판:"#d4855a",화분:"#5a9e6e",유아매트:"#9b6eb4",화장품:"#d4537e",청소:"#5aabb4",물놀이:"#5a7ab4",캠핑:"#7a8a5a"};
+  const blColor=(cat:string)=>BL_COLOR[cat]??"#7a8aaa";
+  const toSvgCoords=(e:React.MouseEvent<SVGSVGElement>)=>{
+    const rect=svgRef.current!.getBoundingClientRect();
+    const ms=Math.max(0,Math.min(100,((e.clientX-rect.left)/rect.width*W-PX)/pw*100));
+    const cs=Math.max(0,Math.min(100,(1-((e.clientY-rect.top)/rect.height*H-PY)/ph)*100));
+    return{ms,cs};
+  };
+  const handleSvgMove=(e:React.MouseEvent<SVGSVGElement>)=>{
+    if(!dragging||!svgRef.current)return;
+    const{ms,cs}=toSvgCoords(e);
+    setLocalOv(prev=>({...prev,[dragging]:{ms,cs}}));
+  };
+  const handleSvgUp=async(e:React.MouseEvent<SVGSVGElement>)=>{
+    if(!dragging||!svgRef.current)return;
+    const{ms,cs}=toSvgCoords(e);
+    setLocalOv(prev=>({...prev,[dragging]:{ms,cs}}));
+    if(storeId){
+      fetch('/api/discover/baseline',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_id:storeId,product_id:dragging,margin_score:Math.round(ms),channel_score:Math.round(cs)})}).catch(()=>{});
+    }
+    setDragging(null);
+  };
   const scored=candidates.filter(c=>candidateScores[c.no]);
   function getAnomaly(sc:ScoreResult):{is:boolean;reason:string} {
     const v=[sc.seasonality.score,sc.margin.score,sc.competition.score,sc.channel.score];
@@ -184,7 +215,9 @@ function DiscoverMatrix({
       .map(c=>c.no)
   );
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
+    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block",userSelect:"none"}}
+      onMouseMove={handleSvgMove} onMouseUp={handleSvgUp}
+      onMouseLeave={()=>{if(dragging)setDragging(null);}}>
       <rect x={PX} y={PY} width={pw/2} height={ph/2} fill="#e8eef8"/>
       <rect x={midX} y={PY} width={pw/2} height={ph/2} fill="#fde8ef"/>
       <rect x={PX} y={midY} width={pw/2} height={ph/2} fill="#eeeeef"/>
@@ -226,15 +259,31 @@ function DiscoverMatrix({
         return(
           <>
             {bl.map(item=>{
-              const cx=xFn(item.margin_score), cy=yFn(item.channel_score);
-              return(<circle key={`bl-${item.id}`} cx={cx} cy={cy} r="3.5" fill="#d1d5db" stroke="white" strokeWidth="1" opacity="0.6"/>);
+              const ov=localOv[item.id];
+              const ms=ov?.ms??item.margin_score, cs_=ov?.cs??item.channel_score;
+              const cx=xFn(ms), cy=yFn(cs_);
+              const isH=blHover===item.id, isS=blSel===item.id, isDrag=dragging===item.id;
+              const r_=isS||isDrag?6:isH?4.5:3.5;
+              const fill_=blColor(item.category||"기타");
+              const op=(blHover||blSel||dragging)?(isH||isS||isDrag?1:0.25):0.7;
+              return(
+                <circle key={`bl-${item.id}`} cx={cx} cy={cy} r={r_}
+                  fill={fill_} stroke="white" strokeWidth="1" opacity={op}
+                  style={{cursor:isDrag?"grabbing":"grab"}}
+                  onMouseDown={(e)=>{e.preventDefault();e.stopPropagation();setDragging(item.id);}}
+                  onMouseEnter={()=>onBlHover?.(item.id)}
+                  onMouseLeave={()=>{if(!dragging)onBlHover?.(null);}}
+                  onClick={()=>{if(!dragging)onBlClick?.(blSel===item.id?null:item.id);}}
+                />
+              );
             })}
             {finalPos.map(({cat,cx,boxY})=>{
               const short=cat.length>4?cat.slice(0,4):cat;
+              const c=blColor(cat);
               return(
                 <g key={`lbl-${cat}`}>
-                  <rect x={cx-18} y={boxY} width="36" height="14" rx="3" fill="rgba(255,255,255,0.88)" stroke="#d1d5db" strokeWidth="0.8"/>
-                  <text x={cx} y={boxY+9} textAnchor="middle" fontSize="9" fill="#6b7280" fontWeight="500">{short}</text>
+                  <rect x={cx-18} y={boxY} width="36" height="14" rx="3" fill={c} fillOpacity="0.12" stroke={c} strokeWidth="0.8"/>
+                  <text x={cx} y={boxY+9} textAnchor="middle" fontSize="9" fill={c} fontWeight="600">{short}</text>
                 </g>
               );
             })}
@@ -378,12 +427,16 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
   const [generatingAdvice,setGeneratingAdvice]=useState(false);
   const [baselineItems,setBaselineItems]=useState<{id:string;name:string;category:string;margin_score:number;channel_score:number}[]>([]);
   const [d60Cards,setD60Cards]=useState<GridCard[]>([]);
+  const [blHover,setBlHover]=useState<string|null>(null);
+  const [blSel,setBlSel]=useState<string|null>(null);
+  const [storeId,setStoreId]=useState<string|null>(null);
 
   const inputRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{setCandidateScores({});candidateScoresRef.current={};setScoring(null);},[track]);
   useEffect(()=>{
     const sid=typeof window!=="undefined"?localStorage.getItem("sellfit_store_id"):null;
     if(!sid)return;
+    setStoreId(sid);
     fetch(`/api/discover/baseline?store_id=${encodeURIComponent(sid)}`).then(r=>r.json()).then(j=>{if(j.items)setBaselineItems(j.items);}).catch(()=>{});
   },[]);
   useEffect(()=>{
@@ -606,15 +659,57 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
                 Discover Matrix
                 {autoScoring&&<span style={{ fontSize:"12px", marginLeft:"12px", color:PINK.mid, fontWeight:500 }}>채점 중… {autoScoredCount}/{candidates.length}</span>}
               </p>
-              <DiscoverMatrix
-                candidates={visibleCandidates}
-                candidateScores={candidateScores}
-                selected={selected}
-                onSelect={scoreCandidate}
-                autoScoring={autoScoring}
-                scoredSoFar={autoScoredCount}
-                baseline={baselineItems}
-              />
+              <div style={{ display:"flex", gap:"10px", alignItems:"flex-start" }}>
+                {/* 이지스토리 상품 사이드바 */}
+                <div style={{ width:"148px", flexShrink:0, maxHeight:"480px", overflowY:"auto", border:"1px solid #e8eaed", borderRadius:"8px" }}>
+                  <div style={{ padding:"6px 8px 5px", fontSize:"10px", color:"#9ca3af", fontWeight:600, borderBottom:"1px solid #f0f0f0", letterSpacing:"0.04em" }}>이지스토리 상품</div>
+                  {baselineItems.length===0?(
+                    <div style={{ padding:"12px 8px", fontSize:"10px", color:"#c0c4cc", textAlign:"center" }}>상품 없음</div>
+                  ):(()=>{
+                    const groups=baselineItems.reduce((acc,item)=>{
+                      const k=item.category||"기타";
+                      if(!acc[k])acc[k]=[];
+                      acc[k].push(item);
+                      return acc;
+                    },{} as Record<string,{id:string;name:string;category:string;margin_score:number;channel_score:number}[]>);
+                    return Object.entries(groups).map(([cat,items])=>(
+                      <div key={cat}>
+                        <div style={{ padding:"5px 8px 2px", fontSize:"9px", color:"#9ca3af", fontWeight:700, letterSpacing:"0.04em", textTransform:"uppercase" }}>{cat}</div>
+                        {items.map(item=>{
+                          const isH=blHover===item.id, isS=blSel===item.id;
+                          return(
+                            <div key={item.id}
+                              onMouseEnter={()=>setBlHover(item.id)}
+                              onMouseLeave={()=>setBlHover(null)}
+                              onClick={()=>setBlSel(blSel===item.id?null:item.id)}
+                              style={{ padding:"3px 8px", fontSize:"11px", color:isS?"#1a1a1a":isH?"#374151":"#6b7280", background:isS?"#eef2ff":isH?"#f9fafb":"transparent", cursor:"pointer", borderLeft:isS?"2px solid #5b8db8":"2px solid transparent", lineHeight:"1.5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
+                            >
+                              {item.name.length>10?item.name.slice(0,10)+"…":item.name}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
+                {/* 매트릭스 */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <DiscoverMatrix
+                    candidates={visibleCandidates}
+                    candidateScores={candidateScores}
+                    selected={selected}
+                    onSelect={scoreCandidate}
+                    autoScoring={autoScoring}
+                    scoredSoFar={autoScoredCount}
+                    baseline={baselineItems}
+                    blHover={blHover}
+                    blSel={blSel}
+                    onBlHover={setBlHover}
+                    onBlClick={setBlSel}
+                    storeId={storeId}
+                  />
+                </div>
+              </div>
             </div>
             <div style={{ ...CARD_STYLE, padding:"18px 20px 16px" }}>
               <p style={{ fontSize:"20px", color:"#111", fontWeight:800, letterSpacing:"-0.01em", margin:"0 0 12px 2px" }}>Demand Forecast</p>
