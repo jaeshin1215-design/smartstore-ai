@@ -325,56 +325,102 @@ function DiscoverMatrix({
 }
 
 // ── ProductTimeHeatmap: 상품 × 시간 수요 히트맵 ────────────────────────────────
+type HeatRow = {name:string;past:number[];future:number[];trend:string;src:string};
+type HeatPayload = {products:HeatRow[];weekLabels:string[];source:string};
+
 function ProductTimeHeatmap() {
+  const [heatData,setHeatData]=useState<HeatPayload|null>(null);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    fetch("/api/discover/heatmap")
+      .then(r=>r.json()).then((d:HeatPayload)=>{setHeatData(d);setLoading(false);})
+      .catch(()=>setLoading(false));
+  },[]);
+
   const PRODS=["압축팩","다리미판","화분","유아매트"];
-  const PAST=8, FUTURE=4, TOTAL=PAST+FUTURE;
-  const CW=44,CH=44,GAP=10,LPAD=92,THEAD=32,BPAD=42;
-  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP; // 730
-  const W=CELLS_W+24; // 754 — 브라켓 제거로 우측 여백만
-  const H=THEAD+PRODS.length*(CH+GAP)-GAP+BPAD;
-  // 카테고리별 독립 수요 패턴 (과거8주 | 예측4주) — 상품 간 인과관계 없음
-  const HEAT:number[][]=[
-    [0.32,0.42,0.62,0.82,0.90,0.78,0.62,0.48, 0.45,0.52,0.62,0.72],
-    [0.55,0.58,0.60,0.62,0.60,0.58,0.55,0.52, 0.52,0.54,0.55,0.57],
-    [0.35,0.52,0.88,0.80,0.65,0.50,0.38,0.28, 0.24,0.22,0.20,0.22],
-    [0.30,0.38,0.52,0.68,0.90,0.85,0.68,0.50, 0.45,0.48,0.52,0.60],
+  const PAST=8,FUTURE=4,TOTAL=PAST+FUTURE;
+  const CW=44,CH=44,GAP=10,LPAD=92,THEAD=32;
+  const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP;
+  const W=CELLS_W+24;
+  const gridBottom=THEAD+PRODS.length*(CH+GAP)-GAP;
+  const H=gridBottom+62; // +week label +legend +note
+
+  const FALLBACK:number[][]=[
+    [0.32,0.42,0.62,0.82,0.90,0.78,0.62,0.48,0.45,0.52,0.62,0.72],
+    [0.55,0.58,0.60,0.62,0.60,0.58,0.55,0.52,0.52,0.54,0.55,0.57],
+    [0.35,0.52,0.88,0.80,0.65,0.50,0.38,0.28,0.24,0.22,0.20,0.22],
+    [0.30,0.38,0.52,0.68,0.90,0.85,0.68,0.50,0.45,0.48,0.52,0.60],
   ];
-  // 과거 4단계: v>0.7 높음 / v>0.4 중간 / v>0.2 낮음 / else 최저
-  // 예측(가상): 동일 4단계 색상 + 점선 테두리로 구분
-  function fill(v:number,future:boolean):string {
-    if(future){return v>0.7?"#f4a899":v>0.4?"#fad0c8":v>0.2?"#fde8e4":"#fde8e4";}
+
+  const heatVal=(ri:number,ci:number):number=>{
+    if(heatData?.products?.[ri]){
+      const row=heatData.products[ri];
+      return ci<PAST?row.past[ci]:row.future[ci-PAST];
+    }
+    return FALLBACK[ri][ci];
+  };
+
+  const weekLabels:string[]=heatData?.weekLabels??[];
+
+  function fill(v:number,future:boolean):string{
+    if(future)return v>0.7?"#f4a899":v>0.4?"#fad0c8":"#fde8e4";
     return v>0.7?"#d96050":v>0.4?"#eba090":v>0.2?"#f4bdb4":"#fde8e4";
   }
+
   const sepX=LPAD+PAST*(CW+GAP)-GAP/2;
-  return (
+  const src=heatData?.source??"";
+
+  if(loading){
+    return(
+      <div style={{height:"200px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <span style={{fontSize:"12px",color:"#9ca3af"}}>수요 데이터 불러오는 중…</span>
+      </div>
+    );
+  }
+
+  return(
     <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",display:"block"}}>
-      <line x1={sepX} y1={THEAD-6} x2={sepX} y2={H-BPAD+4} stroke="#aaa" strokeWidth="1.2" strokeDasharray="4,3"/>
+      {/* 오늘 구분선 + 예측 구간 표시 */}
+      <line x1={sepX} y1={THEAD-6} x2={sepX} y2={gridBottom+4} stroke="#aaa" strokeWidth="1.2" strokeDasharray="4,3"/>
       <text x={sepX} y={THEAD-8} textAnchor="middle" fontSize="10" fill="#888">오늘</text>
       <text x={sepX+8} y={12} fontSize="9.5" fill="#b0987a" fontWeight="500">예측(가상) 구간</text>
       <line x1={sepX+6} y1={14} x2={CELLS_W} y2={14} stroke="#c8b090" strokeWidth="0.8" strokeDasharray="3,2"/>
+      {/* 과거 셀 */}
       {PRODS.flatMap((_,ri)=>Array.from({length:PAST},(_2,ci)=>(
-        <rect key={`p${ri}-${ci}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(HEAT[ri][ci],false)}/>
+        <rect key={`p${ri}-${ci}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(heatVal(ri,ci),false)}/>
       )))}
+      {/* 예측 셀 */}
       {PRODS.flatMap((_,ri)=>Array.from({length:FUTURE},(_2,fi)=>{
         const ci=PAST+fi;
-        return <rect key={`f${ri}-${fi}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(HEAT[ri][ci],true)} stroke="#d4b8b0" strokeWidth={1} strokeDasharray="4,3"/>;
+        return<rect key={`f${ri}-${fi}`} x={LPAD+ci*(CW+GAP)} y={THEAD+ri*(CH+GAP)} width={CW} height={CH} rx="4" fill={fill(heatVal(ri,ci),true)} stroke="#d4b8b0" strokeWidth={1} strokeDasharray="4,3"/>;
       }))}
+      {/* Y축 상품명 */}
       {PRODS.map((prod,ri)=>(
         <text key={prod} x={LPAD-6} y={THEAD+ri*(CH+GAP)+CH/2+4} textAnchor="end" fontSize={prod.length>6?"9":prod.length>3?"10.5":"11.5"} fill="#374151" fontWeight="500">{prod}</text>
       ))}
-      {/* 범례: 과거 4단계 실제 색상 */}
+      {/* X축 주 단위 날짜 라벨 */}
+      {weekLabels.map((lbl,ci)=>(
+        <text key={`wl-${ci}`} x={LPAD+ci*(CW+GAP)+CW/2} y={gridBottom+13} textAnchor="middle" fontSize="7.5" fill={ci===PAST-1?"#888":"#b0b8c4"}>{lbl}</text>
+      ))}
+      {/* X축 단위 표기 */}
+      <text x={LPAD-6} y={gridBottom+13} textAnchor="end" fontSize="7.5" fill="#c8cdd4">주</text>
+      {/* 데이터 소스 배지 */}
+      {src&&src!=="fallback"&&(
+        <text x={CELLS_W} y={THEAD-8} textAnchor="end" fontSize="8" fill="#10b981">{src==="modal_prophet"?"Prophet":"DataLab"}</text>
+      )}
+      {/* 범례: 과거 4단계 */}
       {[
         {c:"#d96050",l:"구매확률 높음",border:false},
         {c:"#eba090",l:"중간",border:false},
         {c:"#f4bdb4",l:"낮음",border:false},
         {c:"#fde8e4",l:"최저·예측(가상)",border:true},
       ].map((item,i)=>(
-        <g key={i} transform={`translate(${LPAD+i*110},${H-BPAD+12})`}>
+        <g key={i} transform={`translate(${LPAD+i*110},${gridBottom+28})`}>
           <circle cx="6" cy="5" r="5" fill={item.c} stroke={item.border?"#d4b8b0":"none"} strokeWidth={item.border?1.2:0}/>
           <text x="16" y="9" fontSize="9.5" fill="#6b7280">{item.l}</text>
         </g>
       ))}
-      <text x={LPAD} y={H-BPAD+30} fontSize="8.5" fill="#9ca3af">· 점선 테두리 = 예측(가상) 구간 / 실선 없음 = 과거 실적</text>
+      <text x={LPAD} y={gridBottom+48} fontSize="8" fill="#9ca3af">· 점선 테두리 = 예측(가상) 구간 / 실선 없음 = 과거 실적</text>
     </svg>
   );
 }
