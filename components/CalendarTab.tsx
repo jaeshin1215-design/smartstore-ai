@@ -11,7 +11,7 @@ const CARD_STYLE: React.CSSProperties = {
   boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
 };
 
-// ── 12개월 시나리오 (설계서 6-2 기준) ────────────────────────────────────────
+// ── 12개월 시나리오 (이지스토리 실제 카테고리 기준 2026-07-07) ────────────────
 interface MonthPlan {
   theme: string;
   mainCategory: string;       // 이달 집중 상시
@@ -21,37 +21,40 @@ interface MonthPlan {
 }
 
 const MONTH_PLANS: MonthPlan[] = [
-  { theme:"신학기 수납의 달",      mainCategory:"수납·정리함",      seasonSpice:"이사철 압축팩",      focusKeywords:["수납함","정리함","신학기"],  season:"winter"  },
-  { theme:"새해 정리의 달",        mainCategory:"수납·정리함",      seasonSpice:"압축팩",             focusKeywords:["수납함","정리함"],           season:"winter"  },
-  { theme:"이사철 수납의 달",      mainCategory:"수납·압축팩",      seasonSpice:"압축팩 피크",        focusKeywords:["압축팩","이사철","정리함"],  season:"spring"  },
-  { theme:"봄 정리의 달",          mainCategory:"수납·다리미판",    seasonSpice:null,                 focusKeywords:["다리미판","수납함"],         season:"spring"  },
-  { theme:"장마 전 건조의 달",     mainCategory:"빨래건조대",       seasonSpice:null,                 focusKeywords:["빨래건조대","건조대"],       season:"spring"  },
-  { theme:"여름 건조·제습의 달",   mainCategory:"빨래건조대·수납",  seasonSpice:null,                 focusKeywords:["빨래건조대","제습","수납"],  season:"summer"  },
-  { theme:"장마 피크 건조의 달",   mainCategory:"빨래건조대",       seasonSpice:null,                 focusKeywords:["빨래건조대","장마"],         season:"summer"  },
-  { theme:"환절기 이불정리의 달",  mainCategory:"압축팩·이불정리",  seasonSpice:"압축팩 피크",        focusKeywords:["압축팩","이불정리","환절기"],season:"summer"  },
-  { theme:"가을 수납 정리의 달",   mainCategory:"수납·정리함",      seasonSpice:null,                 focusKeywords:["수납함","정리함","가을"],    season:"fall"    },
-  { theme:"방한 준비의 달",        mainCategory:"수납·방한",        seasonSpice:"카카오 방한장갑",    focusKeywords:["방한","수납함","카카오"],    season:"fall"    },
-  { theme:"연말 정리의 달",        mainCategory:"수납·연말",        seasonSpice:"카카오 IP 연말",     focusKeywords:["연말정리","카카오IP","방한"],season:"fall"    },
-  { theme:"내년 선기획의 달",      mainCategory:"수납·연말선기획",  seasonSpice:"카카오 IP 캘린더",   focusKeywords:["카카오캘린더","수납함","신학기선기획"], season:"winter" },
+  { theme:"신학기 수납의 달",      mainCategory:"정리수납함",              seasonSpice:"이사철 압축팩 선기획",focusKeywords:["정리수납함","신학기","압축팩"],    season:"winter" },
+  { theme:"이사 전 정리의 달",     mainCategory:"정리수납함·압축팩",       seasonSpice:"압축팩",              focusKeywords:["압축팩","정리수납함","이사전"],    season:"winter" },
+  { theme:"이사철 수납의 달",      mainCategory:"압축팩·정리수납함",       seasonSpice:"압축팩 피크",         focusKeywords:["압축팩","이사철","정리수납함"],   season:"spring" },
+  { theme:"봄 정리·화분의 달",     mainCategory:"정리수납함·다리미판",     seasonSpice:null,                  focusKeywords:["다리미판","정리수납함","화분"],    season:"spring" },
+  { theme:"장마 전 건조의 달",     mainCategory:"빨래건조대",              seasonSpice:null,                  focusKeywords:["빨래건조대","건조대","화분"],      season:"spring" },
+  { theme:"여름 건조·우산꽂이 달", mainCategory:"빨래건조대·우산꽂이",     seasonSpice:null,                  focusKeywords:["빨래건조대","우산꽂이","식품"],   season:"summer" },
+  { theme:"장마 피크 건조의 달",   mainCategory:"빨래건조대",              seasonSpice:null,                  focusKeywords:["빨래건조대","장마","우산꽂이"],   season:"summer" },
+  { theme:"환절기 이불정리의 달",  mainCategory:"압축팩·정리수납함",       seasonSpice:"환절기 압축팩",       focusKeywords:["압축팩","이불정리","환절기"],     season:"summer" },
+  { theme:"가을 수납·이사의 달",   mainCategory:"정리수납함·압축팩",       seasonSpice:null,                  focusKeywords:["정리수납함","압축팩","분리수거함"],season:"fall"  },
+  { theme:"가을 정리의 달",        mainCategory:"정리수납함·우산꽂이",     seasonSpice:null,                  focusKeywords:["정리수납함","우산꽂이","다리미판"],season:"fall"  },
+  { theme:"연말 정리의 달",        mainCategory:"정리수납함·압축팩",       seasonSpice:"겨울 압축팩",         focusKeywords:["연말정리","정리수납함","압축팩"], season:"fall"   },
+  { theme:"내년 선기획의 달",      mainCategory:"정리수납함·분리수거함",   seasonSpice:"연말 분리수거",       focusKeywords:["정리수납함","신학기선기획","분리수거함"],season:"winter"},
 ];
 
 const MONTH_EN = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 const MONTH_KR = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 const SEASON_KR: Record<string, string> = { spring:"봄", summer:"여름", fall:"가을", winter:"겨울" };
 
-// 상시 본체 (연중 고정) — 설계서 6-1
-const EVERGREEN_ITEMS = ["수납·정리함", "빨래건조대", "다리미판", "밀폐용기"];
+// 상시 본체 (연중 고정) — 이지스토리 실제 카테고리 기준
+const EVERGREEN_ITEMS = ["정리수납함", "빨래건조대", "다리미판", "압축팩"];
 
-// 카테고리 → 해당 월 관련도 (캘린더 신호용)
+// 카테고리 → 해당 월 관련도 (이지스토리 9개 카테고리 기준 2026-07-07)
 function getRelevantMonths(category: string): number[] {
   const c = category.toLowerCase();
-  if (c.includes("압축팩")) return [1, 2, 3, 8];
-  if (c.includes("빨래건조대")) return [5, 6, 7, 8];
-  if (c.includes("다리미판")) return [4, 5, 9];
-  if (c.includes("카카오ip") || c.includes("카카오")) return [10, 11, 12];
-  if (c.includes("수납") || c.includes("정리")) return [1, 2, 3, 4, 9, 10, 11, 12];
-  if (c.includes("밀폐") || c.includes("냉장")) return [6, 7, 8, 9];
-  return [];
+  if (c.includes("압축팩"))    return [1, 2, 3, 8, 9];          // 이사철(1~3월) + 환절기(8~9월)
+  if (c.includes("빨래건조대")) return [5, 6, 7, 8];             // 장마철·여름
+  if (c.includes("다리미판"))  return [4, 5, 9];                 // 봄·가을 정리
+  if (c.includes("정리수납함") || c.includes("수납") || c.includes("정리")) return [1, 2, 3, 4, 9, 10, 11, 12]; // 이사철·신학기·가을·연말
+  if (c.includes("분리수거함")) return [3, 9, 12];               // 이사철(3·9월) + 연말(12월)
+  if (c.includes("식품"))      return [1, 2, 6, 7, 8, 9];       // 명절(1~2·9월) + 여름 보관(6~8월)
+  if (c.includes("우산꽂이"))  return [6, 7, 9, 10];             // 장마(6~7월) + 가을 환절기(9~10월)
+  if (c.includes("화분"))      return [3, 4, 5];                 // 봄 식재 시즌
+  if (c.includes("유아매트"))  return [3, 4, 9, 10];             // 봄·가을 인테리어 교체
+  return []; // 기타
 }
 
 // 4사분면 분류 (설계서 4번)
@@ -312,9 +315,9 @@ export default function CalendarTab() {
                     </div>
                   )}
 
-                  {/* 진단 신호 */}
+                  {/* 진단 신호 + Discover 대조 배지 */}
                   {(sig.stars > 0 || sig.drops > 0 || monthProds.length > 0) && (
-                    <div style={{ display:"flex", gap:"8px", marginTop:"8px", borderTop:"1px solid #f3f4f6", paddingTop:"8px" }}>
+                    <div style={{ display:"flex", gap:"8px", marginTop:"8px", borderTop:"1px solid #f3f4f6", paddingTop:"8px", flexWrap:"wrap", alignItems:"center" }}>
                       {monthProds.length > 0 && (
                         <span style={{ fontSize:"12px", color:"#374151" }}>상품 {monthProds.length}종</span>
                       )}
@@ -323,6 +326,12 @@ export default function CalendarTab() {
                       )}
                       {sig.drops > 0 && (
                         <span style={{ fontSize:"12px", color:"#9ca3af" }}>드롭 {sig.drops}</span>
+                      )}
+                      {/* Discover 대조 배지: 재고 0 → 숨김, major ≥1 → 일치, 나머지 → 확인 필요 */}
+                      {monthProds.length > 0 && (
+                        sig.stars >= 1
+                          ? <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f0fdf4", color:"#16a34a", border:"1px solid #bbf7d0", flexShrink:0 }}>일치</span>
+                          : <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#fff7ed", color:"#c2410c", border:"1px solid #fed7aa", flexShrink:0 }}>확인 필요</span>
                       )}
                     </div>
                   )}
