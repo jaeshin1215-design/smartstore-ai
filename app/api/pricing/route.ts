@@ -70,31 +70,54 @@ export async function POST(req: NextRequest) {
   const totalFeeRate = (feeRate * 100).toFixed(3).replace(/\.?0+$/, "");
   const totalCost = price + shipping + platformFee;
 
+  // ── 서버 확정 계산 — LLM은 이 숫자를 절대 재계산하지 않음 ──
+  const margin = targetMargin ? Number(targetMargin) : 32;
+  const recommended_price = Math.round(totalCost / (1 - margin / 100));
+
+  // min_price: 최소마진 15%. 경쟁가 있으면 경쟁가*0.95 캡 적용, 단 원가+500원 바닥 보장
+  const minByMargin = Math.round(totalCost / (1 - 0.15));
+  const competitor = competitorPrice ? Number(competitorPrice) : null;
+  const min_price = competitor
+    ? Math.max(totalCost + 500, Math.min(minByMargin, Math.round(competitor * 0.95)))
+    : minByMargin;
+
+  // max_price: 최대마진 45%
+  const max_price = Math.round(totalCost / (1 - 0.45));
+
+  const margin_rate = Math.round(((recommended_price - totalCost) / recommended_price) * 100);
+  const profit = recommended_price - totalCost;
+  const price_breakdown = { cost: totalCost, profit, margin_per_unit: profit };
+
   const prompt = `당신은 네이버 스마트스토어 가격 전략 전문가입니다.
 
-상품명: ${productName}
-현재 매입가(원가): ${purchasePrice}원
-배송비: ${shipping}원
-스마트스토어 수수료(${totalFeeRate}% / ${feeLabel}): ${platformFee}원
-총 원가 합계: ${totalCost}원
-경쟁사 최저가: ${competitorPrice ? competitorPrice + "원" : "미입력"}
-목표 마진율: ${targetMargin ? targetMargin + "%" : "미입력"}
-카테고리: ${category || "미입력"}
-상품 특징: ${features || "미입력"}
+아래 수치는 서버에서 수식으로 이미 확정 계산된 값입니다. 이 숫자들을 절대 재계산하거나 수정하지 마세요.
 
-다음 JSON 형식으로만 응답하세요:
+[확정된 가격 데이터]
+- 총 원가: ${totalCost.toLocaleString()}원 (매입가 ${price.toLocaleString()} + 배송 ${shipping.toLocaleString()} + 수수료 ${platformFee.toLocaleString()} / ${totalFeeRate}% ${feeLabel})
+- 추천 판매가: ${recommended_price.toLocaleString()}원 (마진 ${margin}%)
+- 최소 판매가: ${min_price.toLocaleString()}원 (최소마진 15%${competitor ? ` / 경쟁가 ${competitor.toLocaleString()}원 기준 캡 적용` : ""})
+- 최대 판매가: ${max_price.toLocaleString()}원 (최대마진 45%)
+- 마진율: ${margin_rate}%
+- 건당 이익: ${profit.toLocaleString()}원
+
+[상품 정보]
+- 상품명: ${productName}
+- 경쟁사 최저가: ${competitorPrice ? competitorPrice + "원" : "미입력"}
+- 카테고리: ${category || "미입력"}
+- 상품 특징: ${features || "미입력"}
+
+위 확정 수치를 그대로 사용하여 다음 JSON 형식으로만 응답하세요.
+숫자 필드는 위에 명시된 값을 그대로 복사하세요:
 {
-  "action_command": "지금 바로 판매가를 [N]원으로 설정하세요. [이유]",
-  "recommended_price": 추천판매가(숫자만),
-  "min_price": 최소판매가(숫자만),
-  "max_price": 최대판매가(숫자만),
-  "margin_rate": 마진율(숫자만),
-  "price_breakdown": { "cost": ${totalCost}, "profit": 이익(숫자만), "margin_per_unit": 건당순이익(숫자만) },
-  "strategy": "가격 전략 설명",
-  "tips": ["오늘 바로 할 것","이번 주","다음 달"]
-}
-- 총 원가 ${totalCost}원 기준으로 모든 가격 계산
-- 목표 마진율 없으면 30~35% 권장`;
+  "action_command": "지금 바로 판매가를 ${recommended_price.toLocaleString()}원으로 설정하세요. [이유 1~2문장]",
+  "recommended_price": ${recommended_price},
+  "min_price": ${min_price},
+  "max_price": ${max_price},
+  "margin_rate": ${margin_rate},
+  "price_breakdown": { "cost": ${price_breakdown.cost}, "profit": ${price_breakdown.profit}, "margin_per_unit": ${price_breakdown.margin_per_unit} },
+  "strategy": "이 가격 구간이 적절한 이유와 경쟁 환경 고려 전략 (3~4문장)",
+  "tips": ["오늘 바로 실행할 것 1가지", "이번 주 점검할 것 1가지", "다음 달 재검토할 것 1가지"]
+}`;
 
   return new Response(createGeminiStream(prompt, 600), {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
