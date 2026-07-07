@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import BiddingTab from "@/components/BiddingTab";
 import CustomerTab from "@/components/CustomerTab";
 import PricingTab from "@/components/PricingTab";
@@ -27,13 +27,7 @@ const TABS = [
 export default function Home() {
   const [activeTab, setActiveTab] = useState("setup");
   const [trialOpen, setTrialOpen] = useState(false);
-  const [onboardingProgress, setOnboardingProgress] = useState(1);
   const [seoKeyword, setSeoKeyword] = useState("");
-
-  useEffect(() => {
-    const isRegistered = localStorage.getItem("product_registered") === "true";
-    setOnboardingProgress(isRegistered ? 1 : 0);
-  }, []);
 
   const handleSeoNavigate = (_keyword?: string) => {
     setActiveTab("discover");
@@ -165,64 +159,7 @@ export default function Home() {
             <ProfitSimulatorTab />
             <div style={{ borderTop: "1px solid #dededi", paddingTop: "3.5rem", marginTop: "4rem", display: "flex", flexDirection: "column", gap: "32px" }}>
               <PricingTab />
-              {onboardingProgress === 0 ? (
-                <div className="max-w-lg mx-auto text-center py-16 px-8 bg-white rounded border border-[#dededi] shadow-md select-none font-['Pretendard']" style={{ borderRadius: 5 }}>
-                  <span className="text-4xl mb-4 block animate-bounce">💡</span>
-                  <h2 className="text-xl font-bold text-[#0d0d0e] mb-3">상품 등록부터 시작하세요</h2>
-                  <p className="text-sm text-[#64676b] leading-relaxed mb-8 max-w-sm mx-auto">
-                    키워드 입찰 최적화 분석을 시작하려면 스토어 설정에서 최소 1개 이상의 자사 상품을 등록해야 합니다.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-                    <button
-                      onClick={() => setActiveTab("setup")}
-                      className="w-full sm:w-auto px-6 py-3.5 bg-[#ef567c] text-white text-xs font-bold rounded hover:opacity-90 transition-opacity cursor-pointer text-center"
-                      style={{ borderRadius: 5 }}
-                    >
-                      🧭 스토어 설정으로 가기 →
-                    </button>
-                    <button
-                      onClick={async (e) => {
-                        const btn = e.currentTarget;
-                        btn.disabled = true;
-                        const originalText = btn.innerText;
-                        btn.innerText = "⏳ 데모 데이터 적재 중...";
-                        try {
-                          await fetch("/api/db/init", { method: "POST" });
-                          await fetch("/api/db/migrate", { method: "POST" });
-                          await fetch("/api/db/seed", { method: "POST" });
-
-                          localStorage.setItem("product_registered", "true");
-                          localStorage.setItem("competitor_registered", "true");
-                          localStorage.setItem("first_analysis_done", "true");
-
-                          const DEMO_STORE_ID = "demo-store-001";
-                          const DEMO_STORE_INFO = JSON.stringify({
-                            id: DEMO_STORE_ID,
-                            name: "데모 윈디 스토어",
-                            email: "demo@sellfit.kr",
-                            kakao: "01000000000",
-                          });
-                          localStorage.setItem("sellfit_store_id", DEMO_STORE_ID);
-                          localStorage.setItem("sellfit_store_info", DEMO_STORE_INFO);
-
-                          window.location.reload();
-                        } catch (err) {
-                          console.error("데모 적재 실패:", err);
-                          btn.disabled = false;
-                          btn.innerText = "❌ 실패 (재시도)";
-                          setTimeout(() => { btn.innerText = originalText; }, 3000);
-                        }
-                      }}
-                      className="w-full sm:w-auto px-6 py-3.5 bg-white text-[#ef567c] border border-[#ef567c] text-xs font-bold rounded hover:bg-[#fff5f5] transition-colors cursor-pointer text-center"
-                      style={{ borderRadius: 5 }}
-                    >
-                      ✨ 데모 데이터로 즉시 확인
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <BiddingTab />
-              )}
+              <BiddingTab />
             </div>
           </div>
         )}
