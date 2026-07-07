@@ -49,11 +49,13 @@ interface VideoScene {
   risk_level: "안전" | "검수필수" | "위험";
   risk_reason: string;
   flow_prompt: string;
+  photo_note?: string | null;
 }
 interface VideoPlanResult {
   strategy: string;
   scenes: VideoScene[];
   safety_note: string;
+  photo_verified?: boolean;
 }
 
 const SECTION_COLORS: Record<number, { bg: string; border: string; badge: string; text: string }> = {
@@ -113,8 +115,22 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
   const [copied, setCopied] = useState<string | null>(null);
   const [openImageSections, setOpenImageSections] = useState<number[]>([1]);
   const [mainView, setMainView] = useState<"content" | "imageedit">("content");
+  const [productImageB64, setProductImageB64] = useState<string | null>(null);
+  const [productImageMime, setProductImageMime] = useState<string>("image/jpeg");
 
   const payload = () => ({ productName, category, features, targetCustomer, price, uniquePoint });
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setProductImageB64(result.split(",")[1]);
+      setProductImageMime(file.type || "image/jpeg");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleImagePlan = async () => {
     if (!productName) return;
@@ -145,7 +161,10 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
     setLoadingType("video");
     setVideoPlan(null);
     try {
-      const res = await fetch("/api/videoplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload()) });
+      const res = await fetch("/api/videoplan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload(), productImageB64, productImageMime }),
+      });
       const data = await res.json();
       if (data.result) { setVideoPlan(data.result); setActiveSection("videoplan"); }
     } catch { alert("오류가 발생했습니다."); }
@@ -287,6 +306,32 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                 placeholder="예) 국산 유기농 아로니아 분말 500g"
                 style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: FF, boxSizing: "border-box" }} />
             </div>
+            {/* 실물 제품사진 업로드 — 영상 기획 위험도 대조에 사용 */}
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
+                실물 제품사진 <span style={{ fontSize: "12px", fontWeight: 400, color: "#9ca3af" }}>(선택 — 영상 기획 허위광고 위험도 대조)</span>
+              </label>
+              {productImageB64 ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", border: "1px solid #86efac", borderRadius: "8px", background: "#f0fdf4" }}>
+                  <img src={`data:${productImageMime};base64,${productImageB64}`} alt="제품사진" style={{ width: "48px", height: "48px", objectFit: "cover", borderRadius: "6px", border: "1px solid #e5e7eb" }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: "#15803d", margin: 0 }}>실물 사진 업로드 완료</p>
+                    <p style={{ fontSize: "11px", color: "#6b7280", margin: "2px 0 0" }}>영상 기획 생성 시 자동으로 위험도 대조에 사용됩니다</p>
+                  </div>
+                  <button onClick={() => setProductImageB64(null)} style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: "1px solid #fecaca", background: "#fff", color: "#dc2626", cursor: "pointer", fontFamily: FF, flexShrink: 0 }}>
+                    제거
+                  </button>
+                </div>
+              ) : (
+                <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "16px", border: "2px dashed #e5e7eb", borderRadius: "8px", cursor: "pointer", background: "#fafafa" }}>
+                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
+                  <span style={{ fontSize: "20px" }}>📷</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6b7280" }}>클릭하여 실물 제품사진 업로드</span>
+                  <span style={{ fontSize: "11px", color: "#9ca3af", textAlign: "center" }}>ImageEditTab에서 이미 업로드한 사진이 있으면 자동 연결됩니다 (준비 중)</span>
+                </label>
+              )}
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "14px", fontWeight: 600, color: "#111827", marginBottom: "6px" }}>
@@ -577,6 +622,19 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                         </div>
                       )}
 
+                      {/* 실물사진 대조 결과 배지 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${videoPlan.photo_verified ? "#86efac" : "#fde68a"}`, background: videoPlan.photo_verified ? "#f0fdf4" : "#fffbeb" }}>
+                        <span style={{ fontSize: "14px" }}>{videoPlan.photo_verified ? "📸" : "⚠️"}</span>
+                        <div>
+                          <p style={{ fontSize: "12px", fontWeight: 700, color: videoPlan.photo_verified ? "#15803d" : "#92400e", margin: 0 }}>
+                            {videoPlan.photo_verified ? "실물사진 검증됨" : "실물사진 미대조"}
+                          </p>
+                          <p style={{ fontSize: "11px", color: videoPlan.photo_verified ? "#6b7280" : "#92400e", margin: 0 }}>
+                            {videoPlan.photo_verified ? "업로드 사진과 색상·형태 대조 완료 — 각 씬 위험도 재판정됨" : "실물사진 없이 텍스트 설명만으로 위험도 추측 중"}
+                          </p>
+                        </div>
+                      </div>
+
                       {/* 위험도 범례 */}
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {(["안전", "검수필수", "위험"] as const).map((level) => {
@@ -627,6 +685,14 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                                 </span>
                                 <p style={{ fontSize: "13px", color: c.text, margin: 0, lineHeight: 1.5 }}>{scene.risk_reason}</p>
                               </div>
+
+                              {/* 실물사진 대조 노트 (사진 있을 때만) */}
+                              {scene.photo_note && (
+                                <div style={{ display: "flex", gap: "6px", alignItems: "flex-start", padding: "8px 10px", borderRadius: "6px", background: "#f0fdf4", border: "1px solid #86efac" }}>
+                                  <span style={{ fontSize: "12px", flexShrink: 0 }}>📸</span>
+                                  <p style={{ fontSize: "12px", color: "#15803d", margin: 0, lineHeight: 1.5, fontWeight: 600 }}>{scene.photo_note}</p>
+                                </div>
+                              )}
 
                               {/* Flow 프롬프트 */}
                               <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "10px", padding: "12px 14px" }}>
