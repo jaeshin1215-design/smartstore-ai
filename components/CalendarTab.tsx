@@ -57,6 +57,49 @@ function getRelevantMonths(category: string): number[] {
   return []; // 기타
 }
 
+// 현재 달 focusKeyword로 DataLab 52주 시즌성 점수 1회 조회 (DiscoverTab fetchSeasonality와 동일 로직)
+const CV_EVERGREEN = 0.15, SCORE_EVERGREEN_MIN = 60;
+async function fetchCurrentMonthSeasonality(keyword: string): Promise<{ score: number; label: string }> {
+  try {
+    const res = await fetch("/api/naver-trend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword, weeks: 52 }),
+    });
+    if (!res.body) return { score: 50, label: "조회 실패" };
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const evt = JSON.parse(line) as { type: string; trend?: { ratios: number[] } };
+          if (evt.type === "naver" && evt.trend?.ratios?.length) {
+            await reader.cancel();
+            const r = evt.trend.ratios, n = r.length, mean = r.reduce((s, x) => s + x, 0) / n;
+            if (mean === 0) return { score: 50, label: "검색량 없음" };
+            const std = Math.sqrt(r.reduce((s, x) => s + (x - mean) ** 2, 0) / n), cv = std / mean;
+            const rA = r.slice(-4).reduce((s, x) => s + x, 0) / 4;
+            const pA = r.slice(-8, -4).reduce((s, x) => s + x, 0) / 4;
+            const g = pA > 0 ? (rA - pA) / pA : 0;
+            if (cv < CV_EVERGREEN) return { score: Math.round(Math.max(SCORE_EVERGREEN_MIN, Math.min(100, (1 - cv) * 110))), label: "상시" };
+            if (g > 0.3)  return { score: 88, label: "급상승 중" };
+            if (g > 0.1)  return { score: 74, label: "상승 중" };
+            if (g > -0.1) return { score: 58, label: "피크 근처" };
+            if (g > -0.3) return { score: 35, label: "하강 중" };
+            return { score: 18, label: "시즌 종료" };
+          }
+        } catch { /**/ }
+      }
+    }
+  } catch { /**/ }
+  return { score: 50, label: "조회 실패" };
+}
+
 // 4사분면 분류 (설계서 4번)
 function getQuadrant(x: number, y: number): "major"|"quick"|"thankless"|"fillin" {
   if (x >= 50 && y >= 50) return "major";
@@ -124,6 +167,7 @@ export default function CalendarTab() {
   const [monthFilter, setMonthFilter] = useState<number | null>(null);
   const [detail, setDetail] = useState<MonthDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [discoverBadge, setDiscoverBadge] = useState<{ score: number; label: string } | "loading" | null>(null);
   const currentMonth = new Date().getMonth(); // 0-based
 
   useEffect(() => {
@@ -136,6 +180,13 @@ export default function CalendarTab() {
       })
       .catch(() => {});
   }, []);
+
+  // 현재 달 focusKeywords[0]으로 DataLab 52주 시즌성 1회 조회
+  useEffect(() => {
+    const keyword = MONTH_PLANS[currentMonth].focusKeywords[0];
+    setDiscoverBadge("loading");
+    fetchCurrentMonthSeasonality(keyword).then(setDiscoverBadge);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 월별 상품 분류
   function getMonthProducts(monthIdx: number): Product[] {
@@ -315,7 +366,7 @@ export default function CalendarTab() {
                     </div>
                   )}
 
-                  {/* 진단 신호 + Discover 대조 배지 */}
+                  {/* 진단 신호 */}
                   {(sig.stars > 0 || sig.drops > 0 || monthProds.length > 0) && (
                     <div style={{ display:"flex", gap:"8px", marginTop:"8px", borderTop:"1px solid #f3f4f6", paddingTop:"8px", flexWrap:"wrap", alignItems:"center" }}>
                       {monthProds.length > 0 && (
@@ -327,11 +378,24 @@ export default function CalendarTab() {
                       {sig.drops > 0 && (
                         <span style={{ fontSize:"12px", color:"#9ca3af" }}>드롭 {sig.drops}</span>
                       )}
-                      {/* Discover 대조 배지: 재고 0 → 숨김, major ≥1 → 일치, 나머지 → 확인 필요 */}
+                      {/* 효자 배지: 재고 0 → 숨김 */}
                       {monthProds.length > 0 && (
                         sig.stars >= 1
-                          ? <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f0fdf4", color:"#16a34a", border:"1px solid #bbf7d0", flexShrink:0 }}>일치</span>
-                          : <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#fff7ed", color:"#c2410c", border:"1px solid #fed7aa", flexShrink:0 }}>확인 필요</span>
+                          ? <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f0fdf4", color:"#16a34a", border:"1px solid #bbf7d0", flexShrink:0 }}>효자 있음</span>
+                          : <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f9fafb", color:"#9ca3af", border:"1px solid #e5e7eb", flexShrink:0 }}>효자 없음</span>
+                      )}
+                    </div>
+                  )}
+                  {/* Discover 대조 배지: 현재 달만, DataLab 52주 시즌성 실데이터 기준 */}
+                  {isCurrent && (
+                    <div style={{ marginTop:"6px" }}>
+                      {discoverBadge === "loading" && (
+                        <span style={{ display:"inline-block", width:"80px", height:"18px", background:"#f3f4f6", borderRadius:"10px", verticalAlign:"middle" }} />
+                      )}
+                      {discoverBadge !== "loading" && discoverBadge !== null && (
+                        discoverBadge.score >= 58
+                          ? <span style={{ fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f0fdf4", color:"#16a34a", border:"1px solid #bbf7d0" }}>Discover 일치 · {discoverBadge.label}</span>
+                          : <span style={{ fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#fff7ed", color:"#c2410c", border:"1px solid #fed7aa" }}>Discover 확인 필요 · {discoverBadge.label}</span>
                       )}
                     </div>
                   )}
