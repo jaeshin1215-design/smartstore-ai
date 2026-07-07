@@ -145,6 +145,7 @@ export default function CustomerTab() {
   const [csLoading, setCsLoading] = useState(false);
   const [csError, setCsError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [urgencies, setUrgencies] = useState<Record<string, "긴급" | "보통">>({});
   const [generatingDraft, setGeneratingDraft] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
@@ -197,8 +198,11 @@ export default function CustomerTab() {
         body: JSON.stringify({ inquiry: cs.content }),
       });
       if (!res.ok) throw new Error(`reply API ${res.status}`);
-      const text = await res.text();
-      if (text.trim()) setDrafts(p => ({ ...p, [cs.cs_no]: text.trim() }));
+      const data = await res.json() as { urgency?: string; reply?: string };
+      if (data.reply?.trim()) setDrafts(p => ({ ...p, [cs.cs_no]: data.reply!.trim() }));
+      if (data.urgency === "긴급" || data.urgency === "보통") {
+        setUrgencies(p => ({ ...p, [cs.cs_no]: data.urgency as "긴급" | "보통" }));
+      }
     } catch { /* 무시 */ }
     setGeneratingDraft(null);
   }
@@ -285,6 +289,16 @@ export default function CustomerTab() {
               <div style={{ display: "flex", gap: "6px", flexShrink: 0, paddingTop: "3px" }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #93c5fd", color: "#1d4ed8", whiteSpace: "nowrap" }}>고객 문의</span>
                 <span style={{ fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626", whiteSpace: "nowrap" }}>{cs.category || "NEW"}</span>
+                {urgencies[cs.cs_no] && (
+                  <span style={{
+                    fontSize: "12px", fontWeight: 600, padding: "4px 11px", borderRadius: "6px", whiteSpace: "nowrap",
+                    background: urgencies[cs.cs_no] === "긴급" ? "#fff8f0" : "#f9fafb",
+                    border: `1px solid ${urgencies[cs.cs_no] === "긴급" ? "#fb923c" : "#d1d5db"}`,
+                    color: urgencies[cs.cs_no] === "긴급" ? "#c2410c" : "#6b7280",
+                  }}>
+                    {urgencies[cs.cs_no] === "긴급" ? "⚡ 긴급" : "보통"}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -312,6 +326,13 @@ export default function CustomerTab() {
               </div>
             ) : (
               <div style={{ marginBottom: "28px" }}>
+                {/* 작업 2 — 교환·반품 SCM 안내 배너 */}
+                {cs.category === "교환·반품" && (
+                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "10px 14px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "13px", color: "#c2410c", flexShrink: 0 }}>⚠</span>
+                    <span style={{ fontSize: "13px", color: "#c2410c", fontWeight: 600 }}>교환 승인 후 자동 처리 불가 — 재발송 송장은 SCM에서 직접 등록하세요</span>
+                  </div>
+                )}
                 {!drafts[cs.cs_no] && (
                   <button onClick={() => generateDraft(cs)} disabled={generatingDraft === cs.cs_no}
                     style={{ fontSize: "13px", fontWeight: 600, padding: "9px 20px", borderRadius: "8px", border: "none", background: generatingDraft === cs.cs_no ? "#c4c8cc" : "#ef567c", color: "#fff", cursor: generatingDraft === cs.cs_no ? "default" : "pointer", fontFamily: FF, display: "flex", alignItems: "center", gap: "6px" }}>
@@ -408,9 +429,14 @@ export default function CustomerTab() {
           {activeInboxSection === "고객 문의" && (
             <div>
               {/* ④ 채널 범위 표기 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px", padding: "8px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", padding: "8px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px" }}>
                 <span style={{ fontSize: "12px", color: "#0369a1" }}>ℹ</span>
                 <span style={{ fontSize: "13px", color: "#0369a1" }}>사방넷 연동 채널 문의만 자동 수집됩니다 (수기채널 제외)</span>
+              </div>
+              {/* 작업 3 — 사방넷 미수집 채널 확인 필요 배너 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px", padding: "8px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px" }}>
+                <span style={{ fontSize: "12px", color: "#c2410c" }}>⚠</span>
+                <span style={{ fontSize: "13px", color: "#92400e" }}>사방넷 미수집 채널 존재 가능 — 수기채널 문의는 이 목록에 안 뜹니다. SCM 직접 확인 권장</span>
               </div>
 
               {/* 서브탭: 미답변 문의 | 불량품 접수 */}

@@ -1,7 +1,7 @@
 export const maxDuration = 60;
 
-import { NextRequest } from "next/server";
-import { createGeminiStream } from "@/lib/claude";
+import { NextRequest, NextResponse } from "next/server";
+import { callGemini } from "@/lib/claude";
 
 export async function POST(req: NextRequest) {
   const { inquiry } = await req.json();
@@ -20,9 +20,25 @@ ${inquiry}
 4. 배송 지연이면 → 현재 상황 인정 + 처리 예정일 안내 + 보상 제안 포함
 5. 교환/반품이면 → 접수 방법 3단계 이내로 명확히 안내
 6. 마지막 문장: 추가 문의 환영 + [셀러명] 자리 표시
-7. 200~300자, 합쇼체, 이모지 1개만`;
+7. 200~300자, 합쇼체, 이모지 1개만
 
-  return new Response(createGeminiStream(prompt, 400), {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+긴급도 판단:
+- "긴급": 마감시한 표현("오늘까지", "내일", "내일 행사", "지금 당장", "당일", "오늘 저녁" 등) 포함 시
+- "보통": 위 표현 없으면 보통
+
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 금지:
+{
+  "urgency": "긴급" 또는 "보통",
+  "reply": "완성형 고객 답변 텍스트"
+}`;
+
+  try {
+    const text = await callGemini(prompt, 600);
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON");
+    const data = JSON.parse(match[0]) as { urgency?: string; reply?: string };
+    return NextResponse.json({ urgency: data.urgency || "보통", reply: data.reply || "" });
+  } catch {
+    return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
+  }
 }
