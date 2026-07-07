@@ -153,6 +153,19 @@ export default function PricingTab() {
     if (!productName || !purchasePrice || submitting.current) return;
     submitting.current = true;
     setLoading(true); setResult(null); setIsSample(false); setError("");
+
+    // 서버와 동일한 수식으로 숫자 먼저 확정 — LLM 응답값은 strategy·tips·action_command만 사용
+    const calcMargin = targetMargin ? Number(targetMargin) : 32;
+    const calcRecommended = Math.round(totalCost / (1 - calcMargin / 100));
+    const calcMinByMargin = Math.round(totalCost / (1 - 0.15));
+    const calcCompetitor = competitorPrice ? Number(competitorPrice) : null;
+    const calcMin = calcCompetitor
+      ? Math.max(totalCost + 500, Math.min(calcMinByMargin, Math.round(calcCompetitor * 0.95)))
+      : calcMinByMargin;
+    const calcMax = Math.round(totalCost / (1 - 0.45));
+    const calcMarginRate = Math.round(((calcRecommended - totalCost) / calcRecommended) * 100);
+    const calcProfit = calcRecommended - totalCost;
+
     try {
       const res = await fetch("/api/pricing", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -162,27 +175,45 @@ export default function PricingTab() {
           customFeeRate: feeMode === "manual" ? customFeeRate : undefined,
         }),
       });
+      let parsed = false;
       await readStream(res, (text) => {
         try {
           const match = text.match(/\{[\s\S]*\}/);
           if (!match) throw new Error("No JSON");
           const p = JSON.parse(match[0]);
+          parsed = true;
           setResult({
             action_command: p.action_command || "",
-            recommended_price: Number(p.recommended_price) || 0,
-            min_price: Number(p.min_price) || 0,
-            max_price: Number(p.max_price) || 0,
-            margin_rate: Number(p.margin_rate) || 0,
-            price_breakdown: {
-              cost: Number(p.price_breakdown?.cost) || totalCost,
-              profit: Number(p.price_breakdown?.profit) || 0,
-              margin_per_unit: Number(p.price_breakdown?.margin_per_unit) || 0,
-            },
+            // LLM 숫자값 무시 — 서버 수식 계산값으로 강제 적용
+            recommended_price: calcRecommended,
+            min_price: calcMin,
+            max_price: calcMax,
+            margin_rate: calcMarginRate,
+            price_breakdown: { cost: totalCost, profit: calcProfit, margin_per_unit: calcProfit },
             strategy: p.strategy || "",
             tips: Array.isArray(p.tips) ? p.tips : [],
           });
         } catch { setError("분석 결과를 불러오지 못했습니다. 다시 시도해주세요."); }
       }, () => setError("오류가 발생했습니다. 다시 시도해주세요."));
+
+      // 가격결정 이력 저장 — 실패해도 화면 흐름에 영향 없음
+      if (parsed && storeId) {
+        fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            store_id: storeId,
+            event_type: "price_decision",
+            product_name: productName,
+            purchase_price: Number(purchasePrice),
+            competitor_price: calcCompetitor,
+            recommended_price: calcRecommended,
+            min_price: calcMin,
+            max_price: calcMax,
+            margin_rate: calcMarginRate,
+          }),
+        }).catch(() => {});
+      }
     } catch { setError("오류가 발생했습니다. 다시 시도해주세요."); }
     finally { submitting.current = false; setLoading(false); }
   };
