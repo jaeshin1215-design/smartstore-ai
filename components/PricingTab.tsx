@@ -109,7 +109,7 @@ export default function PricingTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [storeId, setStoreId] = useState<string | null>(null);
-  const [showDynamic, setShowDynamic] = useState(false);
+  const [showDynamic, setShowDynamic] = useState(true);
   const [dynData, setDynData] = useState<{ comp: number | null; stock: number | null } | null>(null);
   const { streaming, readStream } = useStream();
   const submitting = useRef(false);
