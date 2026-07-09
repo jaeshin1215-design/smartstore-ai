@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
-import { extractCoupangProductId } from "@/lib/priceguard";
+import { extractCoupangProductId, normalizeCoupangUrl } from "@/lib/priceguard";
 
 // 상품 목록 조회
 export async function GET(req: NextRequest) {
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
            is_own !== undefined && is_own !== null ? Number(is_own) : 0,
            matrix_x != null ? Number(matrix_x) : null,
            matrix_y != null ? Number(matrix_y) : null,
-           coupang_url || null,
+           normalizeCoupangUrl(coupang_url),
            extractCoupangProductId(coupang_url)],
   });
 
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (coupang_url !== undefined) {
     fields.push("coupang_url = ?", "coupang_product_id = ?");
-    args.push(coupang_url || null, extractCoupangProductId(coupang_url));
+    args.push(normalizeCoupangUrl(coupang_url), extractCoupangProductId(coupang_url));
   }
 
   if (fields.length === 0) {

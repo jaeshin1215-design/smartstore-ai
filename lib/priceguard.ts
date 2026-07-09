@@ -38,6 +38,25 @@ export function extractCoupangProductId(url: string | null | undefined): string 
   return m ? m[1] : null;
 }
 
+/**
+ * 쿠팡 URL 정규화 — 스킴 없는 입력("coupang.com/vp/...")은 확장의 tabs.create가
+ * 상대경로로 해석해 수집이 실패하므로 저장 시점에 https://www.coupang.com 형태로 강제
+ */
+export function normalizeCoupangUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let u = String(url).trim();
+  if (u === "") return null;
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  try {
+    const p = new URL(u);
+    if (p.hostname === "coupang.com" || p.hostname === "m.coupang.com") p.hostname = "www.coupang.com";
+    if (!p.hostname.endsWith("coupang.com")) return null;
+    return p.toString();
+  } catch {
+    return null;
+  }
+}
+
 /** KST 기준 오늘 날짜 (YYYY-MM-DD) */
 export function kstToday(): string {
   return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);

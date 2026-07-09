@@ -5,8 +5,10 @@
 //              (e) 광고 카드 제외 + 카드 경계 준수
 
 (() => {
-  const MAX_RETRY = 8;
+  // 백그라운드 비활성 탭은 렌더·지연로드가 느림 — 최대 22.5초(15×1.5s) 폴링 대기
+  const MAX_RETRY = 15;
   const RETRY_MS = 1500;
+  console.log("[PG content] 주입됨:", location.href);
 
   function parsePrice(text) {
     const n = Number(String(text ?? "").replace(/[^\d]/g, ""));
@@ -90,6 +92,7 @@
     attempt += 1;
     const captures = extract();
     if (captures) {
+      console.log(`[PG content] 추출 성공 (${attempt}회차):`, JSON.stringify(captures));
       chrome.runtime.sendMessage({
         type: "PG_RESULT",
         url: location.href,
@@ -99,6 +102,7 @@
     } else if (attempt < MAX_RETRY) {
       setTimeout(tryExtract, RETRY_MS);
     } else {
+      console.log(`[PG content] 추출 실패 — ${MAX_RETRY}회 재시도 소진:`, location.href);
       chrome.runtime.sendMessage({ type: "PG_RESULT", url: location.href, captures: [], failed: true });
     }
   }

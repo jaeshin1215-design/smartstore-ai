@@ -15,7 +15,7 @@ const DEFAULTS = {
   collectLog: {},   // { 'YYYY-MM-DD': { count, at, trigger } }
 };
 
-const PAGE_TIMEOUT_MS = 25000;
+const PAGE_TIMEOUT_MS = 35000; // content 폴링(최대 22.5s) + 네트워크 여유
 const PAGE_GAP_MS = 3000; // 사람 열람 속도에 가까운 페이지 간격
 
 async function getConfig() {
@@ -41,6 +41,22 @@ async function ensureAlarms() {
   await chrome.alarms.create("pg-checkup", { when: nextTimeOf(cfg.checkupHour), periodInMinutes: 1440 });
 }
 
+// 스킴 없는 URL("coupang.com/vp/...")은 tabs.create가 확장 내부 상대경로로 해석해
+// 페이지를 못 연다 (2026-07-09 실검증 0건 원인). 항상 https://www.coupang.com 으로 정규화.
+function normalizeCoupangUrl(url) {
+  if (!url) return null;
+  let u = String(url).trim();
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  try {
+    const p = new URL(u);
+    if (p.hostname === "coupang.com" || p.hostname === "m.coupang.com") p.hostname = "www.coupang.com";
+    if (!p.hostname.endsWith("coupang.com")) return null;
+    return p.toString();
+  } catch {
+    return null;
+  }
+}
+
 // ── 수집 대상 = Price Guard 보드 API에서 쿠팡 URL 연결된 상품 ──
 async function fetchTargets(cfg) {
   const res = await fetch(`${cfg.apiBase}/api/price-capture?store_id=${encodeURIComponent(cfg.storeId)}`);
@@ -48,7 +64,8 @@ async function fetchTargets(cfg) {
   const data = await res.json();
   return (data.rows || [])
     .filter((r) => r.coupang_url)
-    .map((r) => ({ url: r.coupang_url, name: r.product_name }));
+    .map((r) => ({ url: normalizeCoupangUrl(r.coupang_url), name: r.product_name }))
+    .filter((t) => t.url);
 }
 
 async function postCaptures(cfg, captures) {
@@ -156,11 +173,16 @@ async function collectAll(trigger) {
     win = await chrome.windows.create({ url: "about:blank", focused: false, state: "minimized" });
 
     const all = [];
+    const runLog = []; // 상품별 결과 — 디버깅용 (SW 콘솔 + storage)
     for (const t of targets) {
+      console.log(`[PG] 수집 시도: ${t.name} → ${t.url}`);
       const captures = await captureInTab(win.id, t.url);
+      console.log(`[PG] 결과: ${t.name} → ${captures ? captures.length + "건" : "실패(타임아웃/추출불가)"}`);
+      runLog.push({ name: t.name, url: t.url, count: captures?.length ?? 0, ok: !!captures?.length });
       if (captures?.length) all.push(...captures);
       await new Promise((r) => setTimeout(r, PAGE_GAP_MS));
     }
+    await chrome.storage.local.set({ lastRun: { at: new Date().toISOString(), trigger, log: runLog } });
 
     if (all.length > 0) {
       await postCaptures(cfg, all);
