@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 // 상품 정보 수정 (PATCH)
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { id, matrix_x, matrix_y, price, is_price_confirmed } = body;
+  const { id, matrix_x, matrix_y, price, is_price_confirmed, coupang_url } = body;
 
   if (!id) return NextResponse.json({ error: "id 필요" }, { status: 400 });
 
@@ -68,6 +68,10 @@ export async function PATCH(req: NextRequest) {
   if (is_price_confirmed !== undefined) {
     fields.push("is_price_confirmed = ?");
     args.push(is_price_confirmed);
+  }
+  if (coupang_url !== undefined) {
+    fields.push("coupang_url = ?", "coupang_product_id = ?");
+    args.push(coupang_url || null, extractCoupangProductId(coupang_url));
   }
 
   if (fields.length === 0) {

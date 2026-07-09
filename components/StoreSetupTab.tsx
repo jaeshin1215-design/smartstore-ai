@@ -16,6 +16,7 @@ interface Product {
   shipping_cost: number;
   stock: number | null;
   is_own: number;
+  coupang_url: string | null;
 }
 
 interface Store {
@@ -91,6 +92,11 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
   const [pStock, setPStock] = useState("");
   const [pIsOwn, setPIsOwn] = useState(1); // 1=자사, 0=경쟁사, 2=소싱·위탁후보
   const [addingProduct, setAddingProduct] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  // 기존 상품 쿠팡 URL 인라인 편집
+  const [editingCoupangId, setEditingCoupangId] = useState<string | null>(null);
+  const [editingCoupangUrl, setEditingCoupangUrl] = useState("");
+  const [savingCoupangUrl, setSavingCoupangUrl] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [collectResult, setCollectResult] = useState<{product: string; searchVolume: number; cpc: number; competitors: number}[] | null>(null);
 
@@ -190,7 +196,16 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
   }
 
   async function handleAddProduct() {
-    if (!store || !pName.trim() || !pKeyword.trim()) return;
+    if (!store) return;
+    // 빠진 필수 항목을 명시적으로 알림 (조용한 무시 금지)
+    const missing: string[] = [];
+    if (!pName.trim()) missing.push("상품명");
+    if (!pKeyword.trim()) missing.push("분석 키워드");
+    if (missing.length > 0) {
+      setAddError(`${missing.join(" · ")} 입력이 필요합니다. 이미 등록된 상품에 쿠팡 URL만 붙이려면 아래 목록에서 "쿠팡 URL 연결"을 누르세요.`);
+      return;
+    }
+    setAddError(null);
     setAddingProduct(true);
     try {
       await fetch("/api/products", {
@@ -214,6 +229,23 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
   async function handleDeleteProduct(id: string) {
     await fetch(`/api/products?id=${id}`, { method: "DELETE" });
     setProducts(prev => prev.filter(p => p.id !== id));
+  }
+
+  // 기존 상품에 쿠팡 URL 연결 (Price Guard 추적 대상 등록)
+  async function handleSaveCoupangUrl(productId: string) {
+    if (!store) return;
+    setSavingCoupangUrl(true);
+    try {
+      await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, coupang_url: editingCoupangUrl.trim() || null }),
+      });
+      await loadProducts(store.id);
+      setEditingCoupangId(null);
+      setEditingCoupangUrl("");
+    } catch (e) { console.error(e); }
+    setSavingCoupangUrl(false);
   }
 
   async function handleCollect() {
@@ -885,6 +917,11 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
                 }}>
                 {addingProduct ? "등록 중..." : "+ 상품 추가"}
               </button>
+              {addError && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#dc2626" }}>
+                  ⚠️ {addError}
+                </div>
+              )}
             </div>
           </div>
 
@@ -934,24 +971,57 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
                       {group.label}
                     </div>
                     {group.list.map(p => (
-                      <div key={p.id} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "12px 0", borderBottom: "1px solid #f3f4f6",
-                      }}>
-                        <div>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f2a1e" }}>{p.name}</span>
-                          <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>
-                            {p.category} · {p.keyword}
-                            {p.price ? ` · 판매가 ${Number(p.price).toLocaleString()}원` : ""}
-                            {p.purchase_price ? ` · 매입가 ${Number(p.purchase_price).toLocaleString()}원` : ""}
-                            {p.shipping_cost ? ` · 배송비 ${Number(p.shipping_cost).toLocaleString()}원` : ""}
-                            {p.stock != null ? ` · 재고 ${Number(p.stock)}개` : ""}
-                          </span>
+                      <div key={p.id} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#0f2a1e" }}>{p.name}</span>
+                            <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>
+                              {p.category} · {p.keyword}
+                              {p.price ? ` · 판매가 ${Number(p.price).toLocaleString()}원` : ""}
+                              {p.purchase_price ? ` · 매입가 ${Number(p.purchase_price).toLocaleString()}원` : ""}
+                              {p.shipping_cost ? ` · 배송비 ${Number(p.shipping_cost).toLocaleString()}원` : ""}
+                              {p.stock != null ? ` · 재고 ${Number(p.stock)}개` : ""}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center", flexShrink: 0 }}>
+                            <button
+                              onClick={() => {
+                                setEditingCoupangId(editingCoupangId === p.id ? null : p.id);
+                                setEditingCoupangUrl(p.coupang_url ?? "");
+                              }}
+                              style={{
+                                fontSize: 11, background: "none", border: "none", cursor: "pointer",
+                                color: p.coupang_url ? "#15803d" : "#be123c", fontWeight: 600,
+                              }}>
+                              {p.coupang_url ? "쿠팡 ✓" : "쿠팡 URL 연결"}
+                            </button>
+                            <button onClick={() => handleDeleteProduct(p.id)}
+                              style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>
+                              삭제
+                            </button>
+                          </div>
                         </div>
-                        <button onClick={() => handleDeleteProduct(p.id)}
-                          style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>
-                          삭제
-                        </button>
+                        {editingCoupangId === p.id && (
+                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <input
+                              style={{ ...S.input, fontSize: 12, border: "1.5px solid #f9a8c4", background: "#fff7f9" }}
+                              placeholder="coupang.com/vp/products/..."
+                              value={editingCoupangUrl}
+                              onChange={e => setEditingCoupangUrl(e.target.value)}
+                              onKeyDown={e => e.key === "Enter" && handleSaveCoupangUrl(p.id)}
+                            />
+                            <button
+                              onClick={() => handleSaveCoupangUrl(p.id)}
+                              disabled={savingCoupangUrl}
+                              style={{
+                                padding: "8px 16px", borderRadius: 8, border: "none", whiteSpace: "nowrap",
+                                background: savingCoupangUrl ? "#c4c8cc" : "#0f2a1e", color: "#fff",
+                                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                              }}>
+                              {savingCoupangUrl ? "저장 중..." : "저장"}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
