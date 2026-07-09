@@ -43,7 +43,7 @@ const S = {
 const STORE_KEY = "sellfit_store_id";
 const STORE_INFO_KEY = "sellfit_store_info";
 
-export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: string) => void } = {}) {
+export default function StoreSetupTab() {
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -190,7 +190,7 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
       localStorage.setItem(STORE_INFO_KEY, JSON.stringify(s));
       setStore(s);
       await loadProducts(s.id);
-      onNavigate?.("diagnosis");
+      // 탭 강제 이동 금지 — 어디를 볼지는 사용자가 정한다 (2026-07-09 원칙 확정)
     } catch (e) { console.error(e); setPinError("오류가 발생했습니다."); }
     setPinLoading(false);
   }

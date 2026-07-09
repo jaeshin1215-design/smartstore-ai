@@ -166,7 +166,7 @@ export default function Home() {
 
         {activeTab === "inbox"     && <CustomerTab />}
         {activeTab === "content"   && <ContentTab initialKeyword={seoKeyword} />}
-        {activeTab === "setup"     && <StoreSetupTab onNavigate={setActiveTab} />}
+        {activeTab === "setup"     && <StoreSetupTab />}
         {activeTab === "diagnosis" && <DiagnosisTab onSeoNavigate={handleSeoNavigate} />}
         {activeTab === "calendar"  && <CalendarTab />}
       </main>
