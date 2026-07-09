@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import OrderProcessingSection from "./OrderProcessingSection";
 
 const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
@@ -126,7 +127,7 @@ const REVIEW_ITEMS: AnnoItem[] = [
 ];
 
 // ② 배송 알림 삭제 — InboxSection 타입에서 제거
-type InboxSection = "고객 문의" | "리뷰 대응";
+type InboxSection = "고객 문의" | "리뷰 대응" | "발주 처리";
 type CsSubTab = "미답변 문의" | "불량품 접수";
 
 const S_INPUT: React.CSSProperties = {
@@ -261,6 +262,7 @@ export default function CustomerTab() {
   const SECTION_META: Record<InboxSection, { desc: string }> = {
     "고객 문의": { desc: "사방넷 연동 채널 문의만 자동 수집 · AI 초안 → 즉시 등록" },
     "리뷰 대응": { desc: "긍정/부정 리뷰 분류 · 답글 초안 자동 생성" },
+    "발주 처리": { desc: "사방넷 주문 → CJ 송장 엑셀 · 세트분리 송장 매칭 자동 생성" },
   };
 
   function renderCSItem(cs: SabangnetCS, idx: number, total: number, isSample: boolean) {
@@ -388,7 +390,7 @@ export default function CustomerTab() {
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>INBOX</p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>고객 목소리, 한곳에서</p>
         <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>문의·리뷰 자동 분류</p>
-        {(["고객 문의", "리뷰 대응"] as InboxSection[]).map(f => {
+        {(["고객 문의", "리뷰 대응", "발주 처리"] as InboxSection[]).map(f => {
           const isActive = activeInboxSection === f;
           return (
             <div key={f} onClick={() => setActiveInboxSection(f)}
@@ -583,6 +585,9 @@ export default function CustomerTab() {
               )}
             </div>
           )}
+
+          {/* ── 발주 처리 섹션 (수도꼭지 1·2) ── */}
+          {activeInboxSection === "발주 처리" && <OrderProcessingSection />}
 
           {/* ── 리뷰 대응 섹션 ── */}
           {activeInboxSection === "리뷰 대응" && (
