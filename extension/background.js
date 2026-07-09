@@ -10,10 +10,16 @@ const DEFAULTS = {
   apiBase: "https://sellfit.kr",
   storeId: "",
   storeName: "",
+  extToken: "",     // 확장 전용 인증 토큰 (팝업에서 1회 입력 — 코드에 넣지 않음: 공개 리포)
   collectHour: 6,   // 정시 수집 시각 (PC 로컬 = KST)
   checkupHour: 10,  // 미수집 알림 시각
   collectLog: {},   // { 'YYYY-MM-DD': { count, at, trigger } }
 };
+
+// SellFit API 인증 헤더 — 2026-07-09 인증 도입 후 필수 (없으면 401)
+function authHeaders(cfg, extra = {}) {
+  return { "x-extension-token": cfg.extToken, ...extra };
+}
 
 const PAGE_TIMEOUT_MS = 35000; // content 폴링(최대 22.5s) + 네트워크 여유
 const PAGE_GAP_MS = 3000; // 사람 열람 속도에 가까운 페이지 간격
@@ -59,7 +65,10 @@ function normalizeCoupangUrl(url) {
 
 // ── 수집 대상 = Price Guard 보드 API에서 쿠팡 URL 연결된 상품 ──
 async function fetchTargets(cfg) {
-  const res = await fetch(`${cfg.apiBase}/api/price-capture?store_id=${encodeURIComponent(cfg.storeId)}`);
+  const res = await fetch(`${cfg.apiBase}/api/price-capture?store_id=${encodeURIComponent(cfg.storeId)}`, {
+    headers: authHeaders(cfg),
+  });
+  if (res.status === 401) throw new Error("인증 실패 — 팝업에서 확장 토큰을 입력하세요");
   if (!res.ok) throw new Error(`보드 API HTTP ${res.status}`);
   const data = await res.json();
   return (data.rows || [])
@@ -71,9 +80,10 @@ async function fetchTargets(cfg) {
 async function postCaptures(cfg, captures) {
   const res = await fetch(`${cfg.apiBase}/api/price-capture`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(cfg, { "Content-Type": "application/json" }),
     body: JSON.stringify({ store_id: cfg.storeId, source: "extension", captures }),
   });
+  if (res.status === 401) throw new Error("인증 실패 — 팝업에서 확장 토큰을 입력하세요");
   if (!res.ok) throw new Error(`전송 실패 HTTP ${res.status}`);
   return res.json();
 }
@@ -103,6 +113,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         storeId: cfg.storeId,
         storeName: cfg.storeName,
         apiBase: cfg.apiBase,
+        hasToken: !!cfg.extToken,
         collectedToday: !!cfg.collectLog[today()],
         collectLog: cfg.collectLog,
         collecting,

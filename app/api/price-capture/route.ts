@@ -7,6 +7,7 @@ import {
   kstToday,
   type SafetyLevel,
 } from "@/lib/priceguard";
+import { resolveStoreId } from "@/lib/auth";
 
 // Price Guard 수집 라우트
 // POST: 확장(source=extension) 또는 수기 보정(source=manual)의 가격 캡처 적재 — 원천만 저장
@@ -22,7 +23,9 @@ interface CaptureInput {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { store_id, source } = body;
+  const { source } = body;
+  // 스토어 스코핑: 세션이 있으면 세션 store_id, 확장 토큰 요청만 body 파라미터 허용
+  const store_id = await resolveStoreId(req, body.store_id ?? null);
   // 단건({...}) / 배치({captures: [...]}) 모두 수용
   const captures: CaptureInput[] = Array.isArray(body.captures)
     ? body.captures
@@ -84,7 +87,8 @@ interface BoardRow {
 }
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
+  // 스토어 스코핑: 세션이 있으면 세션 store_id, 확장 토큰 요청만 파라미터 허용
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
 
   // 추적 대상: 쿠팡 URL이 등록됐거나 캡처 이력이 있는 상품

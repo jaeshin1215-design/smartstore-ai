@@ -11,8 +11,8 @@ async function refresh() {
   const status = await chrome.runtime.sendMessage({ type: "PG_STATUS" });
   const box = $("statusBox");
 
-  if (!status.storeId) {
-    box.innerHTML = `<span class="warn">스토어 미연결</span><br/>SellFit 스토어 코드를 입력하세요.`;
+  if (!status.storeId || !status.hasToken) {
+    box.innerHTML = `<span class="warn">${!status.storeId ? "스토어 미연결" : "확장 토큰 미설정"}</span><br/>스토어 코드와 확장 토큰을 입력하세요.`;
     $("setupRow").style.display = "block";
     $("collectBtn").disabled = true;
     return;
@@ -42,14 +42,19 @@ async function refresh() {
 
 $("saveBtn").addEventListener("click", async () => {
   const pin = $("pinInput").value.trim();
+  const token = $("tokenInput").value.trim();
   if (pin.length !== 6) { $("msg").textContent = "6자리 코드를 입력하세요."; return; }
+  if (!token.startsWith("sfext_")) { $("msg").textContent = "확장 토큰을 입력하세요 (sfext_로 시작)."; return; }
   $("msg").textContent = "확인 중...";
   try {
     const { apiBase } = { apiBase: "https://sellfit.kr", ...(await chrome.storage.local.get("apiBase")) };
-    const res = await fetch(`${apiBase}/api/stores?pin=${pin}`);
+    const res = await fetch(`${apiBase}/api/stores?pin=${pin}`, {
+      headers: { "x-extension-token": token },
+    });
+    if (res.status === 401) { $("msg").textContent = "확장 토큰이 올바르지 않습니다."; return; }
     const data = await res.json();
     if (!data.store) { $("msg").textContent = "코드가 맞지 않습니다."; return; }
-    await chrome.storage.local.set({ storeId: data.store.id, storeName: data.store.name });
+    await chrome.storage.local.set({ storeId: data.store.id, storeName: data.store.name, extToken: token });
     $("msg").textContent = `연결 완료: ${data.store.name}`;
     await refresh();
   } catch {

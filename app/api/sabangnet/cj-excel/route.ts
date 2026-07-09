@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { fetchSabangnetOrders, composeProductName, kstTodayCompact } from "@/lib/sabangnet/orders";
+import { getSession } from "@/lib/auth";
 
 // 수도꼭지 1 — 오늘 주문 → CJ 송장프로그램 업로드 엑셀 (11컬럼, 순서 고정)
 // 원본 개인정보는 이 다운로드 파일에만 담긴다 (화면 표시는 마스킹 원칙)
@@ -16,7 +17,9 @@ const HEADERS = [
 
 export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date") ?? kstTodayCompact();
-  const storeId = req.nextUrl.searchParams.get("store_id");
+  // 스토어 스코핑: 클라이언트 파라미터가 아니라 세션의 store_id (2026-07-09)
+  const session = await getSession(req);
+  const storeId = session?.storeId ?? null;
   if (!/^\d{8}$/.test(date)) {
     return NextResponse.json({ error: "date는 yyyyMMdd 형식" }, { status: 400 });
   }

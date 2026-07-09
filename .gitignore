@@ -42,3 +42,7 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# 고객 PII 포함 산출물 (공개 리포 커밋 금지)
+scratch/order-processing/
+scratch/priceguard/
