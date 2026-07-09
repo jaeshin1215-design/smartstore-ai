@@ -139,6 +139,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // 발송 일시 보류 플래그 (점검 중) — NOTIFY_PAUSED=1이면 발송 없이 종료 (2026-07-10)
+  if (process.env.NOTIFY_PAUSED === "1") {
+    return NextResponse.json({ ok: true, skipped: "notify_paused" });
+  }
+
   // 토·일 발송 X
   const now = new Date();
   const kst = new Date(now.getTime() + 9 * 3600000);

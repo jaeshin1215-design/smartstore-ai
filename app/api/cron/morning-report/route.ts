@@ -118,6 +118,10 @@ function buildEmailHtml(
 }
 
 export async function GET() {
+  // 발송 일시 보류 플래그 (점검 중) — NOTIFY_PAUSED=1이면 발송 없이 종료 (2026-07-10)
+  if (process.env.NOTIFY_PAUSED === "1") {
+    return NextResponse.json({ ok: true, skipped: "notify_paused" });
+  }
   try {
     const month = new Date().getMonth() + 1;
     const season = getSeason(month);
