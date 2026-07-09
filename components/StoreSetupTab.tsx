@@ -56,15 +56,7 @@ export default function StoreSetupTab() {
   const [salesSaved, setSalesSaved] = useState(false);
   const [yesterdaySales, setYesterdaySales] = useState<{revenue?: number; ad_cost?: number} | null>(null);
 
-  // 발주·운송장 state
-  const [ordersFrom, setOrdersFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10).replace(/-/g, "");
-  });
-  const [ordersTo, setOrdersTo] = useState(() => new Date().toISOString().slice(0, 10).replace(/-/g, ""));
-  const [ordersData, setOrdersData] = useState<{orders: {orderNo:string;channel:string;orderedAt:string;productName:string;quantity:number;receiverName:string}[]; total: number} | null>(null);
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
+  // 운송장 업로드 state (발주 취합은 Inbox > 발주 처리로 이동, 2026-07-09)
   const [trackingRows, setTrackingRows] = useState([{ orderNo: "", trackingNo: "", courierCode: "", invoiceDate: new Date().toISOString().slice(0, 10).replace(/-/g, "") }]);
   const [uploadingTracking, setUploadingTracking] = useState(false);
   const [trackingResult, setTrackingResult] = useState<{success_count: number; fail_count: number; message: string} | null>(null);
@@ -675,19 +667,6 @@ export default function StoreSetupTab() {
 
           {/* ── 발주·운송장 섹션 ── */}
           {activeSection === "발주·운송장" && (() => {
-            async function fetchOrders() {
-              setLoadingOrders(true);
-              setOrdersError(null);
-              setOrdersData(null);
-              try {
-                const res = await fetch(`/api/sabangnet/orders?from=${ordersFrom}&to=${ordersTo}`);
-                const data = await res.json();
-                if (!res.ok) setOrdersError(data.error ?? "발주 조회 실패");
-                else setOrdersData(data);
-              } catch { setOrdersError("네트워크 오류"); }
-              setLoadingOrders(false);
-            }
-
             async function uploadTracking() {
               const items = trackingRows.filter(r => r.orderNo.trim() && r.trackingNo.trim());
               if (!items.length) return;
@@ -716,65 +695,12 @@ export default function StoreSetupTab() {
                   ⚠️ 사방넷 API 키 미설정 시 503 응답. <code style={{ background: "#fef3c7", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>SABANGNET_API_KEY</code> + <code style={{ background: "#fef3c7", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>SABANGNET_SHOP_ID</code> 설정 후 활성화.
                 </div>
 
-                {/* 발주 취합 */}
+                {/* 발주 취합 → Inbox 발주 처리로 이동 안내 (구 라우트 삭제, 2026-07-09) */}
                 <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginBottom: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>발주 취합</div>
-                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>사방넷 전채널 주문 조회 → Phase 1 OrderRow 형식 변환</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "flex-end", marginBottom: 14 }}>
-                    <div>
-                      <span style={S.label}>시작일 (YYYYMMDD)</span>
-                      <input style={S.input} placeholder={todayFmt}
-                        value={ordersFrom} onChange={e => setOrdersFrom(e.target.value)} />
-                    </div>
-                    <div>
-                      <span style={S.label}>종료일 (YYYYMMDD)</span>
-                      <input style={S.input} placeholder={todayFmt}
-                        value={ordersTo} onChange={e => setOrdersTo(e.target.value)} />
-                    </div>
-                    <button onClick={fetchOrders} disabled={loadingOrders}
-                      style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: loadingOrders ? "#c4c8cc" : "#ef567c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: loadingOrders ? "default" : "pointer", whiteSpace: "nowrap" }}>
-                      {loadingOrders ? "조회 중..." : "발주 조회 →"}
-                    </button>
+                  <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
+                    <b>Inbox 탭 → 발주 처리</b>로 이동했습니다. 사방넷 주문을 CJ 송장 엑셀·세트분리 송장 매칭 파일로 바로 내려받을 수 있습니다.
                   </div>
-
-                  {ordersError && (
-                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#dc2626" }}>
-                      ⚠️ {ordersError}
-                    </div>
-                  )}
-
-                  {ordersData && (
-                    <div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>총 {ordersData.total}건</div>
-                      {ordersData.orders.length === 0 ? (
-                        <div style={{ background: "#f9fafb", borderRadius: 8, padding: "20px", textAlign: "center", fontSize: 13, color: "#9ca3af" }}>조회 기간 내 주문 없음</div>
-                      ) : (
-                        <div style={{ overflowX: "auto" }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                            <thead>
-                              <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-                                {["주문번호", "채널", "주문일시", "상품명", "수량", "수령인"].map(h => (
-                                  <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {ordersData.orders.map(o => (
-                                <tr key={o.orderNo} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                                  <td style={{ padding: "9px 10px", color: "#374151", whiteSpace: "nowrap", fontSize: 11 }}>{o.orderNo}</td>
-                                  <td style={{ padding: "9px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>{o.channel}</td>
-                                  <td style={{ padding: "9px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>{o.orderedAt}</td>
-                                  <td style={{ padding: "9px 10px", color: "#0f2a1e", fontWeight: 600, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.productName}</td>
-                                  <td style={{ padding: "9px 10px", color: "#374151" }}>{o.quantity}</td>
-                                  <td style={{ padding: "9px 10px", color: "#374151" }}>{o.receiverName}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* 운송장 업로드 */}
