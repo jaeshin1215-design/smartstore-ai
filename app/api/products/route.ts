@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { extractCoupangProductId } from "@/lib/priceguard";
 
 // 상품 목록 조회
 export async function GET(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
 // 상품 등록 (Discover 채널확정 포함)
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { store_id, name, url, keyword, category, price, purchase_price, shipping_cost, stock, is_own, matrix_x, matrix_y } = body;
+  const { store_id, name, url, keyword, category, price, purchase_price, shipping_cost, stock, is_own, matrix_x, matrix_y, coupang_url } = body;
 
   if (!store_id || !name || !keyword || !category) {
     return NextResponse.json({ error: "필수 항목 누락" }, { status: 400 });
@@ -25,8 +26,8 @@ export async function POST(req: NextRequest) {
 
   const id = randomUUID();
   await db.execute({
-    sql: `INSERT INTO sellfit_products (id, store_id, name, url, keyword, category, price, purchase_price, shipping_cost, stock, is_own, matrix_x, matrix_y)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO sellfit_products (id, store_id, name, url, keyword, category, price, purchase_price, shipping_cost, stock, is_own, matrix_x, matrix_y, coupang_url, coupang_product_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [id, store_id, name, url || null, keyword, category,
            price ? Number(price) : null,
            purchase_price ? Number(purchase_price) : null,
@@ -34,7 +35,9 @@ export async function POST(req: NextRequest) {
            stock != null && stock !== "" ? Number(stock) : null,
            is_own !== undefined && is_own !== null ? Number(is_own) : 0,
            matrix_x != null ? Number(matrix_x) : null,
-           matrix_y != null ? Number(matrix_y) : null],
+           matrix_y != null ? Number(matrix_y) : null,
+           coupang_url || null,
+           extractCoupangProductId(coupang_url)],
   });
 
   return NextResponse.json({ ok: true, id });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PriceGuardBoard from "./PriceGuardBoard";
 
 const CATEGORIES = ["압축팩", "다리미판", "유아매트", "화분"];
 
@@ -84,6 +85,7 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
   const [pCategory, setPCategory] = useState("압축팩");
   const [pPrice, setPPrice] = useState("");
   const [pUrl, setPUrl] = useState("");
+  const [pCoupangUrl, setPCoupangUrl] = useState("");
   const [pPurchasePrice, setPPurchasePrice] = useState("");
   const [pShippingCost, setPShippingCost] = useState("");
   const [pStock, setPStock] = useState("");
@@ -110,10 +112,11 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
     judgment_reason: string | null;
   }
   const [trackingRecords, setTrackingRecords] = useState<TrackingRecord[]>([]);
-  const [tProductName, setTProductName] = useState("");
+  const [tProductId, setTProductId] = useState("");
   const [tCoupangPrice, setTCoupangPrice] = useState("");
   const [tIsItemWinner, setTIsItemWinner] = useState(false);
   const [savingTracking, setSavingTracking] = useState(false);
+  const [boardKey, setBoardKey] = useState(0); // 수동 보정 후 보드 갱신용
 
   useEffect(() => {
     initAndLoad();
@@ -198,11 +201,12 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
           keyword: pKeyword, category: pCategory,
           price: pPrice, purchase_price: pPurchasePrice,
           shipping_cost: pShippingCost, stock: pStock, is_own: pIsOwn,
+          coupang_url: pCoupangUrl,
         }),
       });
       await loadProducts(store.id);
       setPName(""); setPKeyword(""); setPPrice(""); setPPurchasePrice("");
-      setPShippingCost(""); setPStock(""); setPUrl(""); setPCategory("압축팩"); setPIsOwn(1);
+      setPShippingCost(""); setPStock(""); setPUrl(""); setPCoupangUrl(""); setPCategory("압축팩"); setPIsOwn(1);
     } catch (e) { console.error(e); }
     setAddingProduct(false);
   }
@@ -285,7 +289,7 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
         <p style={{ fontSize: "10px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "8px" }}>SETUP</p>
         <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>한 번만 등록하면 끝</p>
         <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.5 }}>자사·경쟁사 상품 등록</p>
-        {["상품 등록", "경쟁사 추적", "매출 입력", "발주·운송장"].map(f => (
+        {["상품 등록", "가격 추적", "매출 입력", "발주·운송장"].map(f => (
           <div key={f}
             onClick={() => setActiveSection(f)}
             style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", cursor: "pointer", borderRadius: 6, padding: "4px 6px", background: activeSection === f ? "#fff3f6" : "transparent" }}>
@@ -423,28 +427,27 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
             </button>
           </div>
 
-          {/* ── 경쟁사 추적 섹션 ── */}
-          {activeSection === "경쟁사 추적" && (() => {
+          {/* ── 가격 추적 (Price Guard) 섹션 ── */}
+          {activeSection === "가격 추적" && (() => {
             const todayStr = new Date().toISOString().slice(0, 10);
             async function handleSaveTracking() {
-              if (!tProductName || !store) return;
+              if (!tProductId || !store) return;
               setSavingTracking(true);
               try {
-                await fetch("/api/competitor-tracking", {
+                // 수동 보정도 자동 수집과 같은 원천(price_captures)에 적재
+                await fetch("/api/price-capture", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     store_id: store.id,
-                    product_name: tProductName,
-                    coupang_price: tCoupangPrice ? Number(tCoupangPrice) : null,
+                    source: "manual",
+                    product_id: tProductId,
+                    price: tCoupangPrice ? Number(tCoupangPrice) : null,
                     is_item_winner: tIsItemWinner,
-                    check_date: todayStr,
                   }),
                 });
-                const res = await fetch(`/api/competitor-tracking?store_id=${store.id}`);
-                const data = await res.json();
-                setTrackingRecords(data.records || []);
-                setTProductName(""); setTCoupangPrice(""); setTIsItemWinner(false);
+                setBoardKey(k => k + 1); // 보드 즉시 갱신
+                setTProductId(""); setTCoupangPrice(""); setTIsItemWinner(false);
               } catch (e) { console.error(e); }
               setSavingTracking(false);
             }
@@ -457,16 +460,23 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
             if (trackingRecords.length === 0) loadTracking();
             return (
               <div>
-                {/* 입력 폼 */}
+                {/* Price Guard 자동화 보드 */}
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 2 }}>Price Guard</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>매일 자동 수집 — 쿠팡 마진율 기준 안전/주의/위험 판정</div>
+                </div>
+                <PriceGuardBoard key={boardKey} storeId={store.id} />
+
+                {/* 수동 보정 폼 */}
                 <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px", marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>쿠팡 판매가 기록</div>
-                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 수기 확인 → 여기에 기록 → 추이 자동 적재</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>수동 보정</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>자동 수집이 누락된 날만 여기로 직접 기록 — 보드에 바로 반영</div>
                   <div style={{ display: "grid", gap: 12 }}>
                     <div>
                       <span style={S.label}>자사 상품 선택 *</span>
-                      <select style={S.select} value={tProductName} onChange={e => setTProductName(e.target.value)}>
+                      <select style={S.select} value={tProductId} onChange={e => setTProductId(e.target.value)}>
                         <option value="">— 상품 선택 —</option>
-                        {ownProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        {ownProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -497,22 +507,22 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
                     <div style={{ background: "#f9fafb", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#9ca3af" }}>
                       확인일자: {todayStr} (자동 기록)
                     </div>
-                    <button onClick={handleSaveTracking} disabled={savingTracking || !tProductName}
+                    <button onClick={handleSaveTracking} disabled={savingTracking || !tProductId}
                       style={{
                         padding: "11px", borderRadius: 8, border: "none",
-                        background: !tProductName ? "#e8eaed" : savingTracking ? "#c4c8cc" : "#ef567c",
-                        color: "#fff", fontSize: 13, fontWeight: 600, cursor: tProductName ? "pointer" : "default",
+                        background: !tProductId ? "#e8eaed" : savingTracking ? "#c4c8cc" : "#ef567c",
+                        color: "#fff", fontSize: 13, fontWeight: 600, cursor: tProductId ? "pointer" : "default",
                       }}>
                       {savingTracking ? "저장 중..." : "기록하기 →"}
                     </button>
                   </div>
                 </div>
 
-                {/* 기록 목록 */}
+                {/* 과거 수기 기록 (읽기 전용 아카이브) */}
                 {trackingRecords.length > 0 && (
                   <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px" }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 16 }}>
-                      추적 기록 ({trackingRecords.length}건)
+                      과거 수기 기록 ({trackingRecords.length}건)
                     </div>
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -852,6 +862,17 @@ export default function StoreSetupTab({ onNavigate }: { onNavigate?: (tab: strin
                 <span style={S.label}>스마트스토어 URL (선택)</span>
                 <input style={S.input} placeholder="https://smartstore.naver.com/..."
                   value={pUrl} onChange={e => setPUrl(e.target.value)} />
+              </div>
+
+              <div>
+                <span style={{ ...S.label, color: "#be123c", fontWeight: 700 }}>★ 쿠팡 상품 URL (신규)</span>
+                <input
+                  style={{ ...S.input, border: "1.5px solid #f9a8c4", background: "#fff7f9" }}
+                  placeholder="coupang.com/vp/products/..."
+                  value={pCoupangUrl} onChange={e => setPCoupangUrl(e.target.value)} />
+                <span style={{ fontSize: 11, color: "#9ca3af", marginTop: 4, display: "block" }}>
+                  ← 여기에 쿠팡 주소를 한 번만 넣어두면, 매일 이 상품을 자동 추적
+                </span>
               </div>
 
               <button

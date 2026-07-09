@@ -88,5 +88,25 @@ export async function POST() {
     created_at INTEGER DEFAULT (unixepoch())
   )`);
 
+  // v8 — Price Guard: 쿠팡 URL·상품별 마진 임계값 + 가격 수집 원천 테이블
+  // 원천(측정)과 판정(파생) 분리 — 판정은 조회 시 계산 (임계값 변경이 과거에도 소급 적용)
+  await runSafe("ALTER TABLE sellfit_products ADD COLUMN coupang_url TEXT");
+  await runSafe("ALTER TABLE sellfit_products ADD COLUMN coupang_product_id TEXT");
+  await runSafe("ALTER TABLE sellfit_products ADD COLUMN margin_warn_pct REAL");
+  await runSafe("ALTER TABLE sellfit_products ADD COLUMN margin_danger_pct REAL");
+  await runSafe(`CREATE TABLE IF NOT EXISTS sellfit_price_captures (
+    id TEXT PRIMARY KEY,
+    store_id TEXT NOT NULL,
+    product_id TEXT,
+    coupang_product_id TEXT,
+    price INTEGER NOT NULL,
+    is_ad INTEGER DEFAULT 0,
+    is_item_winner INTEGER,
+    source TEXT NOT NULL DEFAULT 'manual',
+    check_date TEXT NOT NULL,
+    captured_at TEXT DEFAULT (datetime('now'))
+  )`);
+  await runSafe("CREATE INDEX IF NOT EXISTS idx_price_captures_store_date ON sellfit_price_captures (store_id, check_date)");
+
   return NextResponse.json({ ok: true, message: "마이그레이션 완료" });
 }

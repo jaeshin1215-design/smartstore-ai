@@ -2,6 +2,7 @@ export const maxDuration = 30;
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { coupangMarginPct, judgeMargin, kstToday } from "@/lib/priceguard";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const MANAGER_PHONE = process.env.NOTIFY_MANAGER_PHONE!;
@@ -58,11 +59,45 @@ function detectPattern(report: Record<string, unknown>, history: unknown[]): str
   return "A";
 }
 
+// Price Guard: 오늘 캡처 기준 위험 상품 수 (테이블 미생성 등 오류 시 0)
+async function countPriceDanger(storeId: string): Promise<number> {
+  try {
+    const prods = await db.execute({
+      sql: "SELECT id, purchase_price, margin_warn_pct, margin_danger_pct FROM sellfit_products WHERE store_id = ?",
+      args: [storeId],
+    });
+    const caps = await db.execute({
+      sql: "SELECT product_id, price FROM sellfit_price_captures WHERE store_id = ? AND check_date = ? ORDER BY captured_at ASC",
+      args: [storeId, kstToday()],
+    });
+    const latest = new Map<string, number>();
+    for (const c of caps.rows) {
+      if (c.product_id) latest.set(String(c.product_id), Number(c.price));
+    }
+    let danger = 0;
+    for (const p of prods.rows) {
+      const price = latest.get(String(p.id));
+      if (price == null) continue;
+      const margin = coupangMarginPct(price, p.purchase_price != null ? Number(p.purchase_price) : null);
+      const level = judgeMargin(
+        margin,
+        p.margin_warn_pct != null ? Number(p.margin_warn_pct) : null,
+        p.margin_danger_pct != null ? Number(p.margin_danger_pct) : null
+      );
+      if (level === "위험") danger++;
+    }
+    return danger;
+  } catch {
+    return 0;
+  }
+}
+
 function buildManagerMessage(
   pattern: string,
   report: Record<string, unknown>,
   today: string,
-  history: unknown[]
+  history: unknown[],
+  priceDanger: number
 ): string {
   const riskScore = Number(report.risk_score || 0);
   const title1 = String(report.recommended_title_1 || "");
@@ -76,7 +111,8 @@ function buildManagerMessage(
 
   const riskEmoji = riskScore >= 70 ? "🔴" : riskScore >= 50 ? "🟡" : "🟢";
 
-  const baseHeader = `[SellFit] ${today} 이다슬 님 퀘스트\n${riskEmoji} 위험도 ${riskScore}점\n\n`;
+  const priceGuardLine = priceDanger > 0 ? `🛡 오늘 가격 위험 ${priceDanger}건, 확인하세요 (가격 추적 탭)\n` : "";
+  const baseHeader = `[SellFit] ${today} 이다슬 님 퀘스트\n${riskEmoji} 위험도 ${riskScore}점\n${priceGuardLine}\n`;
 
   const quests = [
     title1 ? `⚡ 상품명 수정 (5분)\n"${title1}"` : "",
@@ -131,7 +167,8 @@ export async function POST(req: NextRequest) {
   const history = historyResult.rows;
 
   const pattern = detectPattern(report, history);
-  const message = buildManagerMessage(pattern, report, today, history);
+  const priceDanger = await countPriceDanger(String(store.id));
+  const message = buildManagerMessage(pattern, report, today, history, priceDanger);
 
   let smsSent = false;
   if (MANAGER_PHONE) {
