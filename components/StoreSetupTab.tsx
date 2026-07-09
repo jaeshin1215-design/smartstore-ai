@@ -47,7 +47,7 @@ export default function StoreSetupTab() {
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
-  const [, setDbReady] = useState(false);
+  const [productsError, setProductsError] = useState(false);
   // 매출 입력
   const [salesRevenue, setSalesRevenue] = useState("");
   const [salesAdCost, setSalesAdCost] = useState("");
@@ -128,33 +128,29 @@ export default function StoreSetupTab() {
     initAndLoad();
   }, []);
 
-  async function initAndLoad() {
-    setLoading(true);
-    try {
-      // DB 초기화 → 마이그레이션 (idempotent: 컬럼 이미 있으면 무시)
-      await fetch("/api/db/init", { method: "POST" });
-      await fetch("/api/db/migrate", { method: "POST" });
-      setDbReady(true);
-
-      // 로컬에 저장된 스토어 ID 확인
-      const savedStoreId = localStorage.getItem(STORE_KEY);
-      const savedStoreInfo = localStorage.getItem(STORE_INFO_KEY);
-
-      if (savedStoreId && savedStoreInfo) {
-        const s = JSON.parse(savedStoreInfo);
-        setStore(s);
-        await loadProducts(savedStoreId);
-      }
-    } catch (e) {
-      console.error(e);
+  function initAndLoad() {
+    // DB init/migrate는 접속 런타임 경로에서 제거 (2026-07-09) —
+    // 스키마 변경이 있는 배포 후에만 1회: curl -X POST https://sellfit.kr/api/db/migrate
+    // 화면은 즉시 렌더, 상품 목록은 백그라운드 로드 (블로킹 없음)
+    const savedStoreId = localStorage.getItem(STORE_KEY);
+    const savedStoreInfo = localStorage.getItem(STORE_INFO_KEY);
+    if (savedStoreId && savedStoreInfo) {
+      try { setStore(JSON.parse(savedStoreInfo)); } catch { /* 손상된 저장값 무시 */ }
+      loadProducts(savedStoreId);
     }
-    setLoading(false);
   }
 
   async function loadProducts(storeId: string) {
-    const res = await fetch(`/api/products?store_id=${storeId}`);
-    const data = await res.json();
-    setProducts(data.products || []);
+    setProductsError(false);
+    try {
+      const res = await fetch(`/api/products?store_id=${storeId}`, {
+        signal: AbortSignal.timeout(10000), // hang 방지
+      });
+      const data = await res.json();
+      setProducts(data.products || []);
+    } catch {
+      setProductsError(true);
+    }
   }
 
   async function handleRegisterStore() {
@@ -305,10 +301,11 @@ export default function StoreSetupTab() {
   const compProducts = products.filter(p => p.is_own === 0);
   const candidateProducts = products.filter(p => p.is_own === 2);
 
+  // 접속 시 전체 화면 블로킹 없음 — loading은 스토어 신규 등록 처리 중에만 true
   if (loading) {
     return (
       <div style={{ textAlign: "center", padding: 60, color: "#6b7280", fontSize: 13 }}>
-        DB 연결 중...
+        처리 중...
       </div>
     );
   }
@@ -458,6 +455,25 @@ export default function StoreSetupTab() {
               초기화
             </button>
           </div>
+
+          {/* 상품 로드 실패 폴백 — 화면은 그대로 두고 재시도만 제공 */}
+          {productsError && (
+            <div style={{
+              background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10,
+              padding: "12px 16px", marginBottom: 20, display: "flex",
+              justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontSize: 13, color: "#dc2626" }}>상품 목록을 불러오지 못했습니다.</span>
+              <button
+                onClick={() => store && loadProducts(store.id)}
+                style={{
+                  padding: "6px 14px", borderRadius: 6, border: "1px solid #fecaca",
+                  background: "#fff", fontSize: 12, color: "#dc2626", fontWeight: 600, cursor: "pointer",
+                }}>
+                다시 시도
+              </button>
+            </div>
+          )}
 
           {/* ── 가격 추적 (Price Guard) 섹션 ── */}
           {activeSection === "가격 추적" && (() => {
