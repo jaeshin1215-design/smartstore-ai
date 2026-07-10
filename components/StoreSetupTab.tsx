@@ -87,6 +87,9 @@ export default function StoreSetupTab() {
   const [editingCoupangUrl, setEditingCoupangUrl] = useState("");
   const [savingCoupangUrl, setSavingCoupangUrl] = useState(false);
   const [coupangUrlError, setCoupangUrlError] = useState<string | null>(null);
+  // 저장 성공 가시성 (2026-07-10): 토스트 + 행 하이라이트
+  const [toast, setToast] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [collectResult, setCollectResult] = useState<{product: string; searchVolume: number; cpc: number; competitors: number}[] | null>(null);
 
@@ -211,15 +214,25 @@ export default function StoreSetupTab() {
 
   // 기존 상품에 쿠팡 URL 연결 (Price Guard 추적 대상 등록)
   // 조용한 실패 금지 (2026-07-10): res.ok 확인, 실패 시 편집창 유지 + 에러 표시 + 입력 보존
-  async function handleSaveCoupangUrl(productId: string) {
+  async function handleSaveCoupangUrl(productId: string, productName?: string) {
     if (!store) return;
+    const url = editingCoupangUrl.trim();
+    // 작업 4 가드: 쿠팡 광고 링크(sourceType=srp_product_ads)면 판매자 확인 경고 (비차단)
+    if (url && /sourceType=srp_product_ads/.test(url)) {
+      const go = window.confirm(
+        "이 주소는 쿠팡 광고 링크입니다 (sourceType=srp_product_ads).\n" +
+        "가담다/이지스토리 판매 상품이 맞는지 확인하셨나요?\n" +
+        "다른 판매자 상품이면 그 판매자의 가격을 추적하게 됩니다.\n\n그대로 저장할까요?"
+      );
+      if (!go) { return; } // 편집창·입력 유지
+    }
     setSavingCoupangUrl(true);
     setCoupangUrlError(null);
     try {
       const res = await fetch("/api/products", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: productId, coupang_url: editingCoupangUrl.trim() || null }),
+        body: JSON.stringify({ id: productId, coupang_url: url || null }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -230,6 +243,17 @@ export default function StoreSetupTab() {
       await loadProducts(store.id);
       setEditingCoupangId(null);
       setEditingCoupangUrl("");
+      // 작업 2: 성공 가시성 — 토스트 + 행 하이라이트 + 자동 스크롤
+      if (url) {
+        const name = productName ?? "상품";
+        setToast(`『${name}』 쿠팡 연결 완료`);
+        setHighlightId(productId);
+        setTimeout(() => {
+          document.getElementById(`product-row-${productId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setHighlightId(null), 2500);
+      }
     } catch {
       setCoupangUrlError("저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     }
@@ -297,6 +321,17 @@ export default function StoreSetupTab() {
 
   return (
     <div style={{ width: "100%", display: "flex", gap: "40px", alignItems: "flex-start" }}>
+      {/* 저장 성공 토스트 (2026-07-10) — 성공을 찾아다니지 않게 */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)", zIndex: 1000,
+          background: "#0f2a1e", color: "#fff", padding: "12px 22px", borderRadius: 10,
+          fontSize: 14, fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ color: "#4ade80" }}>✓</span> {toast}
+        </div>
+      )}
 
       {/* LEFT: sticky sidebar */}
       <div style={{ width: "200px", flexShrink: 0, background: "#F7F8FA", borderRadius: "8px", padding: "14px 12px", borderRight: "1px solid #e8eaed", position: "sticky", top: "60px" }}>
@@ -867,7 +902,11 @@ export default function StoreSetupTab() {
                       {group.label}
                     </div>
                     {group.list.map(p => (
-                      <div key={p.id} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
+                      <div key={p.id} id={`product-row-${p.id}`} style={{
+                        padding: "12px 8px", borderBottom: "1px solid #f3f4f6", borderRadius: 8,
+                        transition: "background 0.4s",
+                        background: highlightId === p.id ? "#dcfce7" : "transparent",
+                      }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
                             <span style={{ fontSize: 14, fontWeight: 600, color: "#0f2a1e" }}>{p.name}</span>
@@ -916,10 +955,10 @@ export default function StoreSetupTab() {
                                 placeholder="coupang.com/vp/products/..."
                                 value={editingCoupangUrl}
                                 onChange={e => { setEditingCoupangUrl(e.target.value); setCoupangUrlError(null); }}
-                                onKeyDown={e => e.key === "Enter" && handleSaveCoupangUrl(p.id)}
+                                onKeyDown={e => e.key === "Enter" && handleSaveCoupangUrl(p.id, p.name)}
                               />
                               <button
-                                onClick={() => handleSaveCoupangUrl(p.id)}
+                                onClick={() => handleSaveCoupangUrl(p.id, p.name)}
                                 disabled={savingCoupangUrl}
                                 style={{
                                   padding: "8px 16px", borderRadius: 8, border: "none", whiteSpace: "nowrap",

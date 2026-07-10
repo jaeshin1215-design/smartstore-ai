@@ -200,7 +200,13 @@ export default function PriceGuardBoard({ storeId }: { storeId: string }) {
                           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 12px", borderRadius: 10, background: s!.bg, color: s!.color, border: `1px solid ${s!.border}` }}>
                             {r.level}
                           </span>
-                        ) : <span style={{ fontSize: 11, color: "#c0c4cc" }}>공급가 미입력</span>}
+                        ) : r.supply_price == null ? (
+                          // 공급가 자체가 없을 때만 "공급가 미입력"
+                          <span style={{ fontSize: 11, color: "#c0c4cc" }}>공급가 미입력</span>
+                        ) : (
+                          // 공급가는 있는데 아직 판매가 수집 전 (2026-07-10 오표기 수정)
+                          <span style={{ fontSize: 11, color: "#9ca3af" }}>수집 전</span>
+                        )}
                       </td>
                       <td style={{ padding: "12px 14px" }}>
                         <div style={{ display: "flex", justifyContent: "flex-end" }}>
