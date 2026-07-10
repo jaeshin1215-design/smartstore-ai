@@ -62,7 +62,7 @@ function LoginForm() {
             <label style={{ display: "block", fontSize: 12, color: "#6b7280", marginBottom: 6 }}>이메일</label>
             <input
               type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@easystory.kr" autoFocus
+              placeholder="you@kanomall.com" autoFocus
               style={{
                 width: "100%", boxSizing: "border-box", padding: "12px 14px",
                 border: "1px solid #e8eaed", borderRadius: 8, fontSize: 14,

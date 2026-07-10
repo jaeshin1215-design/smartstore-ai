@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BiddingTab from "@/components/BiddingTab";
 import CustomerTab from "@/components/CustomerTab";
 import PricingTab from "@/components/PricingTab";
@@ -28,6 +28,19 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("setup");
   const [trialOpen, setTrialOpen] = useState(false);
   const [seoKeyword, setSeoKeyword] = useState("");
+  const [account, setAccount] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(d => setAccount(d.user?.email ?? null))
+      .catch(() => {});
+  }, []);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/login";
+  }
 
   const handleSeoNavigate = (_keyword?: string) => {
     setActiveTab("discover");
@@ -126,19 +139,38 @@ export default function Home() {
                   }}
                 />
               </div>
-              <button
-                onClick={() => setTrialOpen(true)}
-                className="cursor-pointer transition-opacity hover:opacity-90"
-                style={{
-                  height: "26px", padding: "0 12px",
-                  fontSize: "12px", fontWeight: 600,
-                  background: "#ef567c", color: "#fff", borderRadius: "5px",
-                  border: "none", whiteSpace: "nowrap",
-                  fontFamily: "inherit",
-                }}
-              >
-                Start free trial
-              </button>
+              {account ? (
+                <div className="flex items-center" style={{ gap: "10px" }}>
+                  <span style={{ fontSize: "12px", color: "#6b7280", whiteSpace: "nowrap" }}>{account}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="cursor-pointer transition-opacity hover:opacity-90"
+                    style={{
+                      height: "26px", padding: "0 12px",
+                      fontSize: "12px", fontWeight: 600,
+                      background: "#fff", color: "#4a4f57", borderRadius: "5px",
+                      border: "1px solid #e8eaed", whiteSpace: "nowrap",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    로그아웃
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setTrialOpen(true)}
+                  className="cursor-pointer transition-opacity hover:opacity-90"
+                  style={{
+                    height: "26px", padding: "0 12px",
+                    fontSize: "12px", fontWeight: 600,
+                    background: "#ef567c", color: "#fff", borderRadius: "5px",
+                    border: "none", whiteSpace: "nowrap",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  도입 문의
+                </button>
+              )}
             </div>
 
           </div>

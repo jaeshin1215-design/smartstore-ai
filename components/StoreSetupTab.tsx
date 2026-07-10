@@ -66,11 +66,8 @@ export default function StoreSetupTab() {
   const [storeName, setStoreName] = useState("");
   const [storeEmail, setStoreEmail] = useState("");
   const [storeKakao, setStoreKakao] = useState("");
-  // PIN 코드
-  const [newPin, setNewPin] = useState<string | null>(null); // 등록 직후 1회 표시
-  const [pinInput, setPinInput] = useState("");
-  const [pinLoading, setPinLoading] = useState(false);
-  const [pinError, setPinError] = useState<string | null>(null);
+  // PIN 코드 (등록 직후 1회 표시 — 확장 연결용)
+  const [newPin, setNewPin] = useState<string | null>(null);
 
   // 상품 등록 폼
   const [pName, setPName] = useState("");
@@ -120,15 +117,24 @@ export default function StoreSetupTab() {
     initAndLoad();
   }, []);
 
-  function initAndLoad() {
-    // DB init/migrate는 접속 런타임 경로에서 제거 (2026-07-09) —
-    // 스키마 변경이 있는 배포 후에만 1회: curl -X POST https://sellfit.kr/api/db/migrate
-    // 화면은 즉시 렌더, 상품 목록은 백그라운드 로드 (블로킹 없음)
-    const savedStoreId = localStorage.getItem(STORE_KEY);
-    const savedStoreInfo = localStorage.getItem(STORE_INFO_KEY);
-    if (savedStoreId && savedStoreInfo) {
-      try { setStore(JSON.parse(savedStoreInfo)); } catch { /* 손상된 저장값 무시 */ }
-      loadProducts(savedStoreId);
+  // 로그인 세션의 store_id로 스토어 자동 로드 (2026-07-10) — PIN 입력 불필요
+  async function initAndLoad() {
+    try {
+      const res = await fetch("/api/stores", { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      if (data.store) {
+        const s = { id: data.store.id, name: data.store.name, email: data.store.email, kakao: data.store.kakao };
+        localStorage.setItem(STORE_KEY, s.id);
+        localStorage.setItem(STORE_INFO_KEY, JSON.stringify(s));
+        setStore(s);
+        loadProducts(s.id);
+      }
+    } catch {
+      // 네트워크 실패 시 로컬 캐시 폴백 (화면 블로킹 없음)
+      const savedStoreInfo = localStorage.getItem(STORE_INFO_KEY);
+      if (savedStoreInfo) {
+        try { const s = JSON.parse(savedStoreInfo); setStore(s); loadProducts(s.id); } catch { /* 무시 */ }
+      }
     }
   }
 
@@ -162,25 +168,6 @@ export default function StoreSetupTab() {
       setStore(s);
     } catch (e) { console.error(e); }
     setLoading(false);
-  }
-
-  async function handleLoadByPin() {
-    const code = pinInput.trim();
-    if (code.length !== 6) { setPinError("6자리 코드를 입력해주세요."); return; }
-    setPinLoading(true);
-    setPinError(null);
-    try {
-      const res = await fetch(`/api/stores?pin=${code}`);
-      const data = await res.json();
-      if (!data.store) { setPinError("코드가 맞지 않습니다."); setPinLoading(false); return; }
-      const s = { id: data.store.id, name: data.store.name, email: data.store.email, kakao: data.store.kakao };
-      localStorage.setItem(STORE_KEY, s.id);
-      localStorage.setItem(STORE_INFO_KEY, JSON.stringify(s));
-      setStore(s);
-      await loadProducts(s.id);
-      // 탭 강제 이동 금지 — 어디를 볼지는 사용자가 정한다 (2026-07-09 원칙 확정)
-    } catch (e) { console.error(e); setPinError("오류가 발생했습니다."); }
-    setPinLoading(false);
   }
 
   async function handleAddProduct() {
@@ -282,13 +269,6 @@ export default function StoreSetupTab() {
     setSavingSales(false);
   }
 
-  function handleReset() {
-    localStorage.removeItem(STORE_KEY);
-    localStorage.removeItem(STORE_INFO_KEY);
-    setStore(null);
-    setProducts([]);
-  }
-
   const ownProducts = products.filter(p => p.is_own === 1);
   const compProducts = products.filter(p => p.is_own === 0);
   const candidateProducts = products.filter(p => p.is_own === 2);
@@ -333,40 +313,9 @@ export default function StoreSetupTab() {
         </p>
       </div>
 
-      {/* 스토어 미등록 */}
+      {/* 스토어 미등록 — 세션에 연결된 스토어가 없을 때만(최초 등록용) */}
       {!store && (
         <div style={{ display: "grid", gap: 16 }}>
-          {/* 코드로 불러오기 */}
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "22px 28px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 14 }}>
-              기존 스토어 불러오기
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <div style={{ flex: 1 }}>
-                <input
-                  style={{ ...S.input, letterSpacing: "0.15em", fontWeight: 600 }}
-                  placeholder="6자리 스토어 코드"
-                  maxLength={6}
-                  value={pinInput}
-                  onChange={e => { setPinInput(e.target.value.replace(/\D/g, "")); setPinError(null); }}
-                  onKeyDown={e => e.key === "Enter" && handleLoadByPin()}
-                />
-                {pinError && <p style={{ fontSize: 12, color: "#ef567c", margin: "6px 0 0" }}>{pinError}</p>}
-              </div>
-              <button
-                onClick={handleLoadByPin}
-                disabled={pinLoading}
-                style={{
-                  padding: "10px 20px", borderRadius: 8, border: "none",
-                  background: "#0f2a1e", color: "#fff", fontSize: 13,
-                  fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
-                }}
-              >
-                {pinLoading ? "확인 중…" : "불러오기 →"}
-              </button>
-            </div>
-          </div>
-
           {/* 신규 등록 */}
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "22px 28px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 20 }}>
@@ -432,20 +381,12 @@ export default function StoreSetupTab() {
       {/* 스토어 등록됨 */}
       {store && (
         <>
-          {/* 스토어 정보 */}
+          {/* 스토어 정보 — 스토어명만 표시 (등록자 개인 이메일 노출 제거·초기화 제거, 2026-07-10) */}
           <div style={{
             background: "#f7f8fa", borderRadius: 10, padding: "14px 18px",
-            marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center",
-            border: "1px solid #e8eaed"
+            marginBottom: 24, border: "1px solid #e8eaed"
           }}>
-            <div>
-              <span style={{ fontWeight: 500, color: "#1a1b1e", fontSize: 13 }}>{store.name}</span>
-              {store.email && <span style={{ fontSize: 12, color: "#6b7280", marginLeft: 10 }}>{store.email}</span>}
-            </div>
-            <button onClick={handleReset}
-              style={{ fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer" }}>
-              초기화
-            </button>
+            <span style={{ fontWeight: 500, color: "#1a1b1e", fontSize: 13 }}>{store.name}</span>
           </div>
 
           {/* 상품 로드 실패 폴백 — 화면은 그대로 두고 재시도만 제공 */}
