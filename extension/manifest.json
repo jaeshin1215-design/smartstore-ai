@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SellFit Price Guard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "쿠팡 판매가 자동 수집 — SellFit Price Guard 보드 데이터 공급 (감지·기록만, 가격 변경 없음)",
   "permissions": ["alarms", "storage", "tabs", "notifications"],
   "host_permissions": [
