@@ -29,6 +29,7 @@ export default function Home() {
   const [trialOpen, setTrialOpen] = useState(false);
   const [seoKeyword, setSeoKeyword] = useState("");
   const [account, setAccount] = useState<string | null>(null);
+  const [showFullAccount, setShowFullAccount] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -123,49 +124,45 @@ export default function Home() {
               })}
             </nav>
 
-            {/* Right: 26px height, 140px search, 8px gap */}
-            <div className="flex items-center flex-shrink-0" style={{ gap: "8px" }}>
-              <div className="relative hidden sm:block">
-                <input
-                  type="text"
-                  placeholder="Search tools..."
-                  style={{
-                    height: "26px", width: "140px",
-                    padding: "0 8px",
-                    fontSize: "12px", color: "#6b7280",
-                    border: "1px solid #e8eaed", borderRadius: "4px",
-                    background: "white", outline: "none",
-                    fontFamily: "inherit",
-                  }}
-                />
-              </div>
+            {/* Right — 좌측 탭과 동급 선명도(15px/500/#4a4f57)로 통일. 장식용 검색창 제거 */}
+            <div className="flex items-center flex-shrink-0" style={{ gap: "14px" }}>
               {account ? (
-                <div className="flex items-center" style={{ gap: "10px" }}>
-                  <span style={{ fontSize: "12px", color: "#6b7280", whiteSpace: "nowrap" }}>{account}</span>
+                <>
+                  {/* 계정: @ 앞부분만, hover(title)·클릭 시 전체 이메일 */}
+                  <span
+                    onClick={() => setShowFullAccount(v => !v)}
+                    title={account}
+                    style={{
+                      fontSize: "15px", fontWeight: 500, color: "#4a4f57",
+                      whiteSpace: "nowrap", cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    {showFullAccount ? account : account.split("@")[0]}
+                  </span>
                   <button
                     onClick={handleLogout}
                     className="cursor-pointer transition-opacity hover:opacity-90"
                     style={{
-                      height: "26px", padding: "0 12px",
-                      fontSize: "12px", fontWeight: 600,
-                      background: "#fff", color: "#4a4f57", borderRadius: "5px",
-                      border: "1px solid #e8eaed", whiteSpace: "nowrap",
-                      fontFamily: "inherit",
+                      padding: "5px 14px",
+                      fontSize: "15px", fontWeight: 500,
+                      background: "#fff", color: "#ef567c", borderRadius: "6px",
+                      border: "1px solid #ef567c", whiteSpace: "nowrap",
+                      fontFamily: "inherit", lineHeight: 1.4,
                     }}
                   >
                     로그아웃
                   </button>
-                </div>
+                </>
               ) : (
                 <button
                   onClick={() => setTrialOpen(true)}
                   className="cursor-pointer transition-opacity hover:opacity-90"
                   style={{
-                    height: "26px", padding: "0 12px",
-                    fontSize: "12px", fontWeight: 600,
-                    background: "#ef567c", color: "#fff", borderRadius: "5px",
+                    padding: "5px 14px",
+                    fontSize: "15px", fontWeight: 500,
+                    background: "#ef567c", color: "#fff", borderRadius: "6px",
                     border: "none", whiteSpace: "nowrap",
-                    fontFamily: "inherit",
+                    fontFamily: "inherit", lineHeight: 1.4,
                   }}
                 >
                   도입 문의
