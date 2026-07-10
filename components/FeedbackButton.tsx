@@ -16,6 +16,7 @@ export default function FeedbackButton() {
   const [role, setRole] = useState("");
   const [plan, setPlan] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   const toggleFeature = (f: string) =>
     setUsedFeatures(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
@@ -23,19 +24,35 @@ export default function FeedbackButton() {
   const handleSubmit = async () => {
     if (!rating) return;
     setSubmitting(true);
+    setSubmitError(false);
     try {
-      await fetch("https://formspree.io/f/mojyjrnv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rating: `${rating}점`, used_features: usedFeatures.join(", "), plan, comment, role }),
+      // Formspree는 이 폼에서 JSON body를 400으로 거부, form-urlencoded만 수락(실측 2026-07-10).
+      // Accept: application/json으로 응답을 JSON({"ok":true})으로 받는다.
+      const form = new URLSearchParams({
+        rating: `${rating}점`,
+        used_features: usedFeatures.join(", "),
+        plan, comment, role,
       });
-    } catch { /* 폼 미등록 시 무시 */ }
-    setStep(2); setSubmitting(false);
+      const res = await fetch("https://formspree.io/f/mojyjrnv", {
+        method: "POST",
+        headers: { "Accept": "application/json" },
+        body: form,
+      });
+      // 성공(res.ok)일 때만 감사 화면 — 실패 시 입력 유지하고 재시도 가능하게 (정직 원칙)
+      if (res.ok) {
+        setStep(2);
+      } else {
+        setSubmitError(true);
+      }
+    } catch {
+      setSubmitError(true);
+    }
+    setSubmitting(false);
   };
 
   const handleClose = () => {
     setOpen(false);
-    setTimeout(() => { setStep(1); setRating(0); setUsedFeatures([]); setComment(""); setRole(""); setPlan(""); }, 300);
+    setTimeout(() => { setStep(1); setRating(0); setUsedFeatures([]); setComment(""); setRole(""); setPlan(""); setSubmitError(false); }, 300);
   };
 
   return (
@@ -163,6 +180,11 @@ export default function FeedbackButton() {
                     style={{ background: "#00aa6c" }}>
                     {submitting ? "전송 중..." : "📨 피드백 보내기"}
                   </button>
+                  {submitError && (
+                    <p className="text-xs text-center mt-2" style={{ color: "#dc2626" }}>
+                      전송에 실패했습니다. 잠시 후 다시 시도해 주세요.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">
