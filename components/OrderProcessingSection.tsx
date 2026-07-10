@@ -24,6 +24,13 @@ interface MatchSummary {
   preview: { sbOrdNo: string; waybillNo: string; receiverNm: string; productAbbr: string }[];
 }
 
+interface CjSummary {
+  date: string;
+  order_count: number;
+  // 전화·주소는 마스킹된 값 (화면 표시용) / 이름·상품명은 원본
+  preview: { receiver: string; product: string; shop: string; phone: string; addr: string }[];
+}
+
 function kstToday(): string {
   return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 }
@@ -32,6 +39,8 @@ export default function OrderProcessingSection() {
   const [date, setDate] = useState(kstToday()); // yyyy-MM-dd (input용)
   const [cjLoading, setCjLoading] = useState(false);
   const [cjMsg, setCjMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [cjSummary, setCjSummary] = useState<CjSummary | null>(null);
+  const [cjPreviewLoading, setCjPreviewLoading] = useState(false);
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchMsg, setMatchMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [summary, setSummary] = useState<MatchSummary | null>(null);
@@ -56,6 +65,19 @@ export default function OrderProcessingSection() {
     a.click();
     URL.revokeObjectURL(a.href);
     return { ok: true, rows: res.headers.get("X-Row-Count") ?? "?" };
+  }
+
+  async function handleCjPreview() {
+    setCjPreviewLoading(true);
+    setCjMsg(null);
+    setCjSummary(null);
+    try {
+      const res = await fetch(`/api/sabangnet/cj-excel?date=${compact}&format=json`);
+      const j = await res.json();
+      if (!res.ok) setCjMsg({ ok: false, text: j.error ?? `HTTP ${res.status}` });
+      else setCjSummary(j);
+    } catch { setCjMsg({ ok: false, text: "네트워크 오류" }); }
+    setCjPreviewLoading(false);
   }
 
   async function handleCjExcel() {
@@ -120,14 +142,57 @@ export default function OrderProcessingSection() {
           사방넷 주문을 CJ 송장프로그램 업로드 양식(11컬럼)으로 변환합니다.
           수취인·주소·전화·수량·상품명·배송메시지·쇼핑몰주문번호·매출처명·주문번호·우편번호.
         </div>
-        <button onClick={handleCjExcel} disabled={cjLoading}
-          style={{
-            padding: "11px 24px", borderRadius: 8, border: "none",
-            background: cjLoading ? "#c4c8cc" : "#ef567c", color: "#fff",
-            fontSize: 13, fontWeight: 700, cursor: cjLoading ? "default" : "pointer", fontFamily: FF,
-          }}>
-          {cjLoading ? "생성 중..." : "오늘 주문 → CJ 송장 엑셀 ↓"}
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={handleCjPreview} disabled={cjPreviewLoading}
+            style={{
+              padding: "11px 24px", borderRadius: 8, border: "1px solid #e8eaed",
+              background: "#fff", color: "#374151", fontSize: 13, fontWeight: 700,
+              cursor: cjPreviewLoading ? "default" : "pointer", fontFamily: FF,
+            }}>
+            {cjPreviewLoading ? "불러오는 중..." : "미리보기"}
+          </button>
+          <button onClick={handleCjExcel} disabled={cjLoading}
+            style={{
+              padding: "11px 24px", borderRadius: 8, border: "none",
+              background: cjLoading ? "#c4c8cc" : "#ef567c", color: "#fff",
+              fontSize: 13, fontWeight: 700, cursor: cjLoading ? "default" : "pointer", fontFamily: FF,
+            }}>
+            {cjLoading ? "생성 중..." : "오늘 주문 → CJ 송장 엑셀 ↓"}
+          </button>
+        </div>
+
+        {cjSummary && (
+          <div style={{ marginTop: 16, border: "1px solid #e8eaed", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", background: "#f9fafb", fontSize: 13, color: "#111827", fontWeight: 700 }}>
+              오늘 주문 {cjSummary.order_count}건
+              <span style={{ fontWeight: 400, color: "#6b7280", marginLeft: 8 }}>
+                (상위 {cjSummary.preview.length}건 미리보기 · 전화·주소는 마스킹, 다운로드 파일은 원본)
+              </span>
+            </div>
+            {cjSummary.preview.length > 0 && (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderTop: "1px solid #e8eaed", borderBottom: "1px solid #e8eaed" }}>
+                    {["수취인", "상품명", "매출처명", "전화", "주소"].map((h) => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 16px", fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cjSummary.preview.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "8px 16px", color: "#111827" }}>{r.receiver}</td>
+                      <td style={{ padding: "8px 16px", color: "#374151", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.product}</td>
+                      <td style={{ padding: "8px 16px", color: "#6b7280" }}>{r.shop}</td>
+                      <td style={{ padding: "8px 16px", color: "#9ca3af" }}>{r.phone}</td>
+                      <td style={{ padding: "8px 16px", color: "#9ca3af", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.addr}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
         {cjMsg && <Msg msg={cjMsg} />}
         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 10 }}>
           수량=주문수량(ORD_CNT)·상품명=상품약어+옵션 — 임시 확정, 심유나 프로 확인 후 조정 가능

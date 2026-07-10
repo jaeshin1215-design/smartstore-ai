@@ -306,9 +306,15 @@ export default function StoreSetupTab() {
     setSavingSales(false);
   }
 
-  const ownProducts = products.filter(p => p.is_own === 1);
-  const compProducts = products.filter(p => p.is_own === 0);
-  const candidateProducts = products.filter(p => p.is_own === 2);
+  // 쿠팡 연결(coupang_url IS NOT NULL) 상품을 그룹 내 상단으로 — 어디까지 연결했는지 한눈에 (2026-07-10)
+  // 그룹(자사1/경쟁사0/소싱2) 구조는 유지, 각 그룹 안에서만 연결됨을 위로 (안정 정렬로 기존 순서 보존)
+  const byCoupangFirst = (list: Product[]) =>
+    list.map((p, i) => ({ p, i }))
+      .sort((a, b) => (a.p.coupang_url ? 0 : 1) - (b.p.coupang_url ? 0 : 1) || a.i - b.i)
+      .map(x => x.p);
+  const ownProducts = byCoupangFirst(products.filter(p => p.is_own === 1));
+  const compProducts = byCoupangFirst(products.filter(p => p.is_own === 0));
+  const candidateProducts = byCoupangFirst(products.filter(p => p.is_own === 2));
 
   // 접속 시 전체 화면 블로킹 없음 — loading은 스토어 신규 등록 처리 중에만 true
   if (loading) {
@@ -895,13 +901,26 @@ export default function StoreSetupTab() {
 
               <div style={{ maxHeight: "360px", overflowY: "auto", paddingRight: "4px" }}>
 
-              {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }, { label: "소싱·위탁후보", list: candidateProducts }].map(group => (
-                group.list.length > 0 && (
+              {[{ label: "자사 상품", list: ownProducts }, { label: "경쟁사 상품", list: compProducts }, { label: "소싱·위탁후보", list: candidateProducts }].map(group => {
+                const linkedCount = group.list.filter(p => p.coupang_url).length;
+                return group.list.length > 0 && (
                   <div key={group.label} style={{ marginBottom: 20 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.1em", marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.1em", marginBottom: 10, display: "flex", gap: 8, alignItems: "center" }}>
                       {group.label}
+                      {/* 연결 진행 상황 — 어디까지 했는지 (2026-07-10) */}
+                      <span style={{ color: "#15803d", fontWeight: 600 }}>쿠팡 연결 {linkedCount}/{group.list.length}</span>
                     </div>
-                    {group.list.map(p => (
+                    {group.list.map((p, idx) => {
+                      // 연결됨↔미연결 경계에 구분선 (상단=연결됨)
+                      const prev = group.list[idx - 1];
+                      const isBoundary = idx > 0 && !!prev?.coupang_url && !p.coupang_url;
+                      return (
+                      <div key={p.id + "-wrap"}>
+                      {isBoundary && (
+                        <div style={{ borderTop: "1px dashed #d1d5db", margin: "4px 0 8px", paddingTop: 4, fontSize: 10, color: "#9ca3af" }}>
+                          미연결 (아래)
+                        </div>
+                      )}
                       <div key={p.id} id={`product-row-${p.id}`} style={{
                         padding: "12px 8px", borderBottom: "1px solid #f3f4f6", borderRadius: 8,
                         transition: "background 0.4s",
@@ -974,10 +993,12 @@ export default function StoreSetupTab() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      </div>
+                      );
+                    })}
                   </div>
-                )
-              ))}
+                );
+              })}
 
               {ownProducts.length > 0 && compProducts.length > 0 && (
                 <div style={{ marginTop: 16 }}>

@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { fetchSabangnetOrders, composeProductName, kstTodayCompact } from "@/lib/sabangnet/orders";
 import { getSession } from "@/lib/auth";
+import { maskPhone, maskAddr } from "@/lib/privacy";
 
 // 수도꼭지 1 — 오늘 주문 → CJ 송장프로그램 업로드 엑셀 (11컬럼, 순서 고정)
 // 원본 개인정보는 이 다운로드 파일에만 담긴다 (화면 표시는 마스킹 원칙)
@@ -17,6 +18,7 @@ const HEADERS = [
 
 export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date") ?? kstTodayCompact();
+  const format = req.nextUrl.searchParams.get("format") ?? "xlsx";
   // 스토어 스코핑: 클라이언트 파라미터가 아니라 세션의 store_id (2026-07-09)
   const session = await getSession(req);
   const storeId = session?.storeId ?? null;
@@ -26,6 +28,22 @@ export async function GET(req: NextRequest) {
 
   try {
     const orders = await fetchSabangnetOrders(date, date);
+
+    // 미리보기 (화면 표시) — 전화·주소 마스킹 규칙 적용, 이름·상품명·주문번호는 원본 (2026-07-10)
+    if (format === "json") {
+      return NextResponse.json({
+        date,
+        order_count: orders.length,
+        preview: orders.slice(0, 5).map((o) => ({
+          receiver: o.RECEIVER_NM ?? "",
+          product: composeProductName(o),
+          shop: o.SHOP_NM ?? "",
+          phone: maskPhone(o.RECEIVER_TEL),
+          addr: maskAddr(o.RECEIVER_ADDR),
+        })),
+      });
+    }
+
     if (orders.length === 0) {
       return NextResponse.json({ error: `${date} 주문 없음` }, { status: 404 });
     }
