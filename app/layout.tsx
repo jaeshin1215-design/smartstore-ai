@@ -30,10 +30,13 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${ebGaramond.variable} h-full antialiased`}
+      lang="ko"
+      translate="no"
+      className={`${geistSans.variable} ${geistMono.variable} ${ebGaramond.variable} h-full antialiased notranslate`}
     >
       <head>
+        {/* 크롬 자동 번역이 상품명·라벨을 재번역해 화면을 깨뜨리는 것 방지 (2026-07-10 삭제사고 원인) */}
+        <meta name="google" content="notranslate" />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"

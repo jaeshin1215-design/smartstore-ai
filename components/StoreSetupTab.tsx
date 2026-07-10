@@ -202,7 +202,9 @@ export default function StoreSetupTab() {
     setAddingProduct(false);
   }
 
-  async function handleDeleteProduct(id: string) {
+  async function handleDeleteProduct(id: string, name: string) {
+    // 확인 없는 파괴 금지 (2026-07-10) — 되돌릴 수 없는 삭제는 반드시 확인
+    if (!window.confirm(`『${name}』을 삭제할까요?\n되돌릴 수 없습니다.\n\n(쿠팡 URL만 해제하려면 취소 후 '쿠팡 ✓'를 눌러 편집하세요)`)) return;
     await fetch(`/api/products?id=${id}`, { method: "DELETE" });
     setProducts(prev => prev.filter(p => p.id !== id));
   }
@@ -878,20 +880,27 @@ export default function StoreSetupTab() {
                             </span>
                           </div>
                           <div style={{ display: "flex", gap: 12, alignItems: "center", flexShrink: 0 }}>
+                            {/* 쿠팡 ✓ 클릭 = 편집창 열림(URL 수정/해제). 연결 상태는 편집 힌트 표시 */}
                             <button
                               onClick={() => {
                                 setEditingCoupangId(editingCoupangId === p.id ? null : p.id);
                                 setEditingCoupangUrl(p.coupang_url ?? "");
                                 setCoupangUrlError(null);
                               }}
+                              title={p.coupang_url ? "쿠팡 URL 수정·해제" : "쿠팡 URL 연결"}
                               style={{
                                 fontSize: 11, background: "none", border: "none", cursor: "pointer",
                                 color: p.coupang_url ? "#15803d" : "#be123c", fontWeight: 600,
                               }}>
-                              {p.coupang_url ? "쿠팡 ✓" : "쿠팡 URL 연결"}
+                              {p.coupang_url ? "쿠팡 ✓ 수정" : "쿠팡 URL 연결"}
                             </button>
-                            <button onClick={() => handleDeleteProduct(p.id)}
-                              style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>
+                            {/* 삭제는 파괴적 — 위 버튼과 구분자로 거리 두기 */}
+                            <span style={{ color: "#e5e7eb", fontSize: 11 }}>|</span>
+                            <button onClick={() => handleDeleteProduct(p.id, p.name)}
+                              style={{
+                                fontSize: 11, color: "#9ca3af", background: "none",
+                                border: "1px solid #f3f4f6", borderRadius: 6, padding: "2px 8px", cursor: "pointer",
+                              }}>
                               삭제
                             </button>
                           </div>
