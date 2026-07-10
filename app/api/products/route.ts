@@ -70,8 +70,14 @@ export async function PATCH(req: NextRequest) {
     args.push(is_price_confirmed);
   }
   if (coupang_url !== undefined) {
+    const normalized = normalizeCoupangUrl(coupang_url);
+    // 값이 들어왔는데 쿠팡 주소로 정규화 안 되면 조용히 null 저장 금지 → 400 (2026-07-10)
+    const provided = typeof coupang_url === "string" && coupang_url.trim() !== "";
+    if (provided && !normalized) {
+      return NextResponse.json({ error: "쿠팡 상품 주소가 아닙니다" }, { status: 400 });
+    }
     fields.push("coupang_url = ?", "coupang_product_id = ?");
-    args.push(normalizeCoupangUrl(coupang_url), extractCoupangProductId(coupang_url));
+    args.push(normalized, extractCoupangProductId(coupang_url));
   }
 
   if (fields.length === 0) {
@@ -79,10 +85,15 @@ export async function PATCH(req: NextRequest) {
   }
 
   args.push(id);
-  await db.execute({
+  const result = await db.execute({
     sql: `UPDATE sellfit_products SET ${fields.join(", ")} WHERE id = ?`,
     args,
   });
+
+  // 0행 업데이트도 성공으로 반환하던 조용한 실패 제거 (2026-07-10)
+  if (result.rowsAffected === 0) {
+    return NextResponse.json({ error: "상품을 찾을 수 없습니다" }, { status: 404 });
+  }
 
   return NextResponse.json({ ok: true });
 }

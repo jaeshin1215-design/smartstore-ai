@@ -86,6 +86,7 @@ export default function StoreSetupTab() {
   const [editingCoupangId, setEditingCoupangId] = useState<string | null>(null);
   const [editingCoupangUrl, setEditingCoupangUrl] = useState("");
   const [savingCoupangUrl, setSavingCoupangUrl] = useState(false);
+  const [coupangUrlError, setCoupangUrlError] = useState<string | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [collectResult, setCollectResult] = useState<{product: string; searchVolume: number; cpc: number; competitors: number}[] | null>(null);
 
@@ -207,19 +208,29 @@ export default function StoreSetupTab() {
   }
 
   // 기존 상품에 쿠팡 URL 연결 (Price Guard 추적 대상 등록)
+  // 조용한 실패 금지 (2026-07-10): res.ok 확인, 실패 시 편집창 유지 + 에러 표시 + 입력 보존
   async function handleSaveCoupangUrl(productId: string) {
     if (!store) return;
     setSavingCoupangUrl(true);
+    setCoupangUrlError(null);
     try {
-      await fetch("/api/products", {
+      const res = await fetch("/api/products", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: productId, coupang_url: editingCoupangUrl.trim() || null }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setCoupangUrlError(data.error ?? "저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        setSavingCoupangUrl(false);
+        return; // 편집창 유지, 입력값 보존
+      }
       await loadProducts(store.id);
       setEditingCoupangId(null);
       setEditingCoupangUrl("");
-    } catch (e) { console.error(e); }
+    } catch {
+      setCoupangUrlError("저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
     setSavingCoupangUrl(false);
   }
 
@@ -871,6 +882,7 @@ export default function StoreSetupTab() {
                               onClick={() => {
                                 setEditingCoupangId(editingCoupangId === p.id ? null : p.id);
                                 setEditingCoupangUrl(p.coupang_url ?? "");
+                                setCoupangUrlError(null);
                               }}
                               style={{
                                 fontSize: 11, background: "none", border: "none", cursor: "pointer",
@@ -885,24 +897,32 @@ export default function StoreSetupTab() {
                           </div>
                         </div>
                         {editingCoupangId === p.id && (
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <input
-                              style={{ ...S.input, fontSize: 12, border: "1.5px solid #f9a8c4", background: "#fff7f9" }}
-                              placeholder="coupang.com/vp/products/..."
-                              value={editingCoupangUrl}
-                              onChange={e => setEditingCoupangUrl(e.target.value)}
-                              onKeyDown={e => e.key === "Enter" && handleSaveCoupangUrl(p.id)}
-                            />
-                            <button
-                              onClick={() => handleSaveCoupangUrl(p.id)}
-                              disabled={savingCoupangUrl}
-                              style={{
-                                padding: "8px 16px", borderRadius: 8, border: "none", whiteSpace: "nowrap",
-                                background: savingCoupangUrl ? "#c4c8cc" : "#0f2a1e", color: "#fff",
-                                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                              }}>
-                              {savingCoupangUrl ? "저장 중..." : "저장"}
-                            </button>
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+                              쿠팡 상품 페이지 주소를 붙여넣고 저장을 누르세요
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <input
+                                style={{ ...S.input, fontSize: 12, border: "1.5px solid #f9a8c4", background: "#fff7f9" }}
+                                placeholder="coupang.com/vp/products/..."
+                                value={editingCoupangUrl}
+                                onChange={e => { setEditingCoupangUrl(e.target.value); setCoupangUrlError(null); }}
+                                onKeyDown={e => e.key === "Enter" && handleSaveCoupangUrl(p.id)}
+                              />
+                              <button
+                                onClick={() => handleSaveCoupangUrl(p.id)}
+                                disabled={savingCoupangUrl}
+                                style={{
+                                  padding: "8px 16px", borderRadius: 8, border: "none", whiteSpace: "nowrap",
+                                  background: savingCoupangUrl ? "#c4c8cc" : "#0f2a1e", color: "#fff",
+                                  fontSize: 12, fontWeight: 600, cursor: "pointer",
+                                }}>
+                                {savingCoupangUrl ? "저장 중..." : "저장"}
+                              </button>
+                            </div>
+                            {coupangUrlError && (
+                              <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>⚠ {coupangUrlError}</div>
+                            )}
                           </div>
                         )}
                       </div>
