@@ -8,8 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 const POT_KEYWORD_RE = /화분|플랜테리어|화기|플랜트/;
 
 const MOOD_CUT_TEMPLATE = (productName: string) =>
-  `A minimalist, softly lit interior wall corner with warm natural light falling on the ${productName}, creating a natural shadow on the wall behind it. Light wood or neutral flooring. No props, no people, no furniture — the plant is the sole subject.
-Critical — scale accuracy: preserve the original product's exact proportions and form. No deformation to the central object.`;
+  `minimalist empty room, soft beige plaster wall, large window with warm afternoon sunlight casting long soft shadows, light wooden floor, negative space, serene atmosphere, high-end interior photography style, Preserve the original ${productName}'s exact scale and proportions, no deformation`;
 
 const CAFE_CUT_TEMPLATE = (productName: string) =>
   `A minimalist café interior corner, generous open space around the ${productName} — not cramped between furniture or shelving. Clean, neutral beige or cream walls with minimal texture, no busy wood shelving or cluttered objects near the plant.
