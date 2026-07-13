@@ -82,6 +82,19 @@ export async function resolveStoreId(req: NextRequest, fallbackParam?: string | 
   return null;
 }
 
+/**
+ * 연동(사방넷·쿠팡) 라우트 가드 — 연동 계정을 소유한 스토어의 세션만 허용.
+ * 사방넷·쿠팡 API는 env 계정(이지스토리) 데이터를 스토어 무관하게 가져오므로,
+ * 데모 등 다른 스토어 세션이 호출하면 실데이터가 노출된다 (2026-07-13 Track② 점검).
+ * INTEGRATION_STORE_ID 미설정 = 전부 차단 (열림보다 닫힘).
+ */
+export async function requireIntegrationStore(req: NextRequest): Promise<boolean> {
+  const allowed = process.env.INTEGRATION_STORE_ID;
+  if (!allowed) return false;
+  const session = await getSession(req);
+  return session?.storeId === allowed;
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   await db.execute({ sql: "DELETE FROM sellfit_sessions WHERE id = ?", args: [sessionId] });
 }

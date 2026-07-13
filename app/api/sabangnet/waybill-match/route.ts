@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { fetchSabangnetOrders, kstTodayCompact, type SabangnetOrder } from "@/lib/sabangnet/orders";
-import { getSession } from "@/lib/auth";
+import { getSession, requireIntegrationStore } from "@/lib/auth";
 
 // 수도꼭지 2 — 세트분리 송장 매칭 (관제탑 규칙, 자동화 100%)
 // 1. 수취인 + 쇼핑몰주문번호 동일 그룹핑
@@ -55,6 +55,10 @@ function matchWaybills(orders: SabangnetOrder[]) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
+  }
+
   const date = req.nextUrl.searchParams.get("date") ?? kstTodayCompact();
   const format = req.nextUrl.searchParams.get("format") ?? "json";
   // 스토어 스코핑: 클라이언트 파라미터가 아니라 세션의 store_id (2026-07-09)

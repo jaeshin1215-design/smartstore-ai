@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireIntegrationStore } from "@/lib/auth";
 import { sabangnetPost, checkSabangnetConfig, SabangnetError } from "@/lib/sabangnet/client";
 import type {
   TrackingMapping,
@@ -13,6 +14,10 @@ import type {
 } from "@/lib/sabangnet/types";
 
 export async function POST(req: NextRequest) {
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
+  }
+
   // 환경변수 프리플라이트
   const config = checkSabangnetConfig();
   if (!config.ok) {

@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireIntegrationStore } from "@/lib/auth";
 import { sabangnetPost, checkSabangnetConfig, SabangnetError } from "@/lib/sabangnet/client";
 import type {
   SabangnetCSListResponse,
@@ -49,6 +50,10 @@ const TEST_CS_LIST = [
 // ── GET: 미답변 CS 문의 목록 ─────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const isTest = searchParams.get("test") === "1";
 
@@ -119,6 +124,10 @@ export async function GET(req: NextRequest) {
 // ── POST: CS 답변 등록 (SABANG_CS_ANS_REG) ───────────────────────────
 
 export async function POST(req: NextRequest) {
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
+  }
+
   let body: SabangnetCSAnswerPayload;
   try {
     body = await req.json();

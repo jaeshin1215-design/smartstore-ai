@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { requireIntegrationStore } from "@/lib/auth";
 import { createHmac } from "crypto";
 
 const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY!;
@@ -44,7 +46,11 @@ async function tryCall(method: string, path: string, query: string, signKey: str
   return { status: res.status, body: await res.text() };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
+  }
+
   // 주문 조회 — 인증 및 기본 접근 권한 확인
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

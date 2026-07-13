@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { fetchSabangnetOrders, composeProductName, kstTodayCompact, normalizePhone } from "@/lib/sabangnet/orders";
-import { getSession } from "@/lib/auth";
+import { getSession, requireIntegrationStore } from "@/lib/auth";
 import { maskPhone, maskAddr } from "@/lib/privacy";
 
 // 수도꼭지 1 — 오늘 주문 → CJ 송장프로그램 업로드 엑셀 (11컬럼, 순서 고정)
@@ -17,6 +17,10 @@ const HEADERS = [
 ] as const;
 
 export async function GET(req: NextRequest) {
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
+  }
+
   const date = req.nextUrl.searchParams.get("date") ?? kstTodayCompact();
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx";
   // 스토어 스코핑: 클라이언트 파라미터가 아니라 세션의 store_id (2026-07-09)
