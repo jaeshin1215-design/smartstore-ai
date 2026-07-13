@@ -19,10 +19,10 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("hex");
 }
 
-/** 세션 생성 → 쿠키 값 반환 */
-export async function createSession(userId: string): Promise<{ cookieValue: string; expiresAtMs: number }> {
+/** 세션 생성 → 쿠키 값 반환. days 기본 30일, 데모 세션은 7일 (2026-07-14 Track②) */
+export async function createSession(userId: string, days: number = SESSION_DAYS): Promise<{ cookieValue: string; expiresAtMs: number }> {
   const id = randomBytes(24).toString("hex");
-  const expiresAtMs = Date.now() + SESSION_DAYS * 86400000;
+  const expiresAtMs = Date.now() + days * 86400000;
   await db.execute({
     sql: "INSERT INTO sellfit_sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
     args: [id, userId, expiresAtMs],

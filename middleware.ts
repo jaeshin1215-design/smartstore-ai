@@ -8,7 +8,8 @@ import type { NextRequest } from "next/server";
 const SESSION_COOKIE = "sellfit_session";
 
 // 인증 없이 통과하는 경로
-const PUBLIC_PREFIXES = ["/api/auth/", "/login", "/api/google/callback"];
+// /try = 셀프서비스 데모 신청 (2026-07-14 Track②). demo-request는 /api/auth/ 하위라 자동 공개.
+const PUBLIC_PREFIXES = ["/api/auth/", "/login", "/api/google/callback", "/try"];
 
 async function hmacHex(secretStr: string, payload: string): Promise<string> {
   const enc = new TextEncoder();

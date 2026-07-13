@@ -27,12 +27,14 @@ export async function GET(req: NextRequest) {
   });
 
   const user = await db.execute({
-    sql: "SELECT id FROM sellfit_users WHERE email = ?",
+    sql: "SELECT id, store_id FROM sellfit_users WHERE email = ?",
     args: [String(row.email)],
   });
   if (!user.rows[0]) return fail("등록되지 않은 사용자입니다");
 
-  const { cookieValue, expiresAtMs } = await createSession(String(user.rows[0].id));
+  // 데모 스토어 계정은 7일 세션 (직원 30일과 구분 — 2026-07-14 Track②)
+  const isDemo = String(user.rows[0].store_id) === "demo-store-001";
+  const { cookieValue, expiresAtMs } = await createSession(String(user.rows[0].id), isDemo ? 7 : undefined);
 
   const res = NextResponse.redirect(new URL("/", req.nextUrl.origin));
   res.cookies.set(SESSION_COOKIE, cookieValue, {
