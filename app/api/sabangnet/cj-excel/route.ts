@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
-import { fetchSabangnetOrders, composeProductName, kstTodayCompact } from "@/lib/sabangnet/orders";
+import { fetchSabangnetOrders, composeProductName, kstTodayCompact, normalizePhone } from "@/lib/sabangnet/orders";
 import { getSession } from "@/lib/auth";
 import { maskPhone, maskAddr } from "@/lib/privacy";
 
@@ -49,13 +49,14 @@ export async function GET(req: NextRequest) {
     }
 
     // 11컬럼 매핑 — 전부 문자열로 (우편번호 앞자리 0 보존, 실측 148건 근거)
-    // 수취인핸드폰번호 = RECEIVER_TEL 복제 (Wendy 실측: CJ 21건 중 18건 동일 복제.
-    // 제2번호 필드는 코드표 확인 대기 — 확인되면 이 줄만 교체)
+    // 수취인핸드폰번호 = RECEIVER_CEL (2026-07-13 심유나 프로 회신 확정, 프로브로 필드 실재 확인).
+    // 사방넷이 빈 번호를 "- -" 더미로 주는 케이스 실측 → normalizePhone으로 정리하고,
+    // CEL이 실질 비면 TEL로 채움 (CJ 업로드 전화번호 빈칸 방지 — 기존 복제 동작 유지 취지)
     const rows = orders.map((o) => [
       o.RECEIVER_NM ?? "",
       o.RECEIVER_ADDR ?? "",
-      o.RECEIVER_TEL ?? "",
-      o.RECEIVER_TEL ?? "",
+      normalizePhone(o.RECEIVER_TEL),
+      normalizePhone(o.RECEIVER_CEL) || normalizePhone(o.RECEIVER_TEL),
       String(o.ORD_CNT ?? ""), // 임시 확정: ORD_CNT (최종은 심유나 프로 확인)
       composeProductName(o),   // 실측 4/4 확정: PRD_ABBR + 옵션(단품 제외)
       o.DELIVERY_MSG ?? "",

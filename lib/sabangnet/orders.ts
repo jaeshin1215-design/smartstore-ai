@@ -5,10 +5,11 @@ import { request as httpsRequest } from "node:https";
 import { fetchSabangnetToken } from "./auth";
 
 // STEP 0 프로브(2026-07-09)로 실재 확인된 21개 필드
+// + RECEIVER_CEL: 2026-07-13 프로브로 실재 확인 (심유나 프로 회신 — TEL/CEL 별도 컬럼)
 export const ORDER_FIELDS = [
   "SB_ORD_NO", "SHOP_ORD_NO", "ORDER_STATUS", "ORD_CNT", "EA",
   "CM_PRD_NM", "CM_SKU_NM", "PRD_ABBR", "CT_DELIVERY_COST",
-  "RECEIVER_NM", "RECEIVER_TEL", "RECEIVER_ADDR", "RECEIVER_ZIPCODE",
+  "RECEIVER_NM", "RECEIVER_TEL", "RECEIVER_CEL", "RECEIVER_ADDR", "RECEIVER_ZIPCODE",
   "DELIVERY_MSG", "WAYBILL_NO", "SHOP_NM", "LOGISTICS_NM",
   "ORDER_DT", "REG_DATE", "SET_DIV_CD",
 ] as const;
@@ -88,6 +89,15 @@ export function composeProductName(order: Pick<SabangnetOrder, "PRD_ABBR" | "CM_
   const abbr = (order.PRD_ABBR ?? "").trim();
   const sku = (order.CM_SKU_NM ?? "").trim();
   return sku && sku !== "단품" ? `${abbr} ${sku}` : abbr;
+}
+
+/**
+ * 전화번호 실질값 판정 — 사방넷은 빈 번호를 "- -" 더미로 반환한다 (2026-07-13 실측).
+ * 숫자가 하나도 없으면 빈 값으로 취급.
+ */
+export function normalizePhone(raw: string | null): string {
+  const v = (raw ?? "").trim();
+  return /\d/.test(v) ? v : "";
 }
 
 /** KST 오늘 (yyyyMMdd) */
