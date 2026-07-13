@@ -5,13 +5,13 @@ export async function POST() {
   try {
     const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
     const storeId = "demo-store-001";
-    const BASE_URL = "https://smartstore.naver.com/easy-story";
+    const BASE_URL = "https://smartstore.naver.com"; // 데모 중립 URL — 실고객사 스토어 링크 노출 금지 (2026-07-13)
 
     // 1. 스토어 덮어쓰기
     await db.execute({ sql: "DELETE FROM sellfit_stores WHERE id = ?", args: [storeId] });
     await db.execute({
       sql: "INSERT INTO sellfit_stores (id, name, email, kakao) VALUES (?, ?, ?, ?)",
-      args: [storeId, "이지스토리 데모", "demo@sellfit.kr", "01000000000"],
+      args: [storeId, "SellFit 데모", "demo@sellfit.kr", "01000000000"],
     });
 
     // 2. 이전 시드 잔재 포함 전체 삭제 (es-p-* 구형 + es-P-* 신형)
