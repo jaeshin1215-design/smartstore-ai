@@ -34,10 +34,12 @@ interface ImageItem {
   text_overlay: string; why_better: string; ai_prompt?: string;
 }
 interface ImageSection { order: number; name: string; purpose: string; images: ImageItem[]; }
+interface PotPrompt { title: string; prompt: string; }
 interface ImagePlanResult {
   strategy: string; competitor_weakness: string;
   sections: ImageSection[]; total_images: number;
   shooting_tips: string[];
+  pot_prompts?: { mood_cut: PotPrompt; cafe_cut: PotPrompt };
 }
 
 interface VideoScene {
@@ -456,6 +458,41 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                           <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", margin: "4px 0 0" }}>총 {imagePlan.total_images}장 구성 제안</p>
                         )}
                       </div>
+                      {imagePlan.pot_prompts && (
+                        <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: "12px", padding: "16px" }}>
+                          <p style={{ fontSize: "13px", fontWeight: 700, color: "#047857", margin: "0 0 10px" }}>🪴 화분 전용 AI 프롬프트</p>
+                          {/* 필수 경고 — 팁 아님 */}
+                          <div style={{ background: "#fef2f2", border: "1.5px solid #f87171", borderRadius: "8px", padding: "10px 12px", marginBottom: "10px" }}>
+                            <p style={{ fontSize: "12.5px", fontWeight: 800, color: "#dc2626", margin: 0, lineHeight: 1.65 }}>
+                              ⚠️ 이 프롬프트는 반드시 ①실물사진 Add Image → ②Cutout(BEN2) → Outpaint 단계에서 사용해야 크기가 정확합니다. 사진 없이 텍스트만으로 새 이미지를 생성하면 크기가 왜곡될 수 있습니다.
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
+                            <p style={{ fontSize: "13px", fontWeight: 600, color: "#065f46", margin: 0 }}>① Add Image → ② Cutout(BEN2) → ③ Outpaint</p>
+                            <a href="https://flow.google.com" target="_blank" rel="noopener noreferrer" style={{
+                              display: "inline-flex", alignItems: "center", gap: "4px",
+                              fontSize: "12.5px", fontWeight: 700, color: "#fff", padding: "5px 12px",
+                              borderRadius: "7px", background: "#059669", textDecoration: "none",
+                            }}>Google Flow 열기 ↗</a>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px" }}>
+                            {([["pot_mood", imagePlan.pot_prompts.mood_cut], ["pot_cafe", imagePlan.pot_prompts.cafe_cut]] as const).map(([key, p]) => (
+                              <div key={key} style={{ background: "#fff", border: "1px solid #a7f3d0", borderRadius: "10px", padding: "12px 14px" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                                  <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#047857" }}>{p.title}</span>
+                                  <button onClick={() => copy(p.prompt, key)} style={{
+                                    fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: FF,
+                                    color: copied === key ? "#fff" : "#059669",
+                                    background: copied === key ? "#059669" : "#ecfdf5",
+                                    border: "1px solid #6ee7b7", borderRadius: "6px", padding: "3px 10px",
+                                  }}>{copied === key ? "복사됨 ✓" : "복사"}</button>
+                                </div>
+                                <p style={{ fontSize: "12px", color: "#374151", margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{p.prompt}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {imagePlan.competitor_weakness && (
                         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "14px 16px" }}>
                           <p style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", margin: "0 0 4px" }}>⚠️ 경쟁사 약점</p>
