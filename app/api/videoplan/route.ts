@@ -79,7 +79,7 @@ Veo 3.1 설정:
         contents: [{ parts }],
         generationConfig: {
           responseMimeType: "application/json",
-          maxOutputTokens: 4096,
+          maxOutputTokens: 8192,
           thinkingConfig: { thinkingBudget: 0 },
         },
       }),
