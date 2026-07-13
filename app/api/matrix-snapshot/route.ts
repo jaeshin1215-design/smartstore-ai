@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 // 매트릭스 스냅샷 저장 (월 1회 — 예측 정확도 검증용)
 export async function POST(req: NextRequest) {
-  const { store_id, date, items } = await req.json() as {
+  const { store_id: clientStoreId, date, items } = await req.json() as {
     store_id: string;
     date: string;
     items: {
@@ -17,8 +18,10 @@ export async function POST(req: NextRequest) {
     }[];
   };
 
-  if (!store_id || !date || !items?.length) {
-    return NextResponse.json({ error: "store_id·date·items 필요" }, { status: 400 });
+  const store_id = await resolveStoreId(req, clientStoreId ?? null); // 세션 강제 (2026-07-14)
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
+  if (!date || !items?.length) {
+    return NextResponse.json({ error: "date·items 필요" }, { status: 400 });
   }
 
   // 같은 날짜 중복 방지: 오늘 저장된 스냅샷이 있으면 스킵
@@ -44,9 +47,9 @@ export async function POST(req: NextRequest) {
 
 // 스냅샷 조회 (검증 시 사용)
 export async function GET(req: NextRequest) {
-  const store_id = req.nextUrl.searchParams.get("store_id");
+  const store_id = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   const date = req.nextUrl.searchParams.get("date");
-  if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const sql = date
     ? "SELECT * FROM sellfit_matrix_snapshots WHERE store_id = ? AND snapshot_date = ? ORDER BY product_name"

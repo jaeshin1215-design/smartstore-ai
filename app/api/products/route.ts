@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { extractCoupangProductId, normalizeCoupangUrl } from "@/lib/priceguard";
+import { resolveStoreId } from "@/lib/auth";
+
+// 스토어 스코핑 (2026-07-14): 클라이언트가 보낸 store_id를 신뢰하지 않는다.
+// 모든 핸들러가 세션의 store_id를 강제하고, 변이(PATCH/DELETE)는 소유권(WHERE store_id)까지 잠근다.
 
 // 상품 목록 조회
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
-  if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
+  if (!storeId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const result = await db.execute({
     sql: "SELECT * FROM sellfit_products WHERE store_id = ? ORDER BY is_own DESC, created_at ASC",
@@ -18,9 +22,12 @@ export async function GET(req: NextRequest) {
 // 상품 등록 (Discover 채널확정 포함)
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { store_id, name, url, keyword, category, price, purchase_price, shipping_cost, stock, is_own, matrix_x, matrix_y, coupang_url } = body;
+  const { name, url, keyword, category, price, purchase_price, shipping_cost, stock, is_own, matrix_x, matrix_y, coupang_url } = body;
+  // 클라이언트 body의 store_id는 무시 — 세션의 store_id 강제 (2026-07-14)
+  const store_id = await resolveStoreId(req, body.store_id ?? null);
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
-  if (!store_id || !name || !keyword || !category) {
+  if (!name || !keyword || !category) {
     return NextResponse.json({ error: "필수 항목 누락" }, { status: 400 });
   }
 
@@ -49,6 +56,9 @@ export async function PATCH(req: NextRequest) {
   const { id, matrix_x, matrix_y, price, is_price_confirmed, coupang_url } = body;
 
   if (!id) return NextResponse.json({ error: "id 필요" }, { status: 400 });
+  // 소유권 검증 — 세션 스토어의 상품만 수정 가능 (2026-07-14)
+  const sessionStoreId = await resolveStoreId(req, null);
+  if (!sessionStoreId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const fields: string[] = [];
   const args: any[] = [];
@@ -84,9 +94,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "수정할 항목 없음" }, { status: 400 });
   }
 
-  args.push(id);
+  args.push(id, sessionStoreId);
   const result = await db.execute({
-    sql: `UPDATE sellfit_products SET ${fields.join(", ")} WHERE id = ?`,
+    sql: `UPDATE sellfit_products SET ${fields.join(", ")} WHERE id = ? AND store_id = ?`,
     args,
   });
 
@@ -102,7 +112,10 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id 필요" }, { status: 400 });
+  // 소유권 검증 — 세션 스토어의 상품만 삭제 가능 (2026-07-14)
+  const sessionStoreId = await resolveStoreId(req, null);
+  if (!sessionStoreId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
-  await db.execute({ sql: "DELETE FROM sellfit_products WHERE id = ?", args: [id] });
+  await db.execute({ sql: "DELETE FROM sellfit_products WHERE id = ? AND store_id = ?", args: [id, sessionStoreId] });
   return NextResponse.json({ ok: true });
 }

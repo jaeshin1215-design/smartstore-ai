@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 
@@ -13,8 +14,8 @@ function calcSafetyLevel(diff: number): "안전" | "주의" | "위험" {
 }
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
-  if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
+  if (!storeId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const result = await db.execute({
     sql: "SELECT * FROM sellfit_competitor_tracking WHERE store_id = ? ORDER BY check_date DESC, created_at DESC LIMIT 200",
@@ -25,9 +26,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { store_id, product_name, coupang_price, is_item_winner, check_date } = body;
+  const { product_name, coupang_price, is_item_winner, check_date } = body;
+  const store_id = await resolveStoreId(req, body.store_id ?? null); // 세션 강제 (2026-07-14)
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
-  if (!store_id || !product_name || !check_date) {
+  if (!product_name || !check_date) {
     return NextResponse.json({ error: "필수 항목 누락" }, { status: 400 });
   }
 
@@ -102,7 +105,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id 필요" }, { status: 400 });
+  const sessionStoreId = await resolveStoreId(req, null); // 소유권 검증 (2026-07-14)
+  if (!sessionStoreId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
-  await db.execute({ sql: "DELETE FROM sellfit_competitor_tracking WHERE id = ?", args: [id] });
+  await db.execute({ sql: "DELETE FROM sellfit_competitor_tracking WHERE id = ? AND store_id = ?", args: [id, sessionStoreId] });
   return NextResponse.json({ ok: true });
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 // 마진: (price - purchase_price) / price × 100 → score = min(100, pct × 2)
@@ -38,7 +39,7 @@ function channelScore(kw: string, price: number): number {
 }
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   if (!storeId) return NextResponse.json({ items: [] });
   try {
     const res = await db.execute({
@@ -88,11 +89,13 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { store_id, product_id, margin_score, channel_score } = await req.json() as {
+    const { store_id: clientStoreId, product_id, margin_score, channel_score } = await req.json() as {
       store_id: string; product_id: string; margin_score?: number; channel_score?: number;
     };
-    if (!store_id || !product_id) {
-      return NextResponse.json({ error: "store_id, product_id 필수" }, { status: 400 });
+    const store_id = await resolveStoreId(req, clientStoreId ?? null); // 세션 강제 (2026-07-14)
+    if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
+    if (!product_id) {
+      return NextResponse.json({ error: "product_id 필수" }, { status: 400 });
     }
 
     await db.execute(`CREATE TABLE IF NOT EXISTS sellfit_discover_overrides (

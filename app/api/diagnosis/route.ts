@@ -1,12 +1,13 @@
 export const maxDuration = 30;
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 // 오늘의 진단 조회
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
-  if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
+  if (!storeId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 
@@ -69,14 +70,16 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { report_id, defended_amount } = await req.json();
   if (!report_id) return NextResponse.json({ error: "report_id 필요" }, { status: 400 });
+  const sessionStoreId = await resolveStoreId(req, null); // 소유권 검증 (2026-07-14)
+  if (!sessionStoreId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const amount = Number(defended_amount) || 0;
   await db.execute({
     sql: `UPDATE sellfit_daily_reports
           SET actions_completed = actions_completed + 1,
               defended_amount = defended_amount + ?
-          WHERE id = ?`,
-    args: [amount, report_id],
+          WHERE id = ? AND store_id = ?`,
+    args: [amount, report_id, sessionStoreId],
   });
 
   // 업데이트된 누적값 반환

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
-  const store_id = req.nextUrl.searchParams.get("store_id");
-  if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const store_id = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   // 고객별 집계: avg_order_value, order_count, order_nos, 식별 정보
   const res = await db.execute({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 // product_name 키워드로 heatmap 4개 카테고리 판매량 집계
@@ -10,7 +11,7 @@ const KW_MAP: Record<string, string[]> = {
 };
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   if (!storeId) return NextResponse.json({ sales: {} });
   try {
     const res = await db.execute({

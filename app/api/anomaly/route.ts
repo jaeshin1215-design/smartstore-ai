@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isolationForest } from "@/lib/isolationForest";
 
 export async function GET(req: NextRequest) {
-  const store_id     = req.nextUrl.searchParams.get("store_id");
+  const store_id = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   const contamination = parseFloat(req.nextUrl.searchParams.get("contamination") ?? "0.05");
 
-  if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const res = await db.execute({
     sql: "SELECT id, name, matrix_x, matrix_y, price, purchase_price FROM sellfit_products WHERE store_id = ?",

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 // 아이템 6: 활성 discover_cards 조회 → DiscoverTab 발굴현황에 편입
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   if (!storeId) return NextResponse.json({ cards: [] });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -38,9 +39,11 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const { id, status } = await req.json() as { id: number; status: "dismissed" | "acted" };
+    const sessionStoreId = await resolveStoreId(req, null); // 소유권 검증 (2026-07-14)
+    if (!sessionStoreId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
     await db.execute({
-      sql: `UPDATE sellfit_discover_cards SET status = ? WHERE id = ?`,
-      args: [status, id],
+      sql: `UPDATE sellfit_discover_cards SET status = ? WHERE id = ? AND store_id = ?`,
+      args: [status, id, sessionStoreId],
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

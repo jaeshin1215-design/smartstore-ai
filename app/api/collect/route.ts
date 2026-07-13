@@ -1,6 +1,7 @@
 export const maxDuration = 30;
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 
@@ -82,8 +83,9 @@ async function fetchCompetitors(keyword: string): Promise<number> {
 }
 
 export async function POST(req: NextRequest) {
-  const { store_id } = await req.json();
-  if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const body = await req.json();
+  const store_id = await resolveStoreId(req, body.store_id ?? null); // 세션 강제 (2026-07-14)
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   // 등록된 상품 목록 조회
   const result = await db.execute({
@@ -125,8 +127,8 @@ export async function POST(req: NextRequest) {
 
 // GET: 최근 수집 데이터 조회
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
-  if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
+  if (!storeId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   const result = await db.execute({
     sql: `SELECT m.*, p.name, p.keyword, p.category, p.is_own

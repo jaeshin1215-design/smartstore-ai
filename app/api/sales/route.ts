@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveStoreId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
 
@@ -21,8 +22,8 @@ async function ensureTable() {
 
 // 최근 매출 조회
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id");
-  if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
+  if (!storeId) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   await ensureTable();
 
@@ -37,8 +38,9 @@ export async function GET(req: NextRequest) {
 
 // 매출 입력
 export async function POST(req: NextRequest) {
-  const { store_id, revenue, ad_cost, action_result } = await req.json();
-  if (!store_id) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
+  const { revenue, ad_cost, action_result, ...rest } = await req.json();
+  const store_id = await resolveStoreId(req, rest.store_id ?? null); // 세션 강제 (2026-07-14)
+  if (!store_id) return NextResponse.json({ error: "인증 필요" }, { status: 401 });
 
   await ensureTable();
 
