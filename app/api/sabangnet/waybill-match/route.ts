@@ -14,21 +14,43 @@ import { getSession, requireIntegrationStore } from "@/lib/auth";
 
 const has = (v: string | null | undefined) => v != null && String(v).trim() !== "";
 
+// 교차 매칭 대상 물류처 — 정확히 이 두 문자열만 (패턴/접두사 금지, 2026-07-14 심유나 프로 확정)
+const CROSS_MATCH_LOGISTICS = new Set(["오포물류", "오포_카노위탁"]);
+// 주문번호 몸통 — 분리 suffix(-1, _2 등) 제거. 없으면 원본 그대로.
+const orderBody = (shopOrdNo: string | null | undefined) => String(shopOrdNo ?? "").replace(/[-_]\d+$/, "").trim();
+
 interface FilledRow {
   sbOrdNo: string;
   waybillNo: string;
   receiverNm: string; // 이름은 원본 표시 허용 (마스킹 규칙 확정본)
   productAbbr: string;
   logisticsNm: string; // 물류처명 — 업로드 전 업체별 확인용 (2026-07-14 심유나 프로)
+  matched: true;       // 합배송 추정 자동매칭 결과 — UI 배경색 표시(눈으로 최종 확인)
 }
 
+// 매칭 규칙(T1+T4): 물류처 ∈ {오포물류, 오포_카노위탁}인 건만 대상(교차 매칭 허용).
+// [주문번호 몸통 동일] OR [주소+수취인 동일] 이면 같은 그룹 → 송장있는 행 값을 없는 행에 복사.
+// 그 외 물류처는 현행대로 직접 입력 유지(매칭 제외).
 function matchWaybills(orders: SabangnetOrder[]) {
-  const groups = new Map<string, SabangnetOrder[]>();
-  for (const o of orders) {
-    const key = `${o.RECEIVER_NM ?? ""}|${o.SHOP_ORD_NO ?? ""}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(o);
-  }
+  const pool = orders.filter((o) => CROSS_MATCH_LOGISTICS.has(String(o.LOGISTICS_NM ?? "")));
+
+  // Union-Find로 두 키(주문번호 몸통 / 주소+수취인)를 OR 병합
+  const parent = pool.map((_, i) => i);
+  const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a: number, b: number) => { parent[find(a)] = find(b); };
+
+  const byOrder = new Map<string, number>();
+  const byAddr = new Map<string, number>();
+  pool.forEach((o, i) => {
+    const ob = orderBody(o.SHOP_ORD_NO);
+    if (ob) { const prev = byOrder.get(ob); if (prev != null) union(i, prev); else byOrder.set(ob, i); }
+    const addr = String(o.RECEIVER_ADDR ?? "").trim();
+    const nm = String(o.RECEIVER_NM ?? "").trim();
+    if (addr && nm) { const ak = `${addr}|${nm}`; const prev = byAddr.get(ak); if (prev != null) union(i, prev); else byAddr.set(ak, i); }
+  });
+
+  const groups = new Map<number, SabangnetOrder[]>();
+  pool.forEach((o, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r)!.push(o); });
 
   const filled: FilledRow[] = [];
   let fillableGroups = 0;
@@ -45,6 +67,7 @@ function matchWaybills(orders: SabangnetOrder[]) {
         receiverNm: m.RECEIVER_NM ?? "",
         productAbbr: m.PRD_ABBR ?? "",
         logisticsNm: m.LOGISTICS_NM ?? "",
+        matched: true,
       });
     }
   }

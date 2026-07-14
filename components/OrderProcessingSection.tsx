@@ -1,8 +1,8 @@
 "use client";
 
 // Inbox > 발주 처리 — 심유나 프로 수작업 대체 수도꼭지 2개 (2026-07-09)
-// 수도꼭지 1: 신규주문 → CJ 송장 엑셀 (13컬럼 A~M)
-// 수도꼭지 2: 세트분리 송장 매칭 → 사방넷 업로드용 3컬럼 파일
+// 수도꼭지 1: 미발주 주문 → CJ 송장 엑셀 (14열 A~N)
+// 수도꼭지 2: 오포물류/오포_카노위탁 교차 송장 매칭 → 사방넷 업로드용 3컬럼 파일
 // 디자인: 텍스트 흑/회색·흰 배경·카드 1px 보더 + 0 2px 8px rgba(0,0,0,0.04)·버튼만 핑크
 
 import { useState } from "react";
@@ -21,7 +21,7 @@ interface MatchSummary {
   multi_groups: number;
   fillable_groups: number;
   filled_rows: number;
-  preview: { sbOrdNo: string; waybillNo: string; receiverNm: string; productAbbr: string }[];
+  preview: { sbOrdNo: string; waybillNo: string; receiverNm: string; productAbbr: string; logisticsNm: string; matched?: boolean }[];
 }
 
 interface CjSummary {
@@ -139,7 +139,7 @@ export default function OrderProcessingSection() {
       <div style={CARD}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>CJ 송장 엑셀 생성</div>
         <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
-          사방넷 주문을 CJ 송장프로그램 업로드 양식(13컬럼: 물류처명·수취인·주소·…·우편번호)으로 변환합니다.
+          사방넷 주문을 CJ 송장프로그램 업로드 양식(14열 A~N: 물류처명·수취인·주소·…·우편번호)으로 변환합니다.
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={handleCjPreview} disabled={cjPreviewLoading}
@@ -234,25 +234,31 @@ export default function OrderProcessingSection() {
               </span>
             </div>
             {summary.filled_rows > 0 && (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                  <tr style={{ borderTop: "1px solid #e8eaed", borderBottom: "1px solid #e8eaed" }}>
-                    {["사방넷주문번호", "채워질 운송장번호", "수취인", "상품약어"].map((h) => (
-                      <th key={h} style={{ textAlign: "left", padding: "8px 16px", fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.preview.map((p, i) => (
-                    <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: "8px 16px", color: "#374151" }}>{p.sbOrdNo}</td>
-                      <td style={{ padding: "8px 16px", color: "#374151" }}>{p.waybillNo}</td>
-                      <td style={{ padding: "8px 16px", color: "#374151" }}>{p.receiverNm}</td>
-                      <td style={{ padding: "8px 16px", color: "#6b7280" }}>{p.productAbbr}</td>
+              <>
+                <div style={{ padding: "8px 16px", background: "#fff7ed", borderBottom: "1px solid #fed7aa", fontSize: 11, color: "#c2410c", lineHeight: 1.6 }}>
+                  🟠 색표시 = 오포물류·오포_카노위탁 교차 합배송 <b>추정</b> 자동매칭 — 100% 단정 아님, 업로드 전 눈으로 최종 확인하세요.
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderTop: "1px solid #e8eaed", borderBottom: "1px solid #e8eaed" }}>
+                      {["사방넷주문번호", "채워질 운송장번호", "수취인", "물류처", "상품약어"].map((h) => (
+                        <th key={h} style={{ textAlign: "left", padding: "8px 16px", fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {summary.preview.map((p, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", background: p.matched ? "#fff7ed" : "#fff" }}>
+                        <td style={{ padding: "8px 16px", color: "#374151" }}>{p.sbOrdNo}</td>
+                        <td style={{ padding: "8px 16px", color: "#374151" }}>{p.waybillNo}</td>
+                        <td style={{ padding: "8px 16px", color: "#374151" }}>{p.receiverNm}</td>
+                        <td style={{ padding: "8px 16px", color: "#6b7280" }}>{p.logisticsNm}</td>
+                        <td style={{ padding: "8px 16px", color: "#6b7280" }}>{p.productAbbr}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             )}
           </div>
         )}

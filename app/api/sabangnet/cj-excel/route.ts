@@ -10,13 +10,14 @@ import { maskPhone, maskAddr } from "@/lib/privacy";
 
 // 수도꼭지 1 — 미발주 주문 → CJ 송장프로그램 업로드 엑셀
 // 원본 개인정보는 이 다운로드 파일에만 담긴다 (화면 표시는 마스킹 원칙)
-// 포맷 통일 A~M (2026-07-14 심유나 프로 확정):
+// 포맷 통일 A~N 14열 (2026-07-14 심유나 프로 실제 양식 확정):
 //   A 물류처명 / B 수취인 / C 주소 / D 수취인전화번호 / E 수취인핸드폰번호 /
-//   F (빈칸·박스크기 수기입력용, SellFit이 채우지 않음) / G 수량(EA) / H 상품명 /
-//   I 배송메시지 / J 쇼핑몰주문번호 / K 매출처명 / L 주문번호 / M 우편번호
+//   F (빈칸·박스크기 수기입력용) / G 수량(EA) / H (빈칸·수기입력용) / I 상품명 /
+//   J 배송메시지 / K 쇼핑몰주문번호 / L 매출처명 / M 주문번호 / N 우편번호
+//   ※ F·H 빈열은 SellFit이 채우지 않는다 (심유나 프로 수기입력용)
 const HEADERS = [
   "물류처명", "수취인", "주소", "수취인전화번호", "수취인핸드폰번호", "",
-  "수량", "상품명", "배송메시지", "쇼핑몰주문번호", "매출처명", "주문번호", "우편번호",
+  "수량", "", "상품명", "배송메시지", "쇼핑몰주문번호", "매출처명", "주문번호", "우편번호",
 ] as const;
 
 export async function GET(req: NextRequest) {
@@ -71,12 +72,13 @@ export async function GET(req: NextRequest) {
       normalizePhone(o.RECEIVER_CEL) || normalizePhone(o.RECEIVER_TEL), // E 수취인핸드폰번호
       "",                                                          // F 빈칸(박스크기 수기입력)
       String(o.CM_EA ?? ""),                                       // G 수량(EA)
-      composeProductName(o),                                       // H 상품명
-      o.DELIVERY_MSG ?? "",                                        // I 배송메시지
-      o.SHOP_ORD_NO ?? "",                                         // J 쇼핑몰주문번호
-      o.SHOP_NM ?? "",                                             // K 매출처명
-      o.SB_ORD_NO ?? "",                                           // L 주문번호
-      String(o.RECEIVER_ZIPCODE ?? ""),                           // M 우편번호
+      "",                                                          // H 빈칸(수기입력)
+      composeProductName(o),                                       // I 상품명
+      o.DELIVERY_MSG ?? "",                                        // J 배송메시지
+      o.SHOP_ORD_NO ?? "",                                         // K 쇼핑몰주문번호
+      o.SHOP_NM ?? "",                                             // L 매출처명
+      o.SB_ORD_NO ?? "",                                           // M 주문번호
+      String(o.RECEIVER_ZIPCODE ?? ""),                           // N 우편번호
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet([[...HEADERS], ...rows]);
