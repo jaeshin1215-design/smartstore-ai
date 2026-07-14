@@ -2,7 +2,7 @@
 
 // Inbox > 발주 처리 — 심유나 프로 수작업 대체 수도꼭지 2개 (2026-07-09)
 // 수도꼭지 1: 오늘 주문 → CJ 송장 엑셀 (11컬럼)
-// 수도꼭지 2: 세트분리 송장 매칭 → 사방넷 업로드용 2컬럼 파일
+// 수도꼭지 2: 세트분리 송장 매칭 → 사방넷 업로드용 3컬럼 파일
 // 디자인: 텍스트 흑/회색·흰 배경·카드 1px 보더 + 0 2px 8px rgba(0,0,0,0.04)·버튼만 핑크
 
 import { useState } from "react";
@@ -204,7 +204,7 @@ export default function OrderProcessingSection() {
         <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>세트분리 송장 매칭</div>
         <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
           수취인+쇼핑몰주문번호가 같은 그룹에서 송장번호 있는 행의 값을 없는 행에 채웁니다.
-          결과는 사방넷 업로드용 2컬럼(사방넷주문번호·운송장번호) 파일로 내려받습니다.
+          결과는 사방넷 업로드용 3컬럼(사방넷주문번호·운송장번호·물류처명) 파일로 내려받습니다.
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={handleMatchSummary} disabled={matchLoading}
