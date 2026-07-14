@@ -1,7 +1,7 @@
 "use client";
 
 // Inbox > 발주 처리 — 심유나 프로 수작업 대체 수도꼭지 2개 (2026-07-09)
-// 수도꼭지 1: 오늘 주문 → CJ 송장 엑셀 (11컬럼)
+// 수도꼭지 1: 신규주문 → CJ 송장 엑셀 (13컬럼 A~M)
 // 수도꼭지 2: 세트분리 송장 매칭 → 사방넷 업로드용 3컬럼 파일
 // 디자인: 텍스트 흑/회색·흰 배경·카드 1px 보더 + 0 2px 8px rgba(0,0,0,0.04)·버튼만 핑크
 
@@ -139,8 +139,7 @@ export default function OrderProcessingSection() {
       <div style={CARD}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>CJ 송장 엑셀 생성</div>
         <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
-          사방넷 주문을 CJ 송장프로그램 업로드 양식(11컬럼)으로 변환합니다.
-          수취인·주소·전화·수량·상품명·배송메시지·쇼핑몰주문번호·매출처명·주문번호·우편번호.
+          사방넷 주문을 CJ 송장프로그램 업로드 양식(13컬럼: 물류처명·수취인·주소·…·우편번호)으로 변환합니다.
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={handleCjPreview} disabled={cjPreviewLoading}
@@ -195,7 +194,7 @@ export default function OrderProcessingSection() {
         )}
         {cjMsg && <Msg msg={cjMsg} />}
         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 10 }}>
-          수량=주문수량(ORD_CNT)·상품명=상품약어+옵션 — 임시 확정, 심유나 프로 확인 후 조정 가능
+          수량=실출고수량(CM_EA)·상품명=상품약어+옵션 — 심유나 프로 확인 완료
         </div>
       </div>
 
