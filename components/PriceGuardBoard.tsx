@@ -22,6 +22,8 @@ interface BoardRow {
   margin_pct: number | null;
   margin_dropped: boolean;
   level: "안전" | "주의" | "위험" | null;
+  margin_warn_pct: number | null;
+  margin_danger_pct: number | null;
   is_item_winner: number | null;
   last_checked_at: string | null;
   history: HistoryPoint[];
@@ -60,12 +62,24 @@ function Sparkline({ history, color }: { history: HistoryPoint[]; color: string 
   );
 }
 
-function DetailChart({ history, supplyPrice }: { history: HistoryPoint[]; supplyPrice: number | null }) {
+// 스팟(변곡점) 판정 — 직전 대비 가격 방향이 바뀌는 지점 + 양 끝
+function isSpot(pts: HistoryPoint[], i: number): boolean {
+  if (i === 0 || i === pts.length - 1) return true;
+  const a = pts[i - 1].price, b = pts[i].price, c = pts[i + 1].price;
+  return (b - a) === 0 || Math.sign(b - a) !== Math.sign(c - b);
+}
+
+function shortDate(d: string) { const m = d.match(/(\d{2})-(\d{2})$/); return m ? `${m[1]}/${m[2]}` : d; }
+
+function DetailChart({ history, supplyPrice, marginWarn, marginDanger }: { history: HistoryPoint[]; supplyPrice: number | null; marginWarn: number | null; marginDanger: number | null }) {
   const points = history.slice(-30);
+  const [activeIdx, setActiveIdx] = useState<number | null>(null); // 툴팁 대상 (호버/탭)
+  const [showTable, setShowTable] = useState(false);
+
   if (points.length < 2) {
     return <div style={{ fontSize: 12, color: "#9ca3af", padding: "16px 0" }}>그래프는 2일 이상 수집 후 표시됩니다.</div>;
   }
-  const w = 560, h = 140, padX = 44, padY = 16;
+  const w = 560, h = 150, padX = 44, padY = 20;
   const prices = points.map(p => p.price);
   const min = Math.min(...prices, supplyPrice ?? Infinity);
   const max = Math.max(...prices);
@@ -73,27 +87,105 @@ function DetailChart({ history, supplyPrice }: { history: HistoryPoint[]; supply
   const x = (i: number) => padX + (i / (points.length - 1)) * (w - padX - 12);
   const y = (v: number) => padY + (1 - (v - min) / range) * (h - padY * 2);
   const line = points.map((p, i) => `${x(i)},${y(p.price)}`).join(" ");
+
+  // 마진율이 판정선(주의/위험) 아래인지
+  const belowThreshold = (m: number | null) =>
+    m != null && ((marginDanger != null && m < marginDanger) || (marginWarn != null && m < marginWarn));
+
+  const at = activeIdx != null ? points[activeIdx] : null;
+
   return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} style={{ display: "block" }}>
-      {/* 공급가 기준선 — 라벨은 우측 끝 (좌측 가격 라벨과 겹침 방지) */}
-      {supplyPrice != null && supplyPrice >= min && supplyPrice <= max && (
-        <>
-          <line x1={padX} y1={y(supplyPrice)} x2={w - 12} y2={y(supplyPrice)} stroke="#c0c4cc" strokeDasharray="4 3" strokeWidth={1} />
-          <text x={w - 12} y={y(supplyPrice) - 4} fontSize={10} fill="#9ca3af" textAnchor="end">
-            공급가 {supplyPrice.toLocaleString()}
-          </text>
-        </>
+    <div>
+      <svg width="100%" viewBox={`0 0 ${w} ${h}`} style={{ display: "block" }}
+        onMouseLeave={() => setActiveIdx(null)}>
+        {/* 공급가 기준선 */}
+        {supplyPrice != null && supplyPrice >= min && supplyPrice <= max && (
+          <>
+            <line x1={padX} y1={y(supplyPrice)} x2={w - 12} y2={y(supplyPrice)} stroke="#c0c4cc" strokeDasharray="4 3" strokeWidth={1} />
+            <text x={w - 12} y={y(supplyPrice) - 4} fontSize={10} fill="#9ca3af" textAnchor="end">공급가 {supplyPrice.toLocaleString()}</text>
+          </>
+        )}
+        <polyline points={line} fill="none" stroke="#ef567c" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+
+        {/* 데이터 포인트 — 스팟은 크게, 활성 포인트 강조. 호버/탭 히트영역 넓게 */}
+        {points.map((p, i) => {
+          const spot = isSpot(points, i);
+          const active = activeIdx === i;
+          return (
+            <g key={i}>
+              <circle cx={x(i)} cy={y(p.price)} r={active ? 5 : spot ? 3.5 : 2.5}
+                fill={belowThreshold(p.margin_pct) ? "#dc2626" : "#ef567c"}
+                stroke={active ? "#fff" : "none"} strokeWidth={active ? 1.5 : 0} />
+              {/* 넓은 투명 히트영역 (호버/탭) */}
+              <circle cx={x(i)} cy={y(p.price)} r={12} fill="transparent" style={{ cursor: "pointer" }}
+                onMouseEnter={() => setActiveIdx(i)} onClick={() => setActiveIdx(active ? null : i)} />
+            </g>
+          );
+        })}
+
+        {/* 최소·최대 라벨 */}
+        <text x={0} y={y(max) + 4} fontSize={10} fill="#6b7280">{max.toLocaleString()}</text>
+        {(supplyPrice == null || Math.abs(y(min) - y(supplyPrice)) > 12) && (
+          <text x={0} y={y(min) + 4} fontSize={10} fill="#6b7280">{min.toLocaleString()}</text>
+        )}
+
+        {/* 툴팁 — 활성 포인트: 일자·판매가·마진율 (수수료율은 답변 후 추가 예정) */}
+        {at && (() => {
+          const tx = Math.min(Math.max(x(activeIdx!) - 52, 2), w - 108);
+          const ty = Math.max(y(at.price) - 52, 2);
+          return (
+            <g pointerEvents="none">
+              <line x1={x(activeIdx!)} y1={padY} x2={x(activeIdx!)} y2={h - padY} stroke="#e5e7eb" strokeWidth={1} />
+              <rect x={tx} y={ty} width={106} height={44} rx={6} fill="#111827" opacity={0.92} />
+              <text x={tx + 8} y={ty + 15} fontSize={10} fill="#fff" fontWeight={700}>{shortDate(at.check_date)}</text>
+              <text x={tx + 8} y={ty + 28} fontSize={10} fill="#e5e7eb">판매가 {at.price.toLocaleString()}원</text>
+              <text x={tx + 8} y={ty + 39} fontSize={10} fill={belowThreshold(at.margin_pct) ? "#fca5a5" : "#86efac"}>
+                마진율 {at.margin_pct != null ? `${at.margin_pct}%` : "—"}
+              </text>
+            </g>
+          );
+        })()}
+      </svg>
+
+      {/* 접이식 가격 이력 테이블 — 협상 근거 스크린샷용 */}
+      <button onClick={() => setShowTable(v => !v)}
+        style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: "#6b7280", background: "none", border: "1px solid #e8eaed", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+        {showTable ? "이력 접기 ▲" : "이력 보기 ▼"}
+      </button>
+      {showTable && (
+        <div style={{ overflowX: "auto", marginTop: 10, border: "1px solid #eef0f2", borderRadius: 8 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e8eaed" }}>
+                {["일자", "판매가", "전일대비", "마진율"].map(hd => (
+                  <th key={hd} style={{ textAlign: hd === "일자" ? "left" : "right", padding: "7px 12px", fontSize: 10, color: "#9ca3af", fontWeight: 600, letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{hd}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {points.slice().reverse().map((p, ri) => {
+                const idx = points.length - 1 - ri;
+                const prev = idx > 0 ? points[idx - 1].price : null;
+                const diff = prev != null ? p.price - prev : null;
+                const below = belowThreshold(p.margin_pct);
+                return (
+                  <tr key={p.check_date} style={{ borderBottom: "1px solid #f3f4f6", background: below ? "#fff1f2" : "#fff" }}>
+                    <td style={{ padding: "7px 12px", color: "#374151", whiteSpace: "nowrap" }}>{shortDate(p.check_date)}</td>
+                    <td style={{ padding: "7px 12px", textAlign: "right", color: "#0f2a1e", fontWeight: 600, whiteSpace: "nowrap" }}>{p.price.toLocaleString()}</td>
+                    <td style={{ padding: "7px 12px", textAlign: "right", whiteSpace: "nowrap", color: diff == null ? "#c0c4cc" : diff < 0 ? "#dc2626" : diff > 0 ? "#2563eb" : "#9ca3af" }}>
+                      {diff == null ? "—" : diff === 0 ? "0" : `${diff > 0 ? "+" : ""}${diff.toLocaleString()}`}
+                    </td>
+                    <td style={{ padding: "7px 12px", textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: below ? "#dc2626" : "#374151" }}>
+                      {p.margin_pct != null ? `${p.margin_pct}%` : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
-      <polyline points={line} fill="none" stroke="#ef567c" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      {points.map((p, i) => (
-        <circle key={i} cx={x(i)} cy={y(p.price)} r={2.5} fill="#ef567c" />
-      ))}
-      {/* 최소·최대 라벨 (공급가와 겹치면 생략) */}
-      <text x={0} y={y(max) + 4} fontSize={10} fill="#6b7280">{max.toLocaleString()}</text>
-      {(supplyPrice == null || Math.abs(y(min) - y(supplyPrice)) > 12) && (
-        <text x={0} y={y(min) + 4} fontSize={10} fill="#6b7280">{min.toLocaleString()}</text>
-      )}
-    </svg>
+    </div>
   );
 }
 
@@ -220,7 +312,7 @@ export default function PriceGuardBoard({ storeId }: { storeId: string }) {
                           <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1e", marginBottom: 8 }}>
                             판매가 변동 (최근 30일) — BM 광고비 협상 근거 화면
                           </div>
-                          <DetailChart history={r.history} supplyPrice={r.supply_price} />
+                          <DetailChart history={r.history} supplyPrice={r.supply_price} marginWarn={r.margin_warn_pct} marginDanger={r.margin_danger_pct} />
                           <div style={{ display: "flex", gap: 24, marginTop: 12, fontSize: 12, color: "#6b7280", flexWrap: "wrap" }}>
                             <span>
                               마진율 추이:{" "}

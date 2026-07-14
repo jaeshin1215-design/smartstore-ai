@@ -81,6 +81,8 @@ interface BoardRow {
   margin_pct: number | null;
   margin_dropped: boolean; // 직전 캡처 대비 마진율 하락 여부 (▼ 표시)
   level: SafetyLevel | null;
+  margin_warn_pct: number | null;   // 이력 테이블 강조 기준 (판정 로직 무변경, 표시용 전달)
+  margin_danger_pct: number | null;
   is_item_winner: number | null;
   last_checked_at: string | null;
   history: { check_date: string; price: number; margin_pct: number | null }[];
@@ -162,6 +164,8 @@ export async function GET(req: NextRequest) {
       margin_pct: marginPct,
       margin_dropped: marginDropped,
       level: judgeMargin(marginPct, warnPct, dangerPct),
+      margin_warn_pct: warnPct,
+      margin_danger_pct: dangerPct,
       is_item_winner: itemWinner,
       last_checked_at: latest ? String(latest.captured_at) : null,
       history,
