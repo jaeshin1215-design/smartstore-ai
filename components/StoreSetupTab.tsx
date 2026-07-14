@@ -221,7 +221,7 @@ export default function StoreSetupTab() {
     if (url && /sourceType=srp_product_ads/.test(url)) {
       const go = window.confirm(
         "이 주소는 쿠팡 광고 링크입니다 (sourceType=srp_product_ads).\n" +
-        "가담다/이지스토리 판매 상품이 맞는지 확인하셨나요?\n" +
+        "내 스토어 판매 상품이 맞는지 확인하셨나요?\n" +
         "다른 판매자 상품이면 그 판매자의 가격을 추적하게 됩니다.\n\n그대로 저장할까요?"
       );
       if (!go) { return; } // 편집창·입력 유지
@@ -378,7 +378,7 @@ export default function StoreSetupTab() {
             <div style={{ display: "grid", gap: 14 }}>
               <div>
                 <span style={S.label}>스토어 이름 *</span>
-                <input style={S.input} placeholder="예) 이지스토리"
+                <input style={S.input} placeholder="예) 우리집리빙"
                   value={storeName} onChange={e => setStoreName(e.target.value)} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
