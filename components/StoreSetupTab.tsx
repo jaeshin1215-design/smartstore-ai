@@ -777,7 +777,7 @@ export default function StoreSetupTab() {
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
                 <div>
                   <span style={S.label}>상품명 *</span>
-                  <input style={S.input} placeholder="예) 이지백 프리미엄 압축팩 10L"
+                  <input style={S.input} placeholder="예) 프리미엄 압축팩 10L"
                     value={pName} onChange={e => setPName(e.target.value)} />
                 </div>
                 <div>

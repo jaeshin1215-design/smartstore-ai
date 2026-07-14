@@ -51,7 +51,7 @@ const CHANNEL_RULES: Array<{re:RegExp;score:number;reason:string}> = [
   {re:/물놀이|수영|튜브|물총|아쿠아|해수욕|비치|워터파크|수영복|래쉬가드/, score:80, reason:"물놀이 — 여름 시즌 집중 수요"},
   {re:/캠핑|텐트|등산|아웃도어|트레킹|백팩|타프|랜턴|버너|코펠|해먹/, score:78, reason:"캠핑·아웃도어 — 봄·여름 시즌 수요"},
   {re:/핫팩|손난로|방한|귀마개|목도리/, score:78, reason:"방한 소품 — 시즌 수요 명확"},
-  {re:/다리미판|다리미|압축팩|유아매트|화분|다육/, score:76, reason:"이지스토리 핵심 카테고리 — 채널 검증됨"},
+  {re:/다리미판|다리미|압축팩|유아매트|화분|다육/, score:76, reason:"생활·리빙 — 실거래 검증된 채널 조합"},
   {re:/전기장판|온수매트|전기히터|난방/, score:75, reason:"계절 가전 — 시즌 집중 매출"},
   {re:/패딩|점퍼|자켓|코트|가디건|니트|옷|의류/, score:70, reason:"의류 — 반품률 관리 필요"},
   {re:/신발|운동화|샌들|슬리퍼/, score:60, reason:"신발 — 사이즈 반품 주의"},
@@ -648,7 +648,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
           {baselineItems.length>0&&(
             <>
               <div style={{ borderTop:"1px solid #e8eaed", margin:"12px 0 8px" }}/>
-              <p style={{ fontSize:"10px", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", color:"#9ca3af", margin:"0 0 6px" }}>이지스토리 상품</p>
+              <p style={{ fontSize:"10px", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", color:"#9ca3af", margin:"0 0 6px" }}>내 상품</p>
               <div style={{ maxHeight:"320px", overflowY:"auto" }}>
                 {(()=>{
                   const groups=baselineItems.reduce((acc,item)=>{

@@ -66,7 +66,7 @@ function InputCard({
       <div style={{ display: "grid", gap: 12 }}>
         <div>
           <span style={S.label}>상품명 *</span>
-          <input style={S.input} placeholder="예) 이지백 프리미엄 압축팩 10L"
+          <input style={S.input} placeholder="예) 프리미엄 압축팩 10L"
             value={data.name} onChange={e => onChange("name", e.target.value)} />
         </div>
         <div>
