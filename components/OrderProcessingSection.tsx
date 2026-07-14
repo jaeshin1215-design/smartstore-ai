@@ -49,11 +49,11 @@ export default function OrderProcessingSection() {
   const compact = date.replace(/-/g, "");
   const storeId = typeof window !== "undefined" ? localStorage.getItem("sellfit_store_id") ?? "" : "";
 
-  async function downloadFile(url: string): Promise<{ ok: boolean; rows?: string; error?: string }> {
+  async function downloadFile(url: string): Promise<{ ok: boolean; rows?: string; error?: string; empty?: boolean }> {
     const res = await fetch(url);
     if (!res.ok) {
       const j = await res.json().catch(() => null);
-      return { ok: false, error: j?.error ?? `HTTP ${res.status}` };
+      return { ok: false, error: j?.error ?? `HTTP ${res.status}`, empty: j?.empty === true };
     }
     const blob = await res.blob();
     const cd = res.headers.get("Content-Disposition") ?? "";
@@ -74,7 +74,7 @@ export default function OrderProcessingSection() {
     try {
       const res = await fetch(`/api/sabangnet/cj-excel?date=${compact}&format=json`);
       const j = await res.json();
-      if (!res.ok) setCjMsg({ ok: false, text: j.error ?? `HTTP ${res.status}` });
+      if (!res.ok) setCjMsg({ ok: j.empty === true, text: j.error ?? `HTTP ${res.status}` }); // 0건은 안내
       else setCjSummary(j);
     } catch { setCjMsg({ ok: false, text: "네트워크 오류" }); }
     setCjPreviewLoading(false);
@@ -86,7 +86,7 @@ export default function OrderProcessingSection() {
     const r = await downloadFile(`/api/sabangnet/cj-excel?date=${compact}&store_id=${storeId}`);
     setCjMsg(r.ok
       ? { ok: true, text: `다운로드 완료 — ${r.rows}건 (${compact}_주문서확인처리_@cj택배.xlsx)` }
-      : { ok: false, text: r.error ?? "실패" });
+      : { ok: r.empty === true, text: r.error ?? "실패" }); // 신규주문 0건은 안내(초록), 실오류만 빨강
     setCjLoading(false);
   }
 

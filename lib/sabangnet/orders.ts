@@ -74,6 +74,9 @@ export async function fetchSabangnetOrders(startDate: string, endDate: string, o
     });
     const text = await getWithBody(`${base}/v3/sb/order`, headers, body);
     const j = JSON.parse(text);
+    // 404 NOT_FOUND = 조건(상태 필터 등)에 맞는 주문 0건. 에러가 아니라 "결과 없음" →
+    // 빈 배열로 처리(500 방어, 2026-07-14). 그 외 비정상 코드만 throw.
+    if (String(j.code) === "404") break;
     if (String(j.code) !== "200") {
       throw new Error(`사방넷 주문 조회 실패 (code ${j.code}): ${String(j.message).substring(0, 120)}`);
     }

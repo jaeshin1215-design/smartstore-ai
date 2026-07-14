@@ -56,7 +56,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (orders.length === 0) {
-      return NextResponse.json({ error: `${date} 주문 없음` }, { status: 404 });
+      // 대상 상태(현재 신규주문 필터) 결과 0건 — 장애 아님, 안내로 처리 (2026-07-14)
+      return NextResponse.json({ error: "오늘 조회된 신규주문이 없습니다.", empty: true }, { status: 404 });
     }
 
     // A~M 매핑 — 전부 문자열로 (우편번호 앞자리 0 보존, 실측 148건 근거)
