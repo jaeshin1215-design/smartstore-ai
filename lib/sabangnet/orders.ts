@@ -4,10 +4,11 @@
 import { request as httpsRequest } from "node:https";
 import { fetchSabangnetToken } from "./auth";
 
-// STEP 0 프로브(2026-07-09)로 실재 확인된 21개 필드
-// + RECEIVER_CEL: 2026-07-13 프로브로 실재 확인 (심유나 프로 회신 — TEL/CEL 별도 컬럼)
+// STEP 0 프로브(2026-07-09)로 실재 확인된 필드
+// + RECEIVER_CEL: 2026-07-13 프로브 (심유나 프로 회신 — TEL/CEL 별도 컬럼)
+// + CM_EA: 2026-07-14 프로브 (실출고 수량 = ea 값, 심유나 프로 확정). ORD_CNT와 다름(세트 19/50건)
 export const ORDER_FIELDS = [
-  "SB_ORD_NO", "SHOP_ORD_NO", "ORDER_STATUS", "ORD_CNT", "EA",
+  "SB_ORD_NO", "SHOP_ORD_NO", "ORDER_STATUS", "ORD_CNT", "EA", "CM_EA",
   "CM_PRD_NM", "CM_SKU_NM", "PRD_ABBR", "CT_DELIVERY_COST",
   "RECEIVER_NM", "RECEIVER_TEL", "RECEIVER_CEL", "RECEIVER_ADDR", "RECEIVER_ZIPCODE",
   "DELIVERY_MSG", "WAYBILL_NO", "SHOP_NM", "LOGISTICS_NM",
@@ -43,8 +44,10 @@ function getWithBody(urlStr: string, headers: Record<string, string>, body: stri
  * 주문 목록 전체 조회 (페이징 자동 순회, 읽기 전용 — updateOrderStsYn=N 고정)
  * @param startDate yyyyMMdd
  * @param endDate   yyyyMMdd
+ * @param orderStatusList 주문상태 필터(배열). 예: ["ORDER_CONFIRM"]=미발주(송장없음)만.
+ *        생략 시 전체 상태. 2026-07-14 프로브로 배열형만 유효 확인(문자열은 400).
  */
-export async function fetchSabangnetOrders(startDate: string, endDate: string): Promise<SabangnetOrder[]> {
+export async function fetchSabangnetOrders(startDate: string, endDate: string, orderStatusList?: string[]): Promise<SabangnetOrder[]> {
   const base = process.env.SABANGNET_BASE_URL; // https://sellfit-proxy.fly.dev/sabangnet
   const acntId = process.env.SABANGNET_ACNT_ID; // 서비스코드 (mw65175)
   const proxySecret = process.env.SELLFIT_PROXY_SECRET;
@@ -67,6 +70,7 @@ export async function fetchSabangnetOrders(startDate: string, endDate: string): 
       page, perPage: 500,
       updateOrderStsYn: "N", // 절대 상태변경 없음 (읽기 전용)
       responseItems: ORDER_FIELDS,
+      ...(orderStatusList && orderStatusList.length ? { orderStatusList } : {}),
     });
     const text = await getWithBody(`${base}/v3/sb/order`, headers, body);
     const j = JSON.parse(text);

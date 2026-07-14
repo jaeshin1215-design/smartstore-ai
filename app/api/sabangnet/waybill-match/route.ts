@@ -19,6 +19,7 @@ interface FilledRow {
   waybillNo: string;
   receiverNm: string; // 이름은 원본 표시 허용 (마스킹 규칙 확정본)
   productAbbr: string;
+  logisticsNm: string; // 물류처명 — 업로드 전 업체별 확인용 (2026-07-14 심유나 프로)
 }
 
 function matchWaybills(orders: SabangnetOrder[]) {
@@ -43,6 +44,7 @@ function matchWaybills(orders: SabangnetOrder[]) {
         waybillNo: withWaybill.WAYBILL_NO!,
         receiverNm: m.RECEIVER_NM ?? "",
         productAbbr: m.PRD_ABBR ?? "",
+        logisticsNm: m.LOGISTICS_NM ?? "",
       });
     }
   }
@@ -94,9 +96,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "채울 송장이 없습니다 (매칭 0건)" }, { status: 404 });
     }
 
-    // 사방넷 업로드용 2컬럼 .xls (원본 파일 관례: cs사방넷_송장_업로드용_파일.xls)
-    const rows = result.filled.map((f) => [f.sbOrdNo, f.waybillNo]);
-    const ws = XLSX.utils.aoa_to_sheet([["사방넷주문번호", "운송장번호"], ...rows]);
+    // 사방넷 업로드용 .xls — 필수 2컬럼(A 사방넷주문번호 / B 운송장번호)은 위치 고정,
+    // 물류처명은 C열로 덧붙임(업로드 전 업체별 확인용, 2026-07-14 심유나 프로 요청).
+    // 사방넷 업로드가 앞 2열만 읽으므로 C열은 무해 — 첫 실업로드 시 재확인 권장.
+    const rows = result.filled.map((f) => [f.sbOrdNo, f.waybillNo, f.logisticsNm]);
+    const ws = XLSX.utils.aoa_to_sheet([["사방넷주문번호", "운송장번호", "물류처명"], ...rows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "송장업로드");
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xls" }) as Buffer;

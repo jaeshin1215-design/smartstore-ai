@@ -8,12 +8,15 @@ import { fetchSabangnetOrders, composeProductName, kstTodayCompact, normalizePho
 import { getSession, requireIntegrationStore } from "@/lib/auth";
 import { maskPhone, maskAddr } from "@/lib/privacy";
 
-// 수도꼭지 1 — 오늘 주문 → CJ 송장프로그램 업로드 엑셀 (11컬럼, 순서 고정)
+// 수도꼭지 1 — 미발주 주문 → CJ 송장프로그램 업로드 엑셀
 // 원본 개인정보는 이 다운로드 파일에만 담긴다 (화면 표시는 마스킹 원칙)
-
+// 포맷 통일 A~M (2026-07-14 심유나 프로 확정):
+//   A 물류처명 / B 수취인 / C 주소 / D 수취인전화번호 / E 수취인핸드폰번호 /
+//   F (빈칸·박스크기 수기입력용, SellFit이 채우지 않음) / G 수량(EA) / H 상품명 /
+//   I 배송메시지 / J 쇼핑몰주문번호 / K 매출처명 / L 주문번호 / M 우편번호
 const HEADERS = [
-  "수취인", "주소", "수취인전화번호", "수취인핸드폰번호", "수량", "상품명",
-  "배송메시지", "쇼핑몰주문번호", "매출처명", "주문번호", "우편번호",
+  "물류처명", "수취인", "주소", "수취인전화번호", "수취인핸드폰번호", "",
+  "수량", "상품명", "배송메시지", "쇼핑몰주문번호", "매출처명", "주문번호", "우편번호",
 ] as const;
 
 export async function GET(req: NextRequest) {
@@ -31,7 +34,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const orders = await fetchSabangnetOrders(date, date);
+    // 신규주문(=ORDER_CONFIRM, 송장 미발급 = 미발주)만 조회.
+    // 발주 완료건은 DELIVERY_WAITING 등으로 넘어가 재조회되지 않음 → 2차 발주 중복 방지
+    // (2026-07-14 프로브: ORDER_CONFIRM 21건 전부 송장없음, DELIVERY_WAITING 30건 전부 송장있음)
+    const orders = await fetchSabangnetOrders(date, date, ["ORDER_CONFIRM"]);
 
     // 미리보기 (화면 표시) — 전화·주소 마스킹 규칙 적용, 이름·상품명·주문번호는 원본 (2026-07-10)
     if (format === "json") {
@@ -52,22 +58,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `${date} 주문 없음` }, { status: 404 });
     }
 
-    // 11컬럼 매핑 — 전부 문자열로 (우편번호 앞자리 0 보존, 실측 148건 근거)
-    // 수취인핸드폰번호 = RECEIVER_CEL (2026-07-13 심유나 프로 회신 확정, 프로브로 필드 실재 확인).
-    // 사방넷이 빈 번호를 "- -" 더미로 주는 케이스 실측 → normalizePhone으로 정리하고,
-    // CEL이 실질 비면 TEL로 채움 (CJ 업로드 전화번호 빈칸 방지 — 기존 복제 동작 유지 취지)
+    // A~M 매핑 — 전부 문자열로 (우편번호 앞자리 0 보존, 실측 148건 근거)
+    // 수취인핸드폰번호 = RECEIVER_CEL (2026-07-13 확정), 빈 번호 "- -" 더미는 normalizePhone 정리,
+    //   CEL 실질 비면 TEL로 채움 (업로드 빈칸 방지)
+    // 수량 = CM_EA (실출고 수량, 2026-07-14 심유나 프로 확정 — ORD_CNT 아님)
+    // F열(index 5) = 박스크기 수기입력용 빈칸, SellFit이 채우지 않음
     const rows = orders.map((o) => [
-      o.RECEIVER_NM ?? "",
-      o.RECEIVER_ADDR ?? "",
-      normalizePhone(o.RECEIVER_TEL),
-      normalizePhone(o.RECEIVER_CEL) || normalizePhone(o.RECEIVER_TEL),
-      String(o.ORD_CNT ?? ""), // 임시 확정: ORD_CNT (최종은 심유나 프로 확인)
-      composeProductName(o),   // 실측 4/4 확정: PRD_ABBR + 옵션(단품 제외)
-      o.DELIVERY_MSG ?? "",
-      o.SHOP_ORD_NO ?? "",
-      o.SHOP_NM ?? "",
-      o.SB_ORD_NO ?? "",
-      String(o.RECEIVER_ZIPCODE ?? ""),
+      o.LOGISTICS_NM ?? "",                                          // A 물류처명
+      o.RECEIVER_NM ?? "",                                          // B 수취인
+      o.RECEIVER_ADDR ?? "",                                        // C 주소
+      normalizePhone(o.RECEIVER_TEL),                              // D 수취인전화번호
+      normalizePhone(o.RECEIVER_CEL) || normalizePhone(o.RECEIVER_TEL), // E 수취인핸드폰번호
+      "",                                                          // F 빈칸(박스크기 수기입력)
+      String(o.CM_EA ?? ""),                                       // G 수량(EA)
+      composeProductName(o),                                       // H 상품명
+      o.DELIVERY_MSG ?? "",                                        // I 배송메시지
+      o.SHOP_ORD_NO ?? "",                                         // J 쇼핑몰주문번호
+      o.SHOP_NM ?? "",                                             // K 매출처명
+      o.SB_ORD_NO ?? "",                                           // L 주문번호
+      String(o.RECEIVER_ZIPCODE ?? ""),                           // M 우편번호
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet([[...HEADERS], ...rows]);
