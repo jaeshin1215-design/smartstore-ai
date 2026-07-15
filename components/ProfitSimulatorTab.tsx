@@ -73,8 +73,8 @@ const IZ_PRESET: SimPreset = {
   dropBlockText: () => "73개를 한 번에 빼지 않습니다. 드롭하면 롱테일 매출이 20~40% 빠질 수 있습니다 (Grok 경고).",
   demoDrop: IZ_DROP,
   demoStar: IZ_STAR,
-  settlementMultipliers: { "띵샵": 0.88, "원룸만들기": 0.85, "현대홈쇼핑": 1.1, "블루베리": 0.85, "이모야킨지로": 0.8 },
-  settlementNote: "이모야킨지로 ×0.8 — 확인 필요 (지시서 명시) · Phase2: 사방넷 API 연동 시 업로드 단계 제거, 계산 로직 재사용",
+  settlementMultipliers: { "띵샵": 0.88, "원룸만들기": 0.85, "현대홈쇼핑": 1.1, "블루베리": 0.85, "이모야킨지로": 0.08 },
+  settlementNote: "이모야킨지로 ×0.08 — 확정 (2026-07-15 이다슬 프로 확인: 운영 수수료 매출 채널) · Phase2: 사방넷 API 연동 시 업로드 단계 제거, 계산 로직 재사용",
 };
 
 const GENERIC_PRESET: SimPreset = {
