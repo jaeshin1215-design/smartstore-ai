@@ -47,6 +47,13 @@ interface SimPreset {
   demoStar: Product[];
   settlementMultipliers: Record<string, number>;            // 채널별 정산 배율 (izStory 실측 / generic 없음)
   settlementNote: string;
+  // 이지스토리 정산 규칙 (izStory 전용, generic은 undefined → 규칙 미적용 = 표준 계산)
+  //   이다슬 프로 규칙서 원문 (2026-07-15 확정)
+  settlementRules?: {
+    swapMNChannels: string[];                    // 이 채널은 N_calc = rawN × 배율 (원룸만들기: M←rawN 스왑)
+    shippingMultipliers: Record<string, number>; // 배송비매출 G에 곱하는 배율 (스마트스토어 0.96 · 이모야킨지로 0)
+    crossLogistics: string[];                    // 물류처가 이 목록이 아니면 S·T·U=0 (오포물류 · 유비엘)
+  };
 }
 
 const IZ_DROP: Product[] = [
@@ -74,7 +81,12 @@ const IZ_PRESET: SimPreset = {
   demoDrop: IZ_DROP,
   demoStar: IZ_STAR,
   settlementMultipliers: { "띵샵": 0.88, "원룸만들기": 0.85, "현대홈쇼핑": 1.1, "블루베리": 0.85, "이모야킨지로": 0.08 },
-  settlementNote: "이모야킨지로 ×0.08 — 확정 (2026-07-15 이다슬 프로 확인: 운영 수수료 매출 채널) · Phase2: 사방넷 API 연동 시 업로드 단계 제거, 계산 로직 재사용",
+  settlementRules: {
+    swapMNChannels: ["원룸만들기"],
+    shippingMultipliers: { "스마트스토어": 0.96, "이모야킨지로": 0 },
+    crossLogistics: ["오포물류", "유비엘"],
+  },
+  settlementNote: "이다슬 규칙서 반영 — 특수 5종 N=M×배율(원룸만들기는 rawN×0.85) · 일반채널 N=rawN · 배송비 G=F/1.1(스마트스토어×0.96·이모야킨지로 0) · 원가측 R=P×Q/1.1·S·T(2%)·U(20%, V 미포함 표시만) · 물류처 예외(오포물류·유비엘 외 S·T·U=0) · 마진=AA−AB. ※ 마진 최종식은 우리 구성(검증 예정) · Phase2: 사방넷 API 연동 시 업로드 제거, 로직 재사용",
 };
 
 const GENERIC_PRESET: SimPreset = {
@@ -121,8 +133,12 @@ export default function ProfitSimulatorTab() {
   const [uploadedRows, setUploadedRows] = useState<Record<string, unknown>[]>([]);
   const [uploadCols, setUploadCols] = useState<string[]>([]);
   const [colChannel, setColChannel] = useState("");
-  const [colSaleAmt, setColSaleAmt] = useState("");
-  const [colCostAmt, setColCostAmt] = useState("");
+  const [colSaleAmt, setColSaleAmt] = useState("");   // M 판매가(VAT포함)
+  const [colCostAmt, setColCostAmt] = useState("");   // P 원가 단가(VAT포함)
+  const [colSupplyAmt, setColSupplyAmt] = useState(""); // N 공급가(선택 — 미선택 시 판매가로 폴백)
+  const [colShipping, setColShipping] = useState("");   // F 배송비 수집(선택 — 미선택 시 G=0)
+  const [colQty, setColQty] = useState("");             // Q 수량 EA(선택 — 미선택 시 1)
+  const [colLogistics, setColLogistics] = useState(""); // Y 물류처(선택 — 미선택 시 물류처 예외 미적용)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ③ 채널별 광고 집계
@@ -553,6 +569,7 @@ export default function ProfitSimulatorTab() {
                       setUploadedRows(rows);
                       setUploadCols(rows.length > 0 ? Object.keys(rows[0]) : []);
                       setColChannel(""); setColSaleAmt(""); setColCostAmt("");
+                      setColSupplyAmt(""); setColShipping(""); setColQty(""); setColLogistics("");
                     };
                     reader.readAsArrayBuffer(file);
                   }} />
@@ -568,12 +585,18 @@ export default function ProfitSimulatorTab() {
               {uploadCols.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "16px" }}>
                   {[
-                    { label: "채널명 컬럼", value: colChannel, set: setColChannel },
-                    { label: "판매금액 컬럼 (VAT포함)", value: colSaleAmt, set: setColSaleAmt },
-                    { label: "원가 컬럼 (VAT포함)", value: colCostAmt, set: setColCostAmt },
+                    { label: "채널명 컬럼", value: colChannel, set: setColChannel, req: true },
+                    { label: "판매가 M 컬럼 (VAT포함)", value: colSaleAmt, set: setColSaleAmt, req: true },
+                    { label: "원가 P 컬럼 (VAT포함)", value: colCostAmt, set: setColCostAmt, req: true },
+                    { label: "공급가 N 컬럼 (선택·미선택시 판매가)", value: colSupplyAmt, set: setColSupplyAmt, req: false },
+                    { label: "배송비수집 F 컬럼 (선택·미선택시 0)", value: colShipping, set: setColShipping, req: false },
+                    { label: "수량 EA·Q 컬럼 (선택·미선택시 1)", value: colQty, set: setColQty, req: false },
+                    { label: "물류처 Y 컬럼 (선택·미선택시 예외미적용)", value: colLogistics, set: setColLogistics, req: false },
                   ].map(f => (
                     <div key={f.label}>
-                      <label style={{ fontSize: "10px", color: "#9ca3af", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</label>
+                      <label style={{ fontSize: "10px", color: f.req ? "#6b7280" : "#9ca3af", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        {f.req && <span style={{ color: "#ef567c" }}>* </span>}{f.label}
+                      </label>
                       <select value={f.value} onChange={e => f.set(e.target.value)}
                         style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e8eaed", background: "#fff", fontSize: "12px", color: "#374151", fontFamily: "inherit", cursor: "pointer" }}>
                         <option value="">— 선택 —</option>
@@ -585,33 +608,66 @@ export default function ProfitSimulatorTab() {
               )}
 
               {colChannel && colSaleAmt && colCostAmt && uploadedRows.length > 0 && (() => {
-                const MULTIPLIERS = preset.settlementMultipliers;
-                const grouped: Record<string, { R: number; O: number; count: number }> = {};
+                // 이다슬 규칙서 (2026-07-15 확정) 기호 그대로:
+                //   매출측 N_calc(특수5종 M×배율·원룸 rawN×0.85·일반 rawN) → O=N_calc/1.1
+                //          G=F/1.1(스마트스토어×0.96·이모야 0) → AA=G+O
+                //   원가측 R=P×Q/1.1 · S=T=R×0.02 · U=R×0.2 · V=R+S+T(U 미포함) → AB=V
+                //   물류처 예외: Y가 오포물류·유비엘 아니면 S·T·U=0
+                //   마진액=AA−AB · 마진율=(AA−AB)/AA  (※ 최종식은 우리 구성·검증 예정)
+                const MULT = preset.settlementMultipliers;
+                const RULES = preset.settlementRules;
+                type Agg = { count: number; O: number; G: number; AA: number; R: number; S: number; T: number; U: number; AB: number };
+                const grouped: Record<string, Agg> = {};
                 for (const row of uploadedRows) {
                   const ch = String(row[colChannel] ?? "기타").trim();
-                  const sale = Number(row[colSaleAmt]) || 0;
-                  const cost = Number(row[colCostAmt]) || 0;
-                  if (!grouped[ch]) grouped[ch] = { R: 0, O: 0, count: 0 };
-                  const mult = MULTIPLIERS[ch] ?? 1.0;
-                  grouped[ch].R += (sale / 1.1) * mult;
-                  grouped[ch].O += cost / 1.1;
-                  grouped[ch].count += 1;
+                  const M = Number(row[colSaleAmt]) || 0;
+                  const Nraw = colSupplyAmt ? (Number(row[colSupplyAmt]) || 0) : M;   // 폴백: 판매가
+                  const P = Number(row[colCostAmt]) || 0;
+                  const Q = colQty ? (Number(row[colQty]) || 0) : 1;                  // 폴백: 1
+                  const F = colShipping ? (Number(row[colShipping]) || 0) : 0;        // 폴백: 0
+                  const Y = colLogistics ? String(row[colLogistics] ?? "").trim() : "";
+                  const mult = MULT[ch];                                              // 특수 5종만 존재
+                  // 매출측
+                  let Ncalc: number;
+                  if (RULES?.swapMNChannels.includes(ch)) Ncalc = Nraw * (mult ?? 1); // 원룸: rawN×배율
+                  else if (mult != null) Ncalc = M * mult;                            // 특수 나머지 4종
+                  else Ncalc = Nraw;                                                  // 일반/그 외
+                  const O = Ncalc / 1.1;
+                  let G = F / 1.1;
+                  const shipMult = RULES?.shippingMultipliers[ch];
+                  if (shipMult != null) G *= shipMult;                                // 스마트스토어 0.96·이모야 0
+                  const AA = G + O;
+                  // 원가측
+                  const R = (P * Q) / 1.1;
+                  let S = R * 0.02, T = R * 0.02, U = R * 0.2;
+                  if (RULES && colLogistics && !RULES.crossLogistics.includes(Y)) { S = 0; T = 0; U = 0; }
+                  const AB = R + S + T;                                               // V=R+S+T (U 미포함), AB=V
+                  const g = grouped[ch] ?? (grouped[ch] = { count: 0, O: 0, G: 0, AA: 0, R: 0, S: 0, T: 0, U: 0, AB: 0 });
+                  g.count++; g.O += O; g.G += G; g.AA += AA; g.R += R; g.S += S; g.T += T; g.U += U; g.AB += AB;
                 }
-                const rows = Object.entries(grouped).map(([ch, { R, O, count }]) => {
-                  const S = R * 0.02; const T2 = R * 0.02;
-                  const margin = R > 0 ? ((R - O - S - T2) / R) * 100 : 0;
-                  const mult = MULTIPLIERS[ch] ?? 1.0;
-                  return { ch, R, O, S, T: T2, margin, count, mult };
-                }).sort((a, b) => b.R - a.R);
-                const totalR = rows.reduce((s, r) => s + r.R, 0);
+                const rows = Object.entries(grouped).map(([ch, g]) => {
+                  const marginAmt = g.AA - g.AB;
+                  const marginPct = g.AA > 0 ? (marginAmt / g.AA) * 100 : 0;
+                  return { ch, ...g, marginAmt, marginPct, mult: MULT[ch] };
+                }).sort((a, b) => b.AA - a.AA);
+                const TOT = {
+                  count: rows.reduce((s, r) => s + r.count, 0),
+                  AA: rows.reduce((s, r) => s + r.AA, 0),
+                  AB: rows.reduce((s, r) => s + r.AB, 0),
+                  U: rows.reduce((s, r) => s + r.U, 0),
+                };
+                const totMarginAmt = TOT.AA - TOT.AB;
+                const totMarginPct = TOT.AA > 0 ? (totMarginAmt / TOT.AA) * 100 : 0;
+                const won = (n: number) => Math.round(n).toLocaleString() + "원";
+                const missing = [!colSupplyAmt && "공급가N", !colShipping && "배송비F", !colQty && "수량Q", !colLogistics && "물류처Y"].filter(Boolean);
                 return (
                   <div>
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>채널별 마진 보드 · 총 {uploadedRows.length}건</div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>채널별 마진 보드 · 총 {uploadedRows.length}건 (AA 상품매출 / AB 상품총원가 / U 물류비)</div>
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                         <thead>
                           <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-                            {["채널", "건수", "배율", "VAT제외매출", "마진율", "S+T(수수료)"].map(h => (
+                            {["채널", "건수", "AA 상품매출", "AB 상품총원가", "U 물류비", "마진액", "마진율"].map(h => (
                               <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: "10px", color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                             ))}
                           </tr>
@@ -619,24 +675,36 @@ export default function ProfitSimulatorTab() {
                         <tbody>
                           {rows.map(r => (
                             <tr key={r.ch} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                              <td style={{ padding: "9px 10px", fontWeight: 600, color: "#0f2a1e" }}>{r.ch}</td>
+                              <td style={{ padding: "9px 10px", fontWeight: 600, color: "#0f2a1e", whiteSpace: "nowrap" }}>
+                                {r.ch}{r.mult != null && <span style={{ marginLeft: 5, fontSize: 10, color: "#f59e0b" }}>×{r.mult}</span>}
+                              </td>
                               <td style={{ padding: "9px 10px", color: "#6b7280" }}>{r.count}</td>
-                              <td style={{ padding: "9px 10px", color: r.mult !== 1 ? "#f59e0b" : "#6b7280" }}>{r.mult !== 1 ? `×${r.mult}` : "일반"}</td>
-                              <td style={{ padding: "9px 10px", color: "#374151" }}>{Math.round(r.R).toLocaleString()}원</td>
-                              <td style={{ padding: "9px 10px", fontWeight: 700, color: r.margin >= 20 ? "#15803d" : r.margin >= 10 ? "#d97706" : "#dc2626" }}>{r.margin.toFixed(1)}%</td>
-                              <td style={{ padding: "9px 10px", color: "#6b7280" }}>{Math.round(r.S + r.T).toLocaleString()}원</td>
+                              <td style={{ padding: "9px 10px", color: "#374151" }}>{won(r.AA)}</td>
+                              <td style={{ padding: "9px 10px", color: "#374151" }}>{won(r.AB)}</td>
+                              <td style={{ padding: "9px 10px", color: "#6b7280" }}>{won(r.U)}</td>
+                              <td style={{ padding: "9px 10px", color: r.marginAmt >= 0 ? "#374151" : "#dc2626" }}>{won(r.marginAmt)}</td>
+                              <td style={{ padding: "9px 10px", fontWeight: 700, color: r.marginPct >= 20 ? "#15803d" : r.marginPct >= 10 ? "#d97706" : "#dc2626" }}>{r.marginPct.toFixed(1)}%</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr style={{ borderTop: "2px solid #e8eaed" }}>
-                            <td colSpan={3} style={{ padding: "9px 10px", fontWeight: 700, color: "#374151", fontSize: "11px" }}>합계</td>
-                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{Math.round(totalR).toLocaleString()}원</td>
-                            <td colSpan={2} />
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151", fontSize: "11px" }}>합계</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{TOT.count}</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{won(TOT.AA)}</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{won(TOT.AB)}</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: "#6b7280" }}>{won(TOT.U)}</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: totMarginAmt >= 0 ? "#374151" : "#dc2626" }}>{won(totMarginAmt)}</td>
+                            <td style={{ padding: "9px 10px", fontWeight: 700, color: totMarginPct >= 20 ? "#15803d" : totMarginPct >= 10 ? "#d97706" : "#dc2626" }}>{totMarginPct.toFixed(1)}%</td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
+                    {missing.length > 0 && (
+                      <p style={{ fontSize: "10px", color: "#d97706", marginTop: "8px", lineHeight: 1.6 }}>
+                        ⚠ 미선택 컬럼: {missing.join("·")} — 각각 {[!colSupplyAmt && "공급가=판매가", !colShipping && "배송비=0", !colQty && "수량=1", !colLogistics && "물류처 예외 미적용(S·T·U 전부 적용)"].filter(Boolean).join(" / ")} 으로 계산됨
+                      </p>
+                    )}
                     <p style={{ fontSize: "10px", color: "#c0c4cc", marginTop: "10px", lineHeight: 1.6 }}>
                       {preset.settlementNote}
                     </p>
