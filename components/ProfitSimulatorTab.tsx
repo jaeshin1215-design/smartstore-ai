@@ -80,9 +80,12 @@ const IZ_PRESET: SimPreset = {
   dropBlockText: () => "73개를 한 번에 빼지 않습니다. 드롭하면 롱테일 매출이 20~40% 빠질 수 있습니다 (Grok 경고).",
   demoDrop: IZ_DROP,
   demoStar: IZ_STAR,
-  settlementMultipliers: { "띵샵": 0.88, "원룸만들기": 0.85, "현대홈쇼핑": 1.1, "블루베리": 0.85, "이모야킨지로": 0.08 },
+  // 채널명은 규칙서 원문 표기로 완전일치 (2026-07-15 이다슬 확정 — 정규화·부분일치 없음)
+  settlementMultipliers: { "띵샵(신)": 0.88, "원룸만들기": 0.85, "현대홈쇼핑(3)": 1.1, "(통합)블루베리": 0.85, "이모야킨지로": 0.08 },
   settlementRules: {
-    swapMNChannels: ["원룸만들기"],
+    // rawN 기반 채널(N_calc = rawN × 배율): 원룸만들기 ×0.85, 현대홈쇼핑(3) ×1.1
+    //   (규칙서: 현대홈쇼핑 "N란 내용변경 = 기존데이터×1.1") · 나머지 특수는 M×배율
+    swapMNChannels: ["원룸만들기", "현대홈쇼핑(3)"],
     shippingMultipliers: { "스마트스토어": 0.96, "이모야킨지로": 0 },
     crossLogistics: ["오포물류", "유비엘"],
   },
