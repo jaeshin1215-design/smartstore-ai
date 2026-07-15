@@ -333,7 +333,12 @@ function DiscoverMatrix({
 type HeatRow = {name:string;past:number[];future:number[];trend:string;src:string;rawPast?:number[]};
 type HeatPayload = {products:HeatRow[];weekLabels:string[];source:string};
 
-function ProductTimeHeatmap({storeId}:{storeId?:string}) {
+const IZ_STORE_ID = "984f8d32-6d13-402a-b251-9bedaf0b1f6a"; // 이지스토리 — izStory 프리셋
+// 히트맵 세로축 상품군 — store별 이원화 (이지스토리 4대 회피)
+const PRODS_IZ = ["압축팩", "다리미판", "화분", "유아매트"];
+const PRODS_GENERIC = ["수납·정리함", "주방용품", "청소·세탁", "인테리어소품"];
+
+function ProductTimeHeatmap({storeId, isIz}:{storeId?:string; isIz?:boolean}) {
   const [heatData,setHeatData]=useState<HeatPayload|null>(null);
   const [salesData,setSalesData]=useState<Record<string,number>>({});
   const [loading,setLoading]=useState(true);
@@ -348,7 +353,7 @@ function ProductTimeHeatmap({storeId}:{storeId?:string}) {
     }
   },[storeId]);
 
-  const PRODS=["압축팩","다리미판","화분","유아매트"];
+  const PRODS = isIz ? PRODS_IZ : PRODS_GENERIC;
   const PAST=8,FUTURE=4,TOTAL=PAST+FUTURE;
   const CW=44,CH=44,GAP=10,LPAD=92,THEAD=32;
   const CELLS_W=LPAD+TOTAL*(CW+GAP)-GAP;
@@ -773,7 +778,7 @@ export default function DiscoverTab({ onNavigateToContent }: { onNavigateToConte
               <div style={{ padding:"5px 10px", background:"#fef9c3", border:"1px solid #fde68a", borderRadius:"6px", marginBottom:"12px", display:"inline-block" }}>
                 <p style={{ fontSize:"11px", color:"#92400e", margin:0, fontWeight:600 }}>잠정값 · 사방넷 연동 후 실제 매출 데이터로 교체 예정</p>
               </div>
-              <ProductTimeHeatmap storeId="984f8d32-6d13-402a-b251-9bedaf0b1f6a" />
+              <ProductTimeHeatmap storeId={storeId ?? undefined} isIz={storeId === IZ_STORE_ID} />
             </div>
           </div>
 

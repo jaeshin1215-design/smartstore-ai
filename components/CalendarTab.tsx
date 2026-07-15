@@ -20,7 +20,10 @@ interface MonthPlan {
   season: "spring"|"summer"|"fall"|"winter";
 }
 
-const MONTH_PLANS: MonthPlan[] = [
+const IZ_STORE_ID = "984f8d32-6d13-402a-b251-9bedaf0b1f6a"; // 이지스토리 — izStory 프리셋
+
+// izStory: 현행 12개월 시나리오 (이지스토리 실제 카테고리, 2026-07-07) — 픽셀 불변
+const MONTH_PLANS_IZ: MonthPlan[] = [
   { theme:"신학기 수납의 달",      mainCategory:"정리수납함",              seasonSpice:"이사철 압축팩 선기획",focusKeywords:["정리수납함","신학기","압축팩"],    season:"winter" },
   { theme:"이사 전 정리의 달",     mainCategory:"정리수납함·압축팩",       seasonSpice:"압축팩",              focusKeywords:["압축팩","정리수납함","이사전"],    season:"winter" },
   { theme:"이사철 수납의 달",      mainCategory:"압축팩·정리수납함",       seasonSpice:"압축팩 피크",         focusKeywords:["압축팩","이사철","정리수납함"],   season:"spring" },
@@ -35,12 +38,30 @@ const MONTH_PLANS: MonthPlan[] = [
   { theme:"내년 선기획의 달",      mainCategory:"정리수납함·분리수거함",   seasonSpice:"연말 분리수거",       focusKeywords:["정리수납함","신학기선기획","분리수거함"],season:"winter"},
 ];
 
+// generic(데모 포함): 생활·리빙 범주 — 이지스토리 4대(압축팩·다리미판·유아매트·화분) 회피.
+// 서사 구조(계절별 이벤트 매칭)는 동일, 카테고리 내용만 교체 (2026-07-15)
+const MONTH_PLANS_GENERIC: MonthPlan[] = [
+  { theme:"신년 정리·수납의 달",   mainCategory:"수납·정리함",             seasonSpice:"새해 정리 리빙박스",  focusKeywords:["수납·정리함","리빙박스","신년정리"], season:"winter" },
+  { theme:"주방 정리의 달",        mainCategory:"주방용품",                seasonSpice:null,                  focusKeywords:["주방용품","밀폐용기","주방정리"],   season:"winter" },
+  { theme:"봄맞이 대청소의 달",    mainCategory:"청소·세탁",               seasonSpice:"봄 대청소 세트",      focusKeywords:["청소·세탁","청소솔","대청소"],      season:"spring" },
+  { theme:"봄 인테리어의 달",      mainCategory:"인테리어소품",            seasonSpice:null,                  focusKeywords:["인테리어소품","무드등","방향제"],   season:"spring" },
+  { theme:"이사·수납의 달",        mainCategory:"수납·정리함",             seasonSpice:"이사철 리빙박스",     focusKeywords:["수납·정리함","리빙박스","이사"],    season:"spring" },
+  { theme:"장마 대비 정리의 달",   mainCategory:"욕실용품·청소·세탁",      seasonSpice:null,                  focusKeywords:["욕실용품","청소·세탁","장마대비"],  season:"summer" },
+  { theme:"여름 생활용품의 달",    mainCategory:"여름·시즌",               seasonSpice:"여름 쿨매트·선풍기",  focusKeywords:["여름·시즌","선풍기","쿨매트"],      season:"summer" },
+  { theme:"무더위 생활의 달",      mainCategory:"여름·시즌",               seasonSpice:"아이스팩·모기장",     focusKeywords:["여름·시즌","아이스팩","모기장"],    season:"summer" },
+  { theme:"가을 수납·정리의 달",   mainCategory:"수납·정리함",             seasonSpice:null,                  focusKeywords:["수납·정리함","서랍정리함","가을정리"],season:"fall"  },
+  { theme:"환절기 주방정리의 달",  mainCategory:"주방용품",                seasonSpice:null,                  focusKeywords:["주방용품","수저통","환절기"],       season:"fall"  },
+  { theme:"겨울 대비 청소의 달",   mainCategory:"청소·세탁",               seasonSpice:null,                  focusKeywords:["청소·세탁","빨래바구니","겨울대비"],season:"fall"   },
+  { theme:"연말 대청소·정리의 달", mainCategory:"수납·정리함·인테리어소품", seasonSpice:"연말 정리 세트",      focusKeywords:["수납·정리함","인테리어소품","연말정리"],season:"winter"},
+];
+
 const MONTH_EN = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 const MONTH_KR = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 const SEASON_KR: Record<string, string> = { spring:"봄", summer:"여름", fall:"가을", winter:"겨울" };
 
-// 상시 본체 (연중 고정) — 이지스토리 실제 카테고리 기준
-const EVERGREEN_ITEMS = ["정리수납함", "빨래건조대", "다리미판", "압축팩"];
+// 상시 본체 (연중 고정) — store별 이원화
+const EVERGREEN_IZ = ["정리수납함", "빨래건조대", "다리미판", "압축팩"];
+const EVERGREEN_GENERIC = ["수납·정리함", "주방용품", "청소·세탁", "인테리어소품"];
 
 // 카테고리 → 해당 월 관련도 (이지스토리 9개 카테고리 기준 2026-07-07)
 function getRelevantMonths(category: string): number[] {
@@ -124,13 +145,13 @@ interface MonthDetail {
   products: Product[];
 }
 
-function ThisWeekTodos({ plan }: { plan: MonthPlan }) {
+function ThisWeekTodos({ plan, star }: { plan: MonthPlan; star: string }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const toggle = (key: string) => setChecked(p => ({ ...p, [key]: !p[key] }));
 
   const todos = [
     { key:"t1", label:`${plan.focusKeywords[0] ?? "주력 상품"} 재고 수준 확인`, icon:"📦" },
-    { key:"t2", label:"효자 상품 광고 예산 배분 점검", icon:"💰" },
+    { key:"t2", label:`${star} 상품 광고 예산 배분 점검`, icon:"💰" },
     { key:"t3", label:"전주 대비 마진율 변동 체크", icon:"📊" },
     ...(plan.seasonSpice ? [{ key:"t4", label:`${plan.seasonSpice} 시즌 대비 재고 선확보`, icon:"🌶" }] : []),
   ];
@@ -168,7 +189,20 @@ export default function CalendarTab() {
   const [detail, setDetail] = useState<MonthDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [discoverBadge, setDiscoverBadge] = useState<{ score: number; label: string } | "loading" | null>(null);
+  const [isIz, setIsIz] = useState<boolean | null>(null); // store 판별 (auth/me) — ProfitSimulator와 동일
   const currentMonth = new Date().getMonth(); // 0-based
+
+  // izStory면 현행 시나리오/용어, 그 외(데모 포함)는 generic
+  const MONTH_PLANS = isIz ? MONTH_PLANS_IZ : MONTH_PLANS_GENERIC;
+  const EVERGREEN_ITEMS = isIz ? EVERGREEN_IZ : EVERGREEN_GENERIC;
+  const STAR = isIz ? "효자" : "주력 상품";
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(d => setIsIz(d?.user?.storeId === IZ_STORE_ID))
+      .catch(() => setIsIz(false)); // 판별 실패 시 generic(안전)
+  }, []);
 
   useEffect(() => {
     const storeId = localStorage.getItem("sellfit_store_id");
@@ -212,7 +246,7 @@ export default function CalendarTab() {
   }
 
   if (detail) {
-    return <MonthDetailView detail={detail} onBack={() => setDetail(null)} />;
+    return <MonthDetailView detail={detail} onBack={() => setDetail(null)} star={STAR} />;
   }
 
   const visibleMonths = monthFilter !== null
@@ -228,7 +262,7 @@ export default function CalendarTab() {
           <p style={{ fontSize:"10px", fontWeight:500, textTransform:"uppercase", letterSpacing:"0.08em", color:"#9ca3af", marginBottom:"8px" }}>CALENDAR</p>
           <p style={{ fontSize:"14px", fontWeight:700, color:"#1a1a1a", lineHeight:1.4, marginBottom:"6px" }}>1년을 진단하며<br/>굴린다</p>
           <p style={{ fontSize:"13px", color:"#6b7280", marginBottom:"14px", lineHeight:1.5 }}>상시가 본체, 시즌은 양념</p>
-          {["키우기 — 효자 집중", "걸러내기 — 드롭 후보", "들이기 — 신규 시즌", "채널 — 집중 배분"].map(f => (
+          {[`키우기 — ${STAR} 집중`, "걸러내기 — 드롭 후보", "들이기 — 신규 시즌", "채널 — 집중 배분"].map(f => (
             <div key={f} style={{ display:"flex", alignItems:"center", gap:"5px", marginBottom:"7px" }}>
               <span style={{ fontSize:"10px", color:"#c0c4cc", flexShrink:0 }}>✓</span>
               <span style={{ fontSize:"13px", color:"#8f9399" }}>{f}</span>
@@ -293,7 +327,7 @@ export default function CalendarTab() {
           })()}
 
           {/* 이번 주 할 일 */}
-          <ThisWeekTodos plan={MONTH_PLANS[currentMonth]} />
+          <ThisWeekTodos plan={MONTH_PLANS[currentMonth]} star={STAR} />
 
           {/* 상시 본체 띠 */}
           <div style={{ background:"#F7F8FA", border:"1px solid #e8eaed", borderRadius:"10px", padding:"14px 20px", marginBottom:"28px", display:"flex", alignItems:"center", gap:"12px" }}>
@@ -373,7 +407,7 @@ export default function CalendarTab() {
                         <span style={{ fontSize:"12px", color:"#374151" }}>상품 {monthProds.length}종</span>
                       )}
                       {sig.stars > 0 && (
-                        <span style={{ fontSize:"12px", color:PINK.main }}>효자 {sig.stars}</span>
+                        <span style={{ fontSize:"12px", color:PINK.main }}>{STAR} {sig.stars}</span>
                       )}
                       {sig.drops > 0 && (
                         <span style={{ fontSize:"12px", color:"#9ca3af" }}>드롭 {sig.drops}</span>
@@ -381,8 +415,8 @@ export default function CalendarTab() {
                       {/* 효자 배지: 재고 0 → 숨김 */}
                       {monthProds.length > 0 && (
                         sig.stars >= 1
-                          ? <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f0fdf4", color:"#16a34a", border:"1px solid #bbf7d0", flexShrink:0 }}>효자 있음</span>
-                          : <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f9fafb", color:"#9ca3af", border:"1px solid #e5e7eb", flexShrink:0 }}>효자 없음</span>
+                          ? <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f0fdf4", color:"#16a34a", border:"1px solid #bbf7d0", flexShrink:0 }}>{STAR} 있음</span>
+                          : <span style={{ marginLeft:"auto", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"10px", background:"#f9fafb", color:"#9ca3af", border:"1px solid #e5e7eb", flexShrink:0 }}>{STAR} 없음</span>
                       )}
                     </div>
                   )}
@@ -411,7 +445,7 @@ export default function CalendarTab() {
 }
 
 // ── 2단: 그 달 기획서 ──────────────────────────────────────────────────────────
-function MonthDetailView({ detail, onBack }: { detail: MonthDetail; onBack: () => void }) {
+function MonthDetailView({ detail, onBack, star }: { detail: MonthDetail; onBack: () => void; star: string }) {
   const { monthIdx, plan, products } = detail;
   const currentMonth = new Date().getMonth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -424,14 +458,14 @@ function MonthDetailView({ detail, onBack }: { detail: MonthDetail; onBack: () =
   const thankless = products.filter(p => getQuadrant(p.matrix_x??50, p.matrix_y??50) === "thankless");
 
   const QUADRANT_LABEL: Record<string, { label: string; action: string; color: string }> = {
-    major:     { label:"효자",     action:"키우기 — 광고·채널 확대",     color:PINK.main  },
+    major:     { label:star,        action:"키우기 — 광고·채널 확대",     color:PINK.main  },
     quick:     { label:"시즌 타이밍", action:"피크 45일 전 진입",          color:"#7c6fcd"  },
     thankless: { label:"마진 수술", action:"가격·묶음·배송비 최적화",     color:"#e97c4a"  },
   };
 
   const WEEK_FLOW = [
     { label:"1W", title:"들이기", desc:`${plan.focusKeywords[0]} 신규 재고 확인 및 발주` },
-    { label:"2W", title:"키우기", desc:"효자 상품 광고 예산 집중 배분" },
+    { label:"2W", title:"키우기", desc:`${star} 상품 광고 예산 집중 배분` },
     { label:"3W", title:"데이터", desc:"전월 대비 마진율 재계산 및 매트릭스 업데이트" },
     { label:"4W", title:"피크",   desc:plan.seasonSpice ? `${plan.seasonSpice} 타이밍 — 피크 전 노출 극대화` : "월말 재고 소진 및 다음 달 선기획" },
   ];
@@ -533,7 +567,7 @@ function MonthDetailView({ detail, onBack }: { detail: MonthDetail; onBack: () =
         <p style={{ fontSize:"11px", fontWeight:700, color:"#9ca3af", letterSpacing:"0.08em", textTransform:"uppercase", margin:"0 0 16px" }}>AI 큐레이션 신호</p>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:"12px" }}>
           {[
-            { icon:"⭐", label:"효자 키우기",     desc:`Major Projects ${major.length}종 — 광고 예산·채널 확대 우선` },
+            { icon:"⭐", label:`${star} 키우기`,   desc:`Major Projects ${major.length}종 — 광고 예산·채널 확대 우선` },
             { icon:"🔪", label:"저효율 실증",      desc:`Thankless ${thankless.length}종 — 묶음·가격 수술로 마진 복구` },
             { icon:"🌶", label:"시즌 타이밍",      desc:plan.seasonSpice ? `${plan.seasonSpice} 피크 45일 전 준비` : "해당 달 시즌 양념 없음 (상시 집중)" },
           ].map(item => (

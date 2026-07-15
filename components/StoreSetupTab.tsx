@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import PriceGuardBoard from "./PriceGuardBoard";
 
-const CATEGORIES = ["압축팩", "다리미판", "유아매트", "화분"];
+const IZ_STORE_ID = "984f8d32-6d13-402a-b251-9bedaf0b1f6a"; // 이지스토리 — izStory 프리셋
+// 상품등록 카테고리 드롭다운 — store별 이원화
+const CATEGORIES_IZ = ["압축팩", "다리미판", "유아매트", "화분"];
+const CATEGORIES_GENERIC = ["수납·정리함", "주방용품", "청소·세탁", "인테리어소품", "욕실용품"];
 
 interface Product {
   id: string;
@@ -48,6 +51,9 @@ export default function StoreSetupTab() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [productsError, setProductsError] = useState(false);
+  // store 판별 (auth/me) — izStory면 현행 4개, 그 외(데모)는 generic 카테고리
+  const [isIz, setIsIz] = useState<boolean | null>(null);
+  const CATEGORIES = isIz ? CATEGORIES_IZ : CATEGORIES_GENERIC;
   // 매출 입력
   const [salesRevenue, setSalesRevenue] = useState("");
   const [salesAdCost, setSalesAdCost] = useState("");
@@ -72,7 +78,7 @@ export default function StoreSetupTab() {
   // 상품 등록 폼
   const [pName, setPName] = useState("");
   const [pKeyword, setPKeyword] = useState("");
-  const [pCategory, setPCategory] = useState("압축팩");
+  const [pCategory, setPCategory] = useState(CATEGORIES_GENERIC[0]); // 초기 generic 안전값, auth/me 로드 후 프리셋 반영
   const [pPrice, setPPrice] = useState("");
   const [pUrl, setPUrl] = useState("");
   const [pCoupangUrl, setPCoupangUrl] = useState("");
@@ -119,6 +125,18 @@ export default function StoreSetupTab() {
 
   useEffect(() => {
     initAndLoad();
+  }, []);
+
+  // store 판별 — izStory면 현행 카테고리, 그 외(데모)는 generic (ProfitSimulator와 동일)
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(d => {
+        const iz = d?.user?.storeId === IZ_STORE_ID;
+        setIsIz(iz);
+        setPCategory((iz ? CATEGORIES_IZ : CATEGORIES_GENERIC)[0]); // 드롭다운 첫 값으로 초기화
+      })
+      .catch(() => { setIsIz(false); setPCategory(CATEGORIES_GENERIC[0]); });
   }, []);
 
   // 로그인 세션의 store_id로 스토어 자동 로드 (2026-07-10) — PIN 입력 불필요
@@ -200,7 +218,7 @@ export default function StoreSetupTab() {
       });
       await loadProducts(store.id);
       setPName(""); setPKeyword(""); setPPrice(""); setPPurchasePrice("");
-      setPShippingCost(""); setPStock(""); setPUrl(""); setPCoupangUrl(""); setPCategory("압축팩"); setPIsOwn(1);
+      setPShippingCost(""); setPStock(""); setPUrl(""); setPCoupangUrl(""); setPCategory(CATEGORIES[0]); setPIsOwn(1);
     } catch (e) { console.error(e); }
     setAddingProduct(false);
   }
@@ -777,7 +795,7 @@ export default function StoreSetupTab() {
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
                 <div>
                   <span style={S.label}>상품명 *</span>
-                  <input style={S.input} placeholder="예) 프리미엄 압축팩 10L"
+                  <input style={S.input} placeholder={isIz ? "예) 프리미엄 압축팩 10L" : "예) 프리미엄 수납함 20L"}
                     value={pName} onChange={e => setPName(e.target.value)} />
                 </div>
                 <div>
@@ -791,7 +809,7 @@ export default function StoreSetupTab() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <span style={S.label}>분석 키워드 *</span>
-                  <input style={S.input} placeholder="예) 압축팩"
+                  <input style={S.input} placeholder={isIz ? "예) 압축팩" : "예) 수납함"}
                     value={pKeyword} onChange={e => setPKeyword(e.target.value)} />
                 </div>
                 <div>
