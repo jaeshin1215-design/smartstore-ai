@@ -469,7 +469,7 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
                             <p style={{ fontSize: "13px", fontWeight: 600, color: "#065f46", margin: 0 }}>① Add Image → ② Cutout(BEN2) → ③ Outpaint</p>
-                            <a href="https://flow.google.com" target="_blank" rel="noopener noreferrer" style={{
+                            <a href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener noreferrer" style={{
                               display: "inline-flex", alignItems: "center", gap: "4px",
                               fontSize: "12.5px", fontWeight: 700, color: "#fff", padding: "5px 12px",
                               borderRadius: "7px", background: "#059669", textDecoration: "none",
