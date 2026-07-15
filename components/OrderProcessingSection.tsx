@@ -34,9 +34,15 @@ interface CjSummary {
 function kstToday(): string {
   return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
 }
+// 오늘 기준 n일 전 (n=0 → 오늘). yyyy-MM-dd
+function kstDaysAgo(n: number): string {
+  return new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+}
 
 export default function OrderProcessingSection() {
-  const [date, setDate] = useState(kstToday()); // yyyy-MM-dd (input용)
+  // 기간 범위 (2026-07-15 심유나 프로 요청) — 기본값 오늘 하루(기존 흐름 유지)
+  const [startDate, setStartDate] = useState(kstToday()); // yyyy-MM-dd
+  const [endDate, setEndDate] = useState(kstToday());
   const [cjLoading, setCjLoading] = useState(false);
   const [cjMsg, setCjMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [cjSummary, setCjSummary] = useState<CjSummary | null>(null);
@@ -46,8 +52,21 @@ export default function OrderProcessingSection() {
   const [summary, setSummary] = useState<MatchSummary | null>(null);
   const [downloadingMatch, setDownloadingMatch] = useState(false);
 
-  const compact = date.replace(/-/g, "");
+  const cStart = startDate.replace(/-/g, "");
+  const cEnd = endDate.replace(/-/g, "");
+  const isRange = startDate !== endDate;
+  // CJ 송장(수도꼭지1)은 기간, 세트분리 매칭(수도꼭지2)은 종료일 하루 기준(현행 유지)
+  const cjRangeQS = `startDate=${cStart}&endDate=${cEnd}`;
   const storeId = typeof window !== "undefined" ? localStorage.getItem("sellfit_store_id") ?? "" : "";
+
+  // 프리셋: 오늘 / 최근3일 / 최근7일 (종료일 항상 오늘)
+  function applyPreset(days: number) {
+    setStartDate(kstDaysAgo(days));
+    setEndDate(kstToday());
+  }
+  const activePreset = endDate === kstToday()
+    ? (startDate === kstToday() ? 0 : startDate === kstDaysAgo(2) ? 2 : startDate === kstDaysAgo(6) ? 6 : -1)
+    : -1;
 
   async function downloadFile(url: string): Promise<{ ok: boolean; rows?: string; error?: string; empty?: boolean }> {
     const res = await fetch(url);
@@ -72,7 +91,7 @@ export default function OrderProcessingSection() {
     setCjMsg(null);
     setCjSummary(null);
     try {
-      const res = await fetch(`/api/sabangnet/cj-excel?date=${compact}&format=json`);
+      const res = await fetch(`/api/sabangnet/cj-excel?${cjRangeQS}&format=json`);
       const j = await res.json();
       if (!res.ok) setCjMsg({ ok: j.empty === true, text: j.error ?? `HTTP ${res.status}` }); // 0건은 안내
       else setCjSummary(j);
@@ -83,9 +102,10 @@ export default function OrderProcessingSection() {
   async function handleCjExcel() {
     setCjLoading(true);
     setCjMsg(null);
-    const r = await downloadFile(`/api/sabangnet/cj-excel?date=${compact}&store_id=${storeId}`);
+    const r = await downloadFile(`/api/sabangnet/cj-excel?${cjRangeQS}&store_id=${storeId}`);
+    const label = isRange ? `${cStart}-${cEnd}` : cStart;
     setCjMsg(r.ok
-      ? { ok: true, text: `다운로드 완료 — ${r.rows}건 (${compact}_주문서확인처리_@cj택배.xlsx)` }
+      ? { ok: true, text: `다운로드 완료 — ${r.rows}건 (${label}_주문서확인처리_@cj택배.xlsx)` }
       : { ok: r.empty === true, text: r.error ?? "실패" }); // 신규주문 0건은 안내(초록), 실오류만 빨강
     setCjLoading(false);
   }
@@ -95,7 +115,7 @@ export default function OrderProcessingSection() {
     setMatchMsg(null);
     setSummary(null);
     try {
-      const res = await fetch(`/api/sabangnet/waybill-match?date=${compact}&format=json`);
+      const res = await fetch(`/api/sabangnet/waybill-match?date=${cEnd}&format=json`);
       const j = await res.json();
       if (!res.ok) { setMatchMsg({ ok: false, text: j.error ?? `HTTP ${res.status}` }); }
       else setSummary(j);
@@ -105,9 +125,9 @@ export default function OrderProcessingSection() {
 
   async function handleMatchDownload() {
     setDownloadingMatch(true);
-    const r = await downloadFile(`/api/sabangnet/waybill-match?date=${compact}&format=xls&store_id=${storeId}`);
+    const r = await downloadFile(`/api/sabangnet/waybill-match?date=${cEnd}&format=xls&store_id=${storeId}`);
     setMatchMsg(r.ok
-      ? { ok: true, text: `다운로드 완료 — ${r.rows}건 (${compact}_사방넷_송장_업로드용.xls)` }
+      ? { ok: true, text: `다운로드 완료 — ${r.rows}건 (${cEnd}_사방넷_송장_업로드용.xls)` }
       : { ok: false, text: r.error ?? "실패" });
     setDownloadingMatch(false);
   }
@@ -125,14 +145,41 @@ export default function OrderProcessingSection() {
 
   return (
     <div style={{ fontFamily: FF }}>
-      {/* 대상 날짜 */}
-      <div style={{ ...CARD, display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>대상 날짜 (주문일)</span>
-        <input
-          type="date" value={date} onChange={(e) => setDate(e.target.value)}
-          style={{ padding: "8px 12px", border: "1px solid #e8eaed", borderRadius: 8, fontSize: 13, fontFamily: FF, color: "#374151", outline: "none" }}
-        />
-        <span style={{ fontSize: 12, color: "#9ca3af" }}>기본값 오늘 — 사방넷 주문일 기준 조회</span>
+      {/* 대상 기간 (주문일 기준) */}
+      <div style={{ ...CARD, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>대상 기간 (주문일)</span>
+        {/* 프리셋 버튼 */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {[{ label: "오늘", n: 0 }, { label: "최근 3일", n: 2 }, { label: "최근 7일", n: 6 }].map((p) => {
+            const active = activePreset === p.n;
+            return (
+              <button key={p.n} onClick={() => applyPreset(p.n)}
+                style={{
+                  padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FF,
+                  border: `1px solid ${active ? "#ef567c" : "#e8eaed"}`,
+                  background: active ? "#fdecf1" : "#fff",
+                  color: active ? "#ef567c" : "#6b7280",
+                }}>
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+        {/* 사용자 지정 범위 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="date" value={startDate} max={endDate} onChange={(e) => setStartDate(e.target.value)}
+            style={{ padding: "8px 12px", border: "1px solid #e8eaed", borderRadius: 8, fontSize: 13, fontFamily: FF, color: "#374151", outline: "none" }}
+          />
+          <span style={{ fontSize: 13, color: "#9ca3af" }}>~</span>
+          <input
+            type="date" value={endDate} min={startDate} max={kstToday()} onChange={(e) => setEndDate(e.target.value)}
+            style={{ padding: "8px 12px", border: "1px solid #e8eaed", borderRadius: 8, fontSize: 13, fontFamily: FF, color: "#374151", outline: "none" }}
+          />
+        </div>
+        <span style={{ fontSize: 12, color: "#9ca3af" }}>
+          {isRange ? `${cStart}~${cEnd} 기간 조회` : "기본값 오늘 — 사방넷 주문일 기준"}
+        </span>
       </div>
 
       {/* 수도꼭지 1 — CJ 송장 엑셀 */}
@@ -156,14 +203,14 @@ export default function OrderProcessingSection() {
               background: cjLoading ? "#c4c8cc" : "#ef567c", color: "#fff",
               fontSize: 13, fontWeight: 700, cursor: cjLoading ? "default" : "pointer", fontFamily: FF,
             }}>
-            {cjLoading ? "생성 중..." : "오늘 주문 → CJ 송장 엑셀 ↓"}
+            {cjLoading ? "생성 중..." : `${isRange ? "기간" : "오늘"} 주문 → CJ 송장 엑셀 ↓`}
           </button>
         </div>
 
         {cjSummary && (
           <div style={{ marginTop: 16, border: "1px solid #e8eaed", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ padding: "12px 16px", background: "#f9fafb", fontSize: 13, color: "#111827", fontWeight: 700 }}>
-              오늘 주문 {cjSummary.order_count}건
+              {isRange ? "기간" : "오늘"} 주문 {cjSummary.order_count}건
               <span style={{ fontWeight: 400, color: "#6b7280", marginLeft: 8 }}>
                 (상위 {cjSummary.preview.length}건 미리보기 · 전화·주소는 마스킹, 다운로드 파일은 원본)
               </span>

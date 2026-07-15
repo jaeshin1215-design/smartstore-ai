@@ -25,26 +25,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
   }
 
-  const date = req.nextUrl.searchParams.get("date") ?? kstTodayCompact();
+  // 기간 범위 지원 (2026-07-15 심유나 프로 요청): startDate/endDate.
+  //   하위호환 — 기존 단일 date 파라미터도 그대로 받음(있으면 시작=종료=date).
+  //   아무것도 없으면 오늘 하루(기존 흐름 유지).
+  const single = req.nextUrl.searchParams.get("date");
+  const startDate = req.nextUrl.searchParams.get("startDate") ?? single ?? kstTodayCompact();
+  const endDate = req.nextUrl.searchParams.get("endDate") ?? single ?? kstTodayCompact();
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx";
   // 스토어 스코핑: 클라이언트 파라미터가 아니라 세션의 store_id (2026-07-09)
   const session = await getSession(req);
   const storeId = session?.storeId ?? null;
-  if (!/^\d{8}$/.test(date)) {
-    return NextResponse.json({ error: "date는 yyyyMMdd 형식" }, { status: 400 });
+  if (!/^\d{8}$/.test(startDate) || !/^\d{8}$/.test(endDate)) {
+    return NextResponse.json({ error: "날짜는 yyyyMMdd 형식" }, { status: 400 });
   }
+  if (startDate > endDate) {
+    return NextResponse.json({ error: "시작일이 종료일보다 늦습니다." }, { status: 400 });
+  }
+  // 파일명·로그·안내용 라벨 (단일일이면 그날, 기간이면 시작-종료)
+  const rangeLabel = startDate === endDate ? startDate : `${startDate}-${endDate}`;
 
   try {
     // 신규주문(NEW_ORDER)만 조회 = 발주 대상. 2026-07-15 심유나 프로 화면 대조 확정:
     //   NEW_ORDER=신규주문 / DELIVERY_WAITING=출고대기(운송장 등록됨).
     //   1차 발주 후 출고대기로 넘어간 건은 재조회 안 됨 → 2차 발주 중복 방지.
     //   ※ 이전 ORDER_CONFIRM 필터는 실제 "주문확인"(처리된 상태)이라 오히려 중복 유발했음(교정).
-    const orders = await fetchSabangnetOrders(date, date, ["NEW_ORDER"]);
+    const orders = await fetchSabangnetOrders(startDate, endDate, ["NEW_ORDER"]);
 
     // 미리보기 (화면 표시) — 전화·주소 마스킹 규칙 적용, 이름·상품명·주문번호는 원본 (2026-07-10)
     if (format === "json") {
       return NextResponse.json({
-        date,
+        date: rangeLabel,
+        startDate,
+        endDate,
         order_count: orders.length,
         preview: orders.slice(0, 5).map((o) => ({
           receiver: o.RECEIVER_NM ?? "",
@@ -58,7 +70,8 @@ export async function GET(req: NextRequest) {
 
     if (orders.length === 0) {
       // 대상 상태(현재 신규주문 필터) 결과 0건 — 장애 아님, 안내로 처리 (2026-07-14)
-      return NextResponse.json({ error: "오늘 조회된 신규주문이 없습니다.", empty: true }, { status: 404 });
+      const when = startDate === endDate ? "오늘" : "해당 기간에";
+      return NextResponse.json({ error: `${when} 조회된 신규주문이 없습니다.`, empty: true }, { status: 404 });
     }
 
     // A~M 매핑 — 전부 문자열로 (우편번호 앞자리 0 보존, 실측 148건 근거)
@@ -94,12 +107,12 @@ export async function GET(req: NextRequest) {
         await db.execute({
           sql: `INSERT INTO sellfit_events (id, store_id, event_type, new_value, note, event_date)
                 VALUES (?, ?, 'cj_excel_download', ?, ?, ?)`,
-          args: [randomUUID(), storeId, String(rows.length), `CJ 송장 엑셀 ${date}`, date],
+          args: [randomUUID(), storeId, String(rows.length), `CJ 송장 엑셀 ${rangeLabel}`, endDate],
         });
       } catch { /* 로그 실패는 다운로드를 막지 않음 */ }
     }
 
-    const filename = `${date}_주문서확인처리_@cj택배.xlsx`;
+    const filename = `${rangeLabel}_주문서확인처리_@cj택배.xlsx`;
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
