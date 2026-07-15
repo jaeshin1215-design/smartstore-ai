@@ -504,13 +504,13 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                           <span style={{ fontSize: "18px" }}>🎬</span>
                           <div>
                             <p style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", margin: 0 }}>Google Flow — 이미지 → 영상까지 한 곳에서</p>
-                            <p style={{ fontSize: "12px", color: "#6b7280", margin: 0 }}>flow.google.com · 무료 50 크레딧/일 · 이미지 모델: Nano Banana 2</p>
+                            <p style={{ fontSize: "12px", color: "#6b7280", margin: 0 }}>labs.google/fx/tools/flow · 무료 50 크레딧/일 · 이미지 모델: Nano Banana 2</p>
                           </div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "12px" }}>
                           {[
                             "① 프롬프트 상자에서 Image 선택 → 비율 9:16 · Nano Banana 2 설정",
-                            "② 아래 AI 프롬프트 복사 → flow.google.com에 붙여넣기 → 생성",
+                            "② 아래 AI 프롬프트 복사 → labs.google/fx/tools/flow에 붙여넣기 → 생성",
                             "③ 마음에 들면 4K 업스케일링 → 영상(Veo 3.1 Quality)으로 변환",
                             "④ 크레딧 절약: 이미지 완성 후 영상 변환 순서 지키기",
                           ].map((step, i) => (
@@ -609,7 +609,7 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                                           <button onClick={() => { copy(prompt, promptKey); window.open(`https://www.bing.com/images/create?q=${encodeURIComponent(prompt)}`, "_blank"); }} style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "6px 12px", borderRadius: "6px", border: "none", background: "#0078d4", cursor: "pointer", fontFamily: FF }}>🚀 Bing AI</button>
                                           <button onClick={() => { copy(prompt, promptKey); window.open("https://app.leonardo.ai/ai-generations", "_blank"); }} style={{ fontSize: "12px", fontWeight: 700, color: "#fff", padding: "6px 12px", borderRadius: "6px", border: "none", background: "#7c3aed", cursor: "pointer", fontFamily: FF }}>Leonardo</button>
                                         </div>
-                                        <p style={{ fontSize: "12px", color: "#9ca3af", margin: "8px 0 0" }}>💡 복사 후 flow.google.com 또는 Bing AI에 붙여넣기(Ctrl+V)하면 즉시 생성됩니다</p>
+                                        <p style={{ fontSize: "12px", color: "#9ca3af", margin: "8px 0 0" }}>💡 복사 후 labs.google/fx/tools/flow 또는 Bing AI에 붙여넣기(Ctrl+V)하면 즉시 생성됩니다</p>
                                       </div>
                                     </div>
                                   );
@@ -761,7 +761,7 @@ export default function ContentTab({ initialKeyword }: { initialKeyword?: string
                       <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "14px 16px" }}>
                         <p style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", margin: "0 0 6px" }}>💡 Google Flow 영상 생성 가이드</p>
                         {[
-                          "① flow.google.com → 프롬프트 상자 → Video 선택",
+                          "① labs.google/fx/tools/flow → 프롬프트 상자 → Video 선택",
                           "② 모델: Quality (커머스 추천 · 왜곡 적음)",
                           "③ 길이: 각 씬에 명시된 초 선택",
                           "④ 프롬프트 복사 후 붙여넣기 → 생성",
