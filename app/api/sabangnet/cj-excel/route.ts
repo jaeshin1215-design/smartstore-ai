@@ -20,6 +20,11 @@ const HEADERS = [
   "수량", "", "상품명", "배송메시지", "쇼핑몰주문번호", "매출처명", "주문번호", "우편번호",
 ] as const;
 
+// 위탁업체 물류처 (2026-07-15 심유나 프로 확인): 2차 발주 시 딸려오는 위탁 건.
+//   waybill-match route의 CROSS_MATCH_LOGISTICS와 동일 집합 — 값 변경 시 양쪽 함께.
+const CONSIGNMENT_LOGISTICS = new Set(["오포물류", "오포_카노위탁"]);
+const isConsignment = (nm: unknown) => CONSIGNMENT_LOGISTICS.has(String(nm ?? ""));
+
 export async function GET(req: NextRequest) {
   if (!(await requireIntegrationStore(req))) {
     return NextResponse.json({ error: "이 스토어에서는 연동 기능을 사용할 수 없습니다." }, { status: 403 });
@@ -32,6 +37,8 @@ export async function GET(req: NextRequest) {
   const startDate = req.nextUrl.searchParams.get("startDate") ?? single ?? kstTodayCompact();
   const endDate = req.nextUrl.searchParams.get("endDate") ?? single ?? kstTodayCompact();
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx";
+  // 위탁업체 제외 다운로드 (2026-07-15 심유나 2차 발주용) — 기본 미적용(기존 동작 유지)
+  const excludeConsignment = req.nextUrl.searchParams.get("excludeConsignment") === "1";
   // 스토어 스코핑: 클라이언트 파라미터가 아니라 세션의 store_id (2026-07-09)
   const session = await getSession(req);
   const storeId = session?.storeId ?? null;
@@ -51,26 +58,35 @@ export async function GET(req: NextRequest) {
     //   ※ 이전 ORDER_CONFIRM 필터는 실제 "주문확인"(처리된 상태)이라 오히려 중복 유발했음(교정).
     const orders = await fetchSabangnetOrders(startDate, endDate, ["NEW_ORDER"]);
 
+    const consignmentCount = orders.filter((o) => isConsignment(o.LOGISTICS_NM)).length;
+
     // 미리보기 (화면 표시) — 전화·주소 마스킹 규칙 적용, 이름·상품명·주문번호는 원본 (2026-07-10)
+    // 위탁 건 배지/필터용으로 물류처명·위탁여부 동봉 (2026-07-15 심유나 2차 발주)
     if (format === "json") {
       return NextResponse.json({
         date: rangeLabel,
         startDate,
         endDate,
         order_count: orders.length,
+        consignment_count: consignmentCount,
         preview: orders.slice(0, 5).map((o) => ({
           receiver: o.RECEIVER_NM ?? "",
           product: composeProductName(o),
           shop: o.SHOP_NM ?? "",
           phone: maskPhone(o.RECEIVER_TEL),
           addr: maskAddr(o.RECEIVER_ADDR),
+          logistics: o.LOGISTICS_NM ?? "",
+          consignment: isConsignment(o.LOGISTICS_NM),
         })),
       });
     }
 
-    if (orders.length === 0) {
+    // 다운로드: 위탁업체 제외 토글이 켜졌으면 위탁 물류처 건 제거 (2차 발주 자사만)
+    const outOrders = excludeConsignment ? orders.filter((o) => !isConsignment(o.LOGISTICS_NM)) : orders;
+
+    if (outOrders.length === 0) {
       // 대상 상태(현재 신규주문 필터) 결과 0건 — 장애 아님, 안내로 처리 (2026-07-14)
-      const when = startDate === endDate ? "오늘" : "해당 기간에";
+      const when = excludeConsignment ? "위탁 제외 후" : startDate === endDate ? "오늘" : "해당 기간에";
       return NextResponse.json({ error: `${when} 조회된 신규주문이 없습니다.`, empty: true }, { status: 404 });
     }
 
@@ -79,7 +95,7 @@ export async function GET(req: NextRequest) {
     //   CEL 실질 비면 TEL로 채움 (업로드 빈칸 방지)
     // 수량 = CM_EA (실출고 수량, 2026-07-14 심유나 프로 확정 — ORD_CNT 아님)
     // F열(index 5) = 박스크기 수기입력용 빈칸, SellFit이 채우지 않음
-    const rows = orders.map((o) => [
+    const rows = outOrders.map((o) => [
       o.LOGISTICS_NM ?? "",                                          // A 물류처명
       o.RECEIVER_NM ?? "",                                          // B 수취인
       o.RECEIVER_ADDR ?? "",                                        // C 주소

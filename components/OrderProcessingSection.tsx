@@ -27,8 +27,9 @@ interface MatchSummary {
 interface CjSummary {
   date: string;
   order_count: number;
+  consignment_count: number; // 위탁업체(오포물류·오포_카노위탁) 건수
   // 전화·주소는 마스킹된 값 (화면 표시용) / 이름·상품명은 원본
-  preview: { receiver: string; product: string; shop: string; phone: string; addr: string }[];
+  preview: { receiver: string; product: string; shop: string; phone: string; addr: string; logistics: string; consignment: boolean }[];
 }
 
 function kstToday(): string {
@@ -47,6 +48,7 @@ export default function OrderProcessingSection() {
   const [cjMsg, setCjMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [cjSummary, setCjSummary] = useState<CjSummary | null>(null);
   const [cjPreviewLoading, setCjPreviewLoading] = useState(false);
+  const [excludeConsignment, setExcludeConsignment] = useState(false); // 위탁업체 제외 보기 (기본 OFF)
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchMsg, setMatchMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [summary, setSummary] = useState<MatchSummary | null>(null);
@@ -102,7 +104,8 @@ export default function OrderProcessingSection() {
   async function handleCjExcel() {
     setCjLoading(true);
     setCjMsg(null);
-    const r = await downloadFile(`/api/sabangnet/cj-excel?${cjRangeQS}&store_id=${storeId}`);
+    const excl = excludeConsignment ? "&excludeConsignment=1" : "";
+    const r = await downloadFile(`/api/sabangnet/cj-excel?${cjRangeQS}&store_id=${storeId}${excl}`);
     const label = isRange ? `${cStart}-${cEnd}` : cStart;
     setCjMsg(r.ok
       ? { ok: true, text: `다운로드 완료 — ${r.rows}건 (${label}_주문서확인처리_@cj택배.xlsx)` }
@@ -209,24 +212,50 @@ export default function OrderProcessingSection() {
 
         {cjSummary && (
           <div style={{ marginTop: 16, border: "1px solid #e8eaed", borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", background: "#f9fafb", fontSize: 13, color: "#111827", fontWeight: 700 }}>
-              {isRange ? "기간" : "오늘"} 주문 {cjSummary.order_count}건
-              <span style={{ fontWeight: 400, color: "#6b7280", marginLeft: 8 }}>
-                (상위 {cjSummary.preview.length}건 미리보기 · 전화·주소는 마스킹, 다운로드 파일은 원본)
+            <div style={{ padding: "12px 16px", background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: "#111827", fontWeight: 700 }}>
+                {isRange ? "기간" : "오늘"} 주문 {cjSummary.order_count}건
+                {cjSummary.consignment_count > 0 && (
+                  <span style={{ fontWeight: 400, color: "#c2410c", marginLeft: 8 }}>· 위탁 {cjSummary.consignment_count}건 포함</span>
+                )}
+                <span style={{ fontWeight: 400, color: "#6b7280", marginLeft: 8 }}>
+                  (상위 {cjSummary.preview.length}건 미리보기 · 전화·주소는 마스킹, 다운로드 파일은 원본)
+                </span>
               </span>
+              {/* 위탁업체 제외 보기 토글 — 위탁 건 있을 때만 노출 (기본 OFF) */}
+              {cjSummary.consignment_count > 0 && (
+                <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#374151", cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox" checked={excludeConsignment} onChange={(e) => setExcludeConsignment(e.target.checked)}
+                    style={{ accentColor: "#ef567c", width: 15, height: 15, cursor: "pointer" }} />
+                  위탁업체 제외 보기
+                </label>
+              )}
             </div>
+            {excludeConsignment && cjSummary.consignment_count > 0 && (
+              <div style={{ padding: "8px 16px", background: "#fff7ed", borderBottom: "1px solid #fed7aa", fontSize: 11, color: "#c2410c", lineHeight: 1.6 }}>
+                위탁업체 건 숨김 중 — 다운로드 시에도 위탁 물류처(오포물류·오포_카노위탁) 건이 제외됩니다. (2차 발주 자사 제품만)
+              </div>
+            )}
             {cjSummary.preview.length > 0 && (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ borderTop: "1px solid #e8eaed", borderBottom: "1px solid #e8eaed" }}>
-                    {["수취인", "상품명", "매출처명", "전화", "주소"].map((h) => (
+                    {["물류처", "수취인", "상품명", "매출처명", "전화", "주소"].map((h) => (
                       <th key={h} style={{ textAlign: "left", padding: "8px 16px", fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {cjSummary.preview.map((r, i) => (
+                  {cjSummary.preview
+                    .filter((r) => !(excludeConsignment && r.consignment))
+                    .map((r, i) => (
                     <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "8px 16px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                        {r.logistics}
+                        {r.consignment && (
+                          <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>위탁</span>
+                        )}
+                      </td>
                       <td style={{ padding: "8px 16px", color: "#111827" }}>{r.receiver}</td>
                       <td style={{ padding: "8px 16px", color: "#374151", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.product}</td>
                       <td style={{ padding: "8px 16px", color: "#6b7280" }}>{r.shop}</td>
