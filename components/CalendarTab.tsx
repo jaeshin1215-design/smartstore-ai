@@ -151,7 +151,7 @@ function ThisWeekTodos({ plan, star }: { plan: MonthPlan; star: string }) {
 
   const todos = [
     { key:"t1", label:`${plan.focusKeywords[0] ?? "주력 상품"} 재고 수준 확인`, icon:"📦" },
-    { key:"t2", label:`${star} 상품 광고 예산 배분 점검`, icon:"💰" },
+    { key:"t2", label:`${star === "효자" ? "효자 상품" : star} 광고 예산 배분 점검`, icon:"💰" },
     { key:"t3", label:"전주 대비 마진율 변동 체크", icon:"📊" },
     ...(plan.seasonSpice ? [{ key:"t4", label:`${plan.seasonSpice} 시즌 대비 재고 선확보`, icon:"🌶" }] : []),
   ];
@@ -465,7 +465,7 @@ function MonthDetailView({ detail, onBack, star }: { detail: MonthDetail; onBack
 
   const WEEK_FLOW = [
     { label:"1W", title:"들이기", desc:`${plan.focusKeywords[0]} 신규 재고 확인 및 발주` },
-    { label:"2W", title:"키우기", desc:`${star} 상품 광고 예산 집중 배분` },
+    { label:"2W", title:"키우기", desc:`${star === "효자" ? "효자 상품" : star} 광고 예산 집중 배분` },
     { label:"3W", title:"데이터", desc:"전월 대비 마진율 재계산 및 매트릭스 업데이트" },
     { label:"4W", title:"피크",   desc:plan.seasonSpice ? `${plan.seasonSpice} 타이밍 — 피크 전 노출 극대화` : "월말 재고 소진 및 다음 달 선기획" },
   ];
