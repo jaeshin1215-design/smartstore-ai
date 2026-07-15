@@ -83,6 +83,8 @@ interface BoardRow {
   level: SafetyLevel | null;
   margin_warn_pct: number | null;   // 이력 테이블 강조 기준 (판정 로직 무변경, 표시용 전달)
   margin_danger_pct: number | null;
+  fee_rate: number | null;          // 쿠팡 판매수수료율(%) — 카테고리 참고값
+  fee_confirmed: boolean;           // true=확정 / false=추정(참고값)
   is_item_winner: number | null;
   last_checked_at: string | null;
   history: { check_date: string; price: number; margin_pct: number | null }[];
@@ -93,9 +95,16 @@ export async function GET(req: NextRequest) {
   const storeId = await resolveStoreId(req, req.nextUrl.searchParams.get("store_id"));
   if (!storeId) return NextResponse.json({ error: "store_id 필요" }, { status: 400 });
 
+  // 카테고리별 수수료율 매핑 (참고값, 2026-07-14) — category 기준 조인용
+  const feeRatesResult = await db.execute("SELECT category, fee_rate, is_confirmed FROM sellfit_fee_rates").catch(() => ({ rows: [] as Record<string, unknown>[] }));
+  const feeByCategory = new Map<string, { rate: number | null; confirmed: boolean }>();
+  for (const f of feeRatesResult.rows) {
+    feeByCategory.set(String(f.category), { rate: f.fee_rate != null ? Number(f.fee_rate) : null, confirmed: Number(f.is_confirmed) === 1 });
+  }
+
   // 추적 대상: 쿠팡 URL이 등록됐거나 캡처 이력이 있는 상품
   const productsResult = await db.execute({
-    sql: `SELECT id, name, is_own, purchase_price, coupang_url, margin_warn_pct, margin_danger_pct
+    sql: `SELECT id, name, is_own, purchase_price, coupang_url, margin_warn_pct, margin_danger_pct, category
           FROM sellfit_products WHERE store_id = ?`,
     args: [storeId],
   });
@@ -166,6 +175,8 @@ export async function GET(req: NextRequest) {
       level: judgeMargin(marginPct, warnPct, dangerPct),
       margin_warn_pct: warnPct,
       margin_danger_pct: dangerPct,
+      fee_rate: feeByCategory.get(String(p.category ?? ""))?.rate ?? null,
+      fee_confirmed: feeByCategory.get(String(p.category ?? ""))?.confirmed ?? false,
       is_item_winner: itemWinner,
       last_checked_at: latest ? String(latest.captured_at) : null,
       history,

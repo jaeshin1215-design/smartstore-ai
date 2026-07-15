@@ -24,6 +24,8 @@ interface BoardRow {
   level: "안전" | "주의" | "위험" | null;
   margin_warn_pct: number | null;
   margin_danger_pct: number | null;
+  fee_rate: number | null;      // 쿠팡 수수료율(%) 카테고리 참고값
+  fee_confirmed: boolean;       // true=확정 / false=추정(참고값)
   is_item_winner: number | null;
   last_checked_at: string | null;
   history: HistoryPoint[];
@@ -71,10 +73,17 @@ function isSpot(pts: HistoryPoint[], i: number): boolean {
 
 function shortDate(d: string) { const m = d.match(/(\d{2})-(\d{2})$/); return m ? `${m[1]}/${m[2]}` : d; }
 
-function DetailChart({ history, supplyPrice, marginWarn, marginDanger }: { history: HistoryPoint[]; supplyPrice: number | null; marginWarn: number | null; marginDanger: number | null }) {
+// 수수료율 참고값 라벨 (옅은 회색·작게 — 실캡처값과 성격 구분)
+function feeLabel(feeRate: number | null, feeConfirmed: boolean): string | null {
+  if (feeRate == null) return null;
+  return feeConfirmed ? `${feeRate}%` : `${feeRate}% (참고값)`;
+}
+
+function DetailChart({ history, supplyPrice, marginWarn, marginDanger, feeRate, feeConfirmed }: { history: HistoryPoint[]; supplyPrice: number | null; marginWarn: number | null; marginDanger: number | null; feeRate: number | null; feeConfirmed: boolean }) {
   const points = history.slice(-30);
   const [activeIdx, setActiveIdx] = useState<number | null>(null); // 툴팁 대상 (호버/탭)
   const [showTable, setShowTable] = useState(false);
+  const fee = feeLabel(feeRate, feeConfirmed);
 
   if (points.length < 2) {
     return <div style={{ fontSize: 12, color: "#9ca3af", padding: "16px 0" }}>그래프는 2일 이상 수집 후 표시됩니다.</div>;
@@ -129,19 +138,24 @@ function DetailChart({ history, supplyPrice, marginWarn, marginDanger }: { histo
           <text x={0} y={y(min) + 4} fontSize={10} fill="#6b7280">{min.toLocaleString()}</text>
         )}
 
-        {/* 툴팁 — 활성 포인트: 일자·판매가·마진율 (수수료율은 답변 후 추가 예정) */}
+        {/* 툴팁 — 활성 포인트: 일자·판매가·마진율(실캡처) + 수수료율(카테고리 참고값·옅은색) */}
         {at && (() => {
-          const tx = Math.min(Math.max(x(activeIdx!) - 52, 2), w - 108);
-          const ty = Math.max(y(at.price) - 52, 2);
+          const boxH = fee ? 58 : 44;
+          const boxW = fee ? 128 : 106;
+          const tx = Math.min(Math.max(x(activeIdx!) - boxW / 2, 2), w - boxW - 2);
+          const ty = Math.max(y(at.price) - boxH - 8, 2);
           return (
             <g pointerEvents="none">
               <line x1={x(activeIdx!)} y1={padY} x2={x(activeIdx!)} y2={h - padY} stroke="#e5e7eb" strokeWidth={1} />
-              <rect x={tx} y={ty} width={106} height={44} rx={6} fill="#111827" opacity={0.92} />
+              <rect x={tx} y={ty} width={boxW} height={boxH} rx={6} fill="#111827" opacity={0.92} />
               <text x={tx + 8} y={ty + 15} fontSize={10} fill="#fff" fontWeight={700}>{shortDate(at.check_date)}</text>
               <text x={tx + 8} y={ty + 28} fontSize={10} fill="#e5e7eb">판매가 {at.price.toLocaleString()}원</text>
               <text x={tx + 8} y={ty + 39} fontSize={10} fill={belowThreshold(at.margin_pct) ? "#fca5a5" : "#86efac"}>
                 마진율 {at.margin_pct != null ? `${at.margin_pct}%` : "—"}
               </text>
+              {fee && (
+                <text x={tx + 8} y={ty + 51} fontSize={9} fill="#9ca3af">수수료 {fee}</text>
+              )}
             </g>
           );
         })()}
@@ -153,7 +167,15 @@ function DetailChart({ history, supplyPrice, marginWarn, marginDanger }: { histo
         {showTable ? "이력 접기 ▲" : "이력 보기 ▼"}
       </button>
       {showTable && (
-        <div style={{ overflowX: "auto", marginTop: 10, border: "1px solid #eef0f2", borderRadius: 8 }}>
+        <div style={{ marginTop: 10, border: "1px solid #eef0f2", borderRadius: 8, overflow: "hidden" }}>
+          {/* 수수료율 — 카테고리 참고값(옅은색·작게). 판매가·마진율(실캡처)과 성격 구분 */}
+          {fee && (
+            <div style={{ padding: "6px 12px", background: "#fafbfc", borderBottom: "1px solid #eef0f2", fontSize: 11, color: "#9ca3af" }}>
+              쿠팡 판매수수료율 <span style={{ fontWeight: 700, color: "#6b7280" }}>{fee}</span>
+              <span style={{ marginLeft: 6 }}>· 카테고리 기준{feeConfirmed ? "" : " 추정값"} (실캡처값 아님)</span>
+            </div>
+          )}
+          <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e8eaed" }}>
@@ -183,6 +205,7 @@ function DetailChart({ history, supplyPrice, marginWarn, marginDanger }: { histo
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
@@ -312,7 +335,7 @@ export default function PriceGuardBoard({ storeId }: { storeId: string }) {
                           <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1e", marginBottom: 8 }}>
                             판매가 변동 (최근 30일) — BM 광고비 협상 근거 화면
                           </div>
-                          <DetailChart history={r.history} supplyPrice={r.supply_price} marginWarn={r.margin_warn_pct} marginDanger={r.margin_danger_pct} />
+                          <DetailChart history={r.history} supplyPrice={r.supply_price} marginWarn={r.margin_warn_pct} marginDanger={r.margin_danger_pct} feeRate={r.fee_rate} feeConfirmed={r.fee_confirmed} />
                           <div style={{ display: "flex", gap: 24, marginTop: 12, fontSize: 12, color: "#6b7280", flexWrap: "wrap" }}>
                             <span>
                               마진율 추이:{" "}
