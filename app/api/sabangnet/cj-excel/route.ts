@@ -35,10 +35,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 신규주문(=ORDER_CONFIRM, 송장 미발급 = 미발주)만 조회.
-    // 발주 완료건은 DELIVERY_WAITING 등으로 넘어가 재조회되지 않음 → 2차 발주 중복 방지
-    // (2026-07-14 프로브: ORDER_CONFIRM 21건 전부 송장없음, DELIVERY_WAITING 30건 전부 송장있음)
-    const orders = await fetchSabangnetOrders(date, date, ["ORDER_CONFIRM"]);
+    // 신규주문(NEW_ORDER)만 조회 = 발주 대상. 2026-07-15 심유나 프로 화면 대조 확정:
+    //   NEW_ORDER=신규주문 / DELIVERY_WAITING=출고대기(운송장 등록됨).
+    //   1차 발주 후 출고대기로 넘어간 건은 재조회 안 됨 → 2차 발주 중복 방지.
+    //   ※ 이전 ORDER_CONFIRM 필터는 실제 "주문확인"(처리된 상태)이라 오히려 중복 유발했음(교정).
+    const orders = await fetchSabangnetOrders(date, date, ["NEW_ORDER"]);
 
     // 미리보기 (화면 표시) — 전화·주소 마스킹 규칙 적용, 이름·상품명·주문번호는 원본 (2026-07-10)
     if (format === "json") {
