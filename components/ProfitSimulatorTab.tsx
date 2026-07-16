@@ -50,7 +50,6 @@ interface SimPreset {
   // 이지스토리 정산 규칙 (izStory 전용, generic은 undefined → 규칙 미적용 = 표준 계산)
   //   이다슬 프로 규칙서 원문 (2026-07-15 확정)
   settlementRules?: {
-    swapMNChannels: string[];                    // 이 채널은 N_calc = rawN × 배율 (원룸만들기: M←rawN 스왑)
     shippingMultipliers: Record<string, number>; // 배송비매출 G에 곱하는 배율 (스마트스토어 0.96 · 이모야킨지로 0)
     crossLogistics: string[];                    // 물류처가 이 목록이 아니면 S·T·U=0 (오포물류 · 유비엘)
     zeroCostChannels: string[];                  // 원가 R=0 강제 (이모야킨지로 — 2026-07-16 이다슬 확정)
@@ -82,16 +81,15 @@ const IZ_PRESET: SimPreset = {
   demoDrop: IZ_DROP,
   demoStar: IZ_STAR,
   // 채널명은 규칙서 원문 표기로 완전일치 (2026-07-15 이다슬 확정 — 정규화·부분일치 없음)
+  // ※ 이 배율은 "공급가(N)가 비어 있을 때만" M×배율로 N을 생성하는 폴백용.
+  //    이다슬 프로 실제집계 파일의 N에는 이미 배율이 적용돼 있어 그대로 사용한다(195건 전수대조 확정).
   settlementMultipliers: { "띵샵(신)": 0.88, "원룸만들기": 0.85, "현대홈쇼핑(3)": 1.1, "(통합)블루베리": 0.85, "이모야킨지로": 0.08 },
   settlementRules: {
-    // rawN 기반 채널(N_calc = rawN × 배율): 원룸만들기 ×0.85, 현대홈쇼핑(3) ×1.1
-    //   (규칙서: 현대홈쇼핑 "N란 내용변경 = 기존데이터×1.1") · 나머지 특수는 M×배율
-    swapMNChannels: ["원룸만들기", "현대홈쇼핑(3)"],
     shippingMultipliers: { "스마트스토어": 0.96, "이모야킨지로": 0 },
     crossLogistics: ["오포물류", "유비엘"],
     zeroCostChannels: ["이모야킨지로"],   // 위탁 운영수수료 채널 — 원가 미발생
   },
-  settlementNote: "이다슬 규칙서 반영 — 특수 5종 N=M×배율(원룸만들기·현대홈쇼핑(3)은 rawN×배율) · 일반채널 N=rawN · 배송비 G=F/1.1(스마트스토어×0.96·이모야킨지로 0) · 원가측 R=P×Q/1.1(이모야킨지로 R=0)·S·T(2%)·U(20%, V 미포함 표시만) · 물류처 예외(오포물류·유비엘 외 S·T·U=0) · 매출이익=AA−AB. 채널명은 현 표기 완전일치(사방넷·채널 업데이트 시 이다슬 프로 재공유 예정) · Phase2: 사방넷 API 연동 시 업로드 제거, 로직 재사용",
+  settlementNote: "이다슬 실제집계 파일(0628-0630) 195건 전수대조 일치 (2026-07-16) — 공급가 N 그대로 사용(배율 기적용 값, 비었을 때만 M×배율 폴백) · O=N/1.1 · 배송비 G=F/1.1(스마트스토어×0.96·이모야킨지로 0) · AA=G+O · 원가측 R=P×Q/1.1(이모야킨지로 R=0)·S·T(2%)·U(20%, V 미포함 표시만) · 물류처 예외(오포물류·유비엘 외 S·T·U=0) · AB=V · 매출이익=AA−AB. 채널명 현 표기 완전일치(사방넷·채널 업데이트 시 이다슬 프로 재공유 예정) · Phase2: 사방넷 API 연동 시 업로드 제거, 로직 재사용",
 };
 
 const GENERIC_PRESET: SimPreset = {
@@ -633,11 +631,10 @@ export default function ProfitSimulatorTab() {
                   const F = colShipping ? (Number(row[colShipping]) || 0) : 0;        // 폴백: 0
                   const Y = colLogistics ? String(row[colLogistics] ?? "").trim() : "";
                   const mult = MULT[ch];                                              // 특수 5종만 존재
-                  // 매출측
-                  let Ncalc: number;
-                  if (RULES?.swapMNChannels.includes(ch)) Ncalc = Nraw * (mult ?? 1); // 원룸: rawN×배율
-                  else if (mult != null) Ncalc = M * mult;                            // 특수 나머지 4종
-                  else Ncalc = Nraw;                                                  // 일반/그 외
+                  // 매출측 — 공급가 N에는 이미 채널 배율이 적용돼 있음 (2026-07-16 실제집계 파일 195건 전수대조로 확정).
+                  //   따라서 N이 있으면 그대로 쓴다(배율 재적용 = 이중 적용 오류).
+                  //   N이 비어 있을 때만 특수 5종에 한해 M×배율로 생성한다(구 raw 양식 대비 폴백).
+                  const Ncalc = Nraw > 0 ? Nraw : (mult != null ? M * mult : 0);
                   const O = Ncalc / 1.1;
                   let G = F / 1.1;
                   const shipMult = RULES?.shippingMultipliers[ch];
