@@ -45,3 +45,6 @@ next-env.d.ts
 
 # scratch 전체 — 일회성 스크립트·고객 PII 산출물 (공개 리포 커밋 금지, 2026-07-10)
 /scratch/
+
+# 캡처 검증용 Chrome for Testing (420MB) — 커밋·배포 금지 (2026-07-16)
+/chrome/

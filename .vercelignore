@@ -1,0 +1,5 @@
+# 배포 업로드 제외 (2026-07-16)
+# chrome/ — 화면 캡처 검증용 Chrome for Testing (약 420MB). 런타임 불필요, 100MB 업로드 한도 초과 유발.
+chrome/
+# scratch/ — 일회성 스크립트·고객 PII 산출물. 배포 대상 아님 (.gitignore와 동일 기준)
+scratch/
