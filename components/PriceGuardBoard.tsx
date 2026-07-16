@@ -273,6 +273,22 @@ export default function PriceGuardBoard({ storeId }: { storeId: string }) {
         </div>
       </div>
 
+      {/* 매입가 미등록 안내 (2026-07-16 쿠팡 상품리스트 신규 등록분) — 마진율 미표시 사유 + 중복 가능성 */}
+      {(() => {
+        const noCost = rows.filter(r => r.margin_pct == null).length;
+        if (noCost === 0) return null;
+        return (
+          <div style={{
+            background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8,
+            padding: "9px 14px", marginBottom: 12, fontSize: 11, color: "#c2410c", lineHeight: 1.7,
+          }}>
+            ⓘ <b>{noCost}건은 매입가가 없어 마진율이 표시되지 않습니다</b> — 판매가·아이템위너만 추적됩니다.
+            쿠팡 상품리스트로 신규 등록한 상품이며, <b>기존 등록 상품과 중복일 수 있습니다</b>(상품명 표기 체계가 달라 자동 매칭 불가).
+            매입가 매핑·중복 정리는 이다슬 프로 확인 후 진행 예정입니다.
+          </div>
+        );
+      })()}
+
       {/* 상품별 행 */}
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
