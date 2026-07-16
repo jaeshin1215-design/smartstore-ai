@@ -275,7 +275,8 @@ export default function PriceGuardBoard({ storeId }: { storeId: string }) {
 
       {/* 매입가 미등록 안내 (2026-07-16 쿠팡 상품리스트 신규 등록분) — 마진율 미표시 사유 + 중복 가능성 */}
       {(() => {
-        const noCost = rows.filter(r => r.margin_pct == null).length;
+        // 매입가 없음(공급가 0/null)과 "매입가는 있으나 아직 수집 전"은 다른 사유 — 섞지 않는다
+        const noCost = rows.filter(r => r.supply_price == null || r.supply_price === 0).length;
         if (noCost === 0) return null;
         return (
           <div style={{
