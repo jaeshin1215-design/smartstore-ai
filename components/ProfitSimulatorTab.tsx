@@ -53,6 +53,7 @@ interface SimPreset {
     swapMNChannels: string[];                    // 이 채널은 N_calc = rawN × 배율 (원룸만들기: M←rawN 스왑)
     shippingMultipliers: Record<string, number>; // 배송비매출 G에 곱하는 배율 (스마트스토어 0.96 · 이모야킨지로 0)
     crossLogistics: string[];                    // 물류처가 이 목록이 아니면 S·T·U=0 (오포물류 · 유비엘)
+    zeroCostChannels: string[];                  // 원가 R=0 강제 (이모야킨지로 — 2026-07-16 이다슬 확정)
   };
 }
 
@@ -88,8 +89,9 @@ const IZ_PRESET: SimPreset = {
     swapMNChannels: ["원룸만들기", "현대홈쇼핑(3)"],
     shippingMultipliers: { "스마트스토어": 0.96, "이모야킨지로": 0 },
     crossLogistics: ["오포물류", "유비엘"],
+    zeroCostChannels: ["이모야킨지로"],   // 위탁 운영수수료 채널 — 원가 미발생
   },
-  settlementNote: "이다슬 규칙서 반영 — 특수 5종 N=M×배율(원룸만들기는 rawN×0.85) · 일반채널 N=rawN · 배송비 G=F/1.1(스마트스토어×0.96·이모야킨지로 0) · 원가측 R=P×Q/1.1·S·T(2%)·U(20%, V 미포함 표시만) · 물류처 예외(오포물류·유비엘 외 S·T·U=0) · 마진=AA−AB. ※ 마진 최종식은 우리 구성(검증 예정) · Phase2: 사방넷 API 연동 시 업로드 제거, 로직 재사용",
+  settlementNote: "이다슬 규칙서 반영 — 특수 5종 N=M×배율(원룸만들기·현대홈쇼핑(3)은 rawN×배율) · 일반채널 N=rawN · 배송비 G=F/1.1(스마트스토어×0.96·이모야킨지로 0) · 원가측 R=P×Q/1.1(이모야킨지로 R=0)·S·T(2%)·U(20%, V 미포함 표시만) · 물류처 예외(오포물류·유비엘 외 S·T·U=0) · 매출이익=AA−AB. 채널명은 현 표기 완전일치(사방넷·채널 업데이트 시 이다슬 프로 재공유 예정) · Phase2: 사방넷 API 연동 시 업로드 제거, 로직 재사용",
 };
 
 const GENERIC_PRESET: SimPreset = {
@@ -616,7 +618,8 @@ export default function ProfitSimulatorTab() {
                 //          G=F/1.1(스마트스토어×0.96·이모야 0) → AA=G+O
                 //   원가측 R=P×Q/1.1 · S=T=R×0.02 · U=R×0.2 · V=R+S+T(U 미포함) → AB=V
                 //   물류처 예외: Y가 오포물류·유비엘 아니면 S·T·U=0
-                //   마진액=AA−AB · 마진율=(AA−AB)/AA  (※ 최종식은 우리 구성·검증 예정)
+                //   매출이익=AA−AB · 매출이익률=(AA−AB)/AA
+                //   ※ 최종이익 아님 — 광고비·배송비 제외 전 (이다슬 프로 별도 반영, 2026-07-16 확정)
                 const MULT = preset.settlementMultipliers;
                 const RULES = preset.settlementRules;
                 type Agg = { count: number; O: number; G: number; AA: number; R: number; S: number; T: number; U: number; AB: number };
@@ -640,8 +643,8 @@ export default function ProfitSimulatorTab() {
                   const shipMult = RULES?.shippingMultipliers[ch];
                   if (shipMult != null) G *= shipMult;                                // 스마트스토어 0.96·이모야 0
                   const AA = G + O;
-                  // 원가측
-                  const R = (P * Q) / 1.1;
+                  // 원가측 — 이모야킨지로 등 위탁 운영수수료 채널은 R=0 (2026-07-16 이다슬 확정)
+                  const R = RULES?.zeroCostChannels.includes(ch) ? 0 : (P * Q) / 1.1;
                   let S = R * 0.02, T = R * 0.02, U = R * 0.2;
                   if (RULES && colLogistics && !RULES.crossLogistics.includes(Y)) { S = 0; T = 0; U = 0; }
                   const AB = R + S + T;                                               // V=R+S+T (U 미포함), AB=V
@@ -665,12 +668,15 @@ export default function ProfitSimulatorTab() {
                 const missing = [!colSupplyAmt && "공급가N", !colShipping && "배송비F", !colQty && "수량Q", !colLogistics && "물류처Y"].filter(Boolean);
                 return (
                   <div>
-                    <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>채널별 마진 보드 · 총 {uploadedRows.length}건 (AA 상품매출 / AB 상품총원가 / U 물류비)</div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>채널별 매출이익 보드 · 총 {uploadedRows.length}건 (AA 상품매출 / AB 상품총원가 / U 물류비)</div>
+                    <div style={{ fontSize: "11px", color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "7px 10px", marginBottom: "10px", lineHeight: 1.6 }}>
+                      ※ 여기 표시되는 값은 <b>매출이익</b>(AA−AB)입니다. <b>최종이익이 아닙니다</b> — 광고비·배송비는 제외 전이며, 이다슬 프로가 광고비 시스템에서 직접 확인해 별도 반영합니다. (2026-07-16 확정)
+                    </div>
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                         <thead>
                           <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-                            {["채널", "건수", "AA 상품매출", "AB 상품총원가", "U 물류비", "마진액", "마진율"].map(h => (
+                            {["채널", "건수", "AA 상품매출", "AB 상품총원가", "U 물류비", "매출이익", "매출이익률"].map(h => (
                               <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: "10px", color: "#9ca3af", fontWeight: 600, letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                             ))}
                           </tr>
