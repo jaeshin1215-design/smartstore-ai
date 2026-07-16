@@ -148,9 +148,9 @@ export default function OrderProcessingSection() {
 
   return (
     <div style={{ fontFamily: FF }}>
-      {/* 대상 기간 (주문일 기준) */}
+      {/* 대상 기간 (배송희망일 기준 — 2026-07-16 심유나 실측 대조 확정) */}
       <div style={{ ...CARD, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>대상 기간 (주문일)</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>대상 기간 (배송희망일)</span>
         {/* 프리셋 버튼 */}
         <div style={{ display: "flex", gap: 6 }}>
           {[{ label: "오늘", n: 0 }, { label: "최근 3일", n: 2 }, { label: "최근 7일", n: 6 }].map((p) => {
@@ -181,7 +181,7 @@ export default function OrderProcessingSection() {
           />
         </div>
         <span style={{ fontSize: 12, color: "#9ca3af" }}>
-          {isRange ? `${cStart}~${cEnd} 기간 조회` : "기본값 오늘 — 사방넷 주문일 기준"}
+          {isRange ? `${cStart}~${cEnd} 기간 조회` : "기본값 오늘 — 사방넷 배송희망일 기준"}
         </span>
       </div>
 

@@ -66,7 +66,12 @@ export async function fetchSabangnetOrders(startDate: string, endDate: string, o
   while (true) {
     const body = JSON.stringify({
       startDate, endDate,
-      dateSearchCondition: 1, // 주문일 기준
+      // 배송희망일 기준 (2026-07-16 심유나 프로 실측 대조로 확정 — 이전 "주문일 기준" 주석은 오류)
+      //   근거: 사방넷 UI [배송희망일·20260716·신규주문] 82건 ↔ API cond=1 84건(그 사이 2건 인입) 일치.
+      //         cond=1 반환건은 배송희망일이 100% 조회일과 일치, 주문일은 36/84만 일치 → 주문일 기준 아님.
+      //         참고: 주문일 기준은 cond=2 (36건). cond=3·4·5는 0건.
+      //   ※ 이 계정은 수집일==배송희망일이라 API상 두 기준의 결과가 동일 — 실무 영향 없음.
+      dateSearchCondition: 1,
       page, perPage: 500,
       updateOrderStsYn: "N", // 절대 상태변경 없음 (읽기 전용)
       responseItems: ORDER_FIELDS,
