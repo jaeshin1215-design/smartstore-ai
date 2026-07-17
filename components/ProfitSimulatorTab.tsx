@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { T5_MULTIPLIERS, T5_SHIPPING, T5_ZEROCOST, CROSS_LOGISTICS } from "@/lib/settlement-rules";
+import SettlementSection from "@/components/SettlementSection";
 
 const PINK = { main: "#D4537E", mid: "#E89CB8", light: "#FBEAF0", text: "#993556" };
 const CARD: React.CSSProperties = {
@@ -720,6 +721,9 @@ export default function ProfitSimulatorTab() {
             </div>
           )}
         </div>
+
+        {/* ══ BLOCK 4.5: 정산매출 자동화 (박혜미 T6) — IZ 전용 ══ */}
+        {preset === IZ_PRESET && <SettlementSection />}
 
         {/* ══ BLOCK 5: 채널별 광고 집계 ══ */}
         <div style={{ ...CARD }}>
