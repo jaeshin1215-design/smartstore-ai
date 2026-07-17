@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const text = await callClaude(prompt, 500);
+    const text = await callClaude(prompt, 500, { feature: "offer" });
     const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
     let depth = 0, start = -1;
     for (let i = 0; i < clean.length; i++) {

@@ -39,8 +39,8 @@ JSON만 출력 (설명 없이): {"keyword_strategy":{"main_keyword":"메인키�
 
   try {
     const [raw1, raw2] = await Promise.all([
-      callClaude(p1, 1500),
-      callClaude(p2, 1500),
+      callClaude(p1, 1500, { feature: "seo" }),
+      callClaude(p2, 1500, { feature: "seo" }),
     ]);
 
     function extractJson(raw: string): Record<string, unknown> | null {

@@ -1,6 +1,7 @@
 export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
+import { logLlmUsage, geminiTokens } from "@/lib/llm-usage";
 
 // 화분 전용 프롬프트 템플릿 (2026-07-13 강희원 차장 건 — Google Flow 실증 검증 문구)
 // ⚠️ Gemini 생성 금지: 검증된 골격이 한 글자도 바뀌지 않도록 코드 레벨 고정.
@@ -104,6 +105,8 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await res.json();
+  const t = geminiTokens(data);
+  void logLlmUsage({ feature: "imageplan", model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
   try {

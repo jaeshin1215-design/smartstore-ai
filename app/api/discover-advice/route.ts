@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 - 합쇼체, 군더더기 없이 직설적으로
 - 이모지 없음`;
 
-  return new Response(createGeminiStream(prompt, 200), {
+  return new Response(createGeminiStream(prompt, 200, { feature: "discover-advice" }), {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }

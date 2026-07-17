@@ -28,7 +28,7 @@ ${history}
 AI:`;
 
   try {
-    const raw = await callClaude(prompt, 250);
+    const raw = await callClaude(prompt, 250, { feature: "voice-chat" });
     const text = raw.replace(/^AI:\s*/i, "").trim();
     return NextResponse.json({ text });
   } catch (e) {

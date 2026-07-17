@@ -21,7 +21,7 @@ JSON만 반환 (다른 텍스트 없음):
 {"score": 정수, "label": "우수" 또는 "보통" 또는 "주의", "evidence": "한 줄 근거 (40자 이내)"}`;
 
   try {
-    const raw = await callGemini(prompt, 100);
+    const raw = await callGemini(prompt, 100, { feature: "channel-score" });
     const cleaned = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleaned) as { score: number; label: string; evidence: string };
     return NextResponse.json(parsed);

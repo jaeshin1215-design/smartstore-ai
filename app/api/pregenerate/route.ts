@@ -3,6 +3,7 @@ export const maxDuration = 60;
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { logLlmUsage, geminiTokens, type LlmLogMeta } from "@/lib/llm-usage";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -10,7 +11,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 const GEMINI_URL = (key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
 
-async function callGeminiJSON(systemPrompt: string, userPrompt: string): Promise<Record<string, unknown>> {
+async function callGeminiJSON(systemPrompt: string, userPrompt: string, meta?: LlmLogMeta): Promise<Record<string, unknown>> {
   const apiKey = process.env.GEMINI_API_KEY!;
   const body = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -31,10 +32,15 @@ async function callGeminiJSON(systemPrompt: string, userPrompt: string): Promise
       });
       if (!res.ok) throw new Error(`Gemini ${res.status}`);
       const data = await res.json();
+      const t = geminiTokens(data);
+      void logLlmUsage({ ...meta, model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
       return JSON.parse(text);
     } catch {
-      if (attempt === 1) return {};
+      if (attempt === 1) {
+        void logLlmUsage({ ...meta, model: "gemini-2.5-flash", input_tokens: 0, output_tokens: 0, success: false });
+        return {};
+      }
     }
   }
   return {};
@@ -246,7 +252,7 @@ export async function POST(req: NextRequest) {
 
       const userPrompt = `다음 상품을 분석하고 OUTPUT FORMAT STRICT에 따라 JSON으로만 응답하세요.${extraNote}\n\n${JSON.stringify(inputData, null, 2)}`;
 
-      const result = await callGeminiJSON(systemPrompt, userPrompt);
+      const result = await callGeminiJSON(systemPrompt, userPrompt, { feature: "pregenerate", storeId });
       reportParts.push({ product: String(p.name), category, analysis: result });
     }
 

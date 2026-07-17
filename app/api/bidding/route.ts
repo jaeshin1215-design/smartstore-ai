@@ -81,7 +81,7 @@ ${breakEvenSection}
 - estimated_cpc_range는 반드시 "최솟값~최댓값원" 형식으로 작성
 - break_even_limit는 모든 키워드에 동일하게 "${breakEvenDisplay}" 적용`;
 
-  return new Response(createGeminiStream(prompt, 800), {
+  return new Response(createGeminiStream(prompt, 800, { feature: "bidding" }), {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }

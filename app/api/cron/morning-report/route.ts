@@ -132,7 +132,7 @@ export async function GET() {
     try {
       const raw = await callClaude(
         `지금은 ${month}월 ${season} 시즌입니다. 스마트스토어에서 지금 잘 팔리는 상품 키워드 5개를 JSON 배열로만 답해주세요: ["키워드1","키워드2","키워드3","키워드4","키워드5"]`,
-        150
+        150, { feature: "morning-report-season" }
       );
       const parsed = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
       if (Array.isArray(parsed) && parsed.length >= 3) keywords = parsed.slice(0, 5);
@@ -172,7 +172,7 @@ export async function GET() {
         .join("\n");
       const raw = await callClaude(
         `스마트스토어 셀러를 위해 각 키워드의 트렌드 한 줄 코멘트를 작성해주세요. 형식: "지금 [키워드] 검색량 [상태] → [행동 제안]" (25자 이내)\n\n${summaries}\n\nJSON 형식으로만: {"키워드1": "코멘트1", "키워드2": "코멘트2"}`,
-        400
+        400, { feature: "morning-report-comment" }
       );
       comments = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
     } catch { /* 기본 코멘트 사용 */ }
@@ -203,7 +203,7 @@ ${summaryText}
 1. 오늘 가장 주목할 키워드 1~2개와 이유
 2. 이 시즌 스마트스토어 트렌드 흐름
 3. 오늘 Jae가 바로 실행할 수 있는 구체적 행동 2가지`,
-        600
+        600, { feature: "morning-report-ai" }
       );
     } catch { /* 기본값 유지 */ }
 
@@ -223,7 +223,7 @@ ${summaryText}
 [아웃트로] (15초) - 구독 유도
 
 자연스러운 구어체로 작성하되, 각 섹션 제목과 예상 발화 시간 포함.`,
-        800
+        800, { feature: "morning-report-youtube" }
       );
     } catch { /* 기본값 유지 */ }
 

@@ -33,7 +33,7 @@ ${inquiry}
 }`;
 
   try {
-    const text = await callGemini(prompt, 600);
+    const text = await callGemini(prompt, 600, { feature: "reply" });
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("No JSON");
     const data = JSON.parse(match[0]) as { urgency?: string; reply?: string };

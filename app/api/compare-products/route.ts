@@ -1,6 +1,7 @@
 export const maxDuration = 30;
 
 import { NextRequest, NextResponse } from "next/server";
+import { logLlmUsage, geminiTokens } from "@/lib/llm-usage";
 
 const DATALAB_URL = "https://openapi.naver.com/v1/datalab/search";
 const SHOP_URL = "https://openapi.naver.com/v1/search/shop.json";
@@ -19,8 +20,13 @@ async function callGemini(prompt: string): Promise<string> {
       generationConfig: { maxOutputTokens: 2400, thinkingConfig: { thinkingBudget: 0 } },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  if (!res.ok) {
+    void logLlmUsage({ feature: "compare-products", model: "gemini-2.5-flash", input_tokens: 0, output_tokens: 0, success: false });
+    throw new Error(`Gemini ${res.status}`);
+  }
   const data = await res.json();
+  const t = geminiTokens(data);
+  void logLlmUsage({ feature: "compare-products", model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 

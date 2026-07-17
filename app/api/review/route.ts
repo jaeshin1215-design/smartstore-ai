@@ -22,7 +22,7 @@ ${review}
 - 100~150자 이내로 짧고 진심 있게
 - 이모지 1개 자연스럽게 포함`;
 
-  return new Response(createGeminiStream(prompt, 300), {
+  return new Response(createGeminiStream(prompt, 300, { feature: "review" }), {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }

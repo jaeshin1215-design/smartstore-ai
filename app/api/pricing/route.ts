@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   "tips": ["오늘 바로 실행할 것 1가지", "이번 주 점검할 것 1가지", "다음 달 재검토할 것 1가지"]
 }`;
 
-  return new Response(createGeminiStream(prompt, 600), {
+  return new Response(createGeminiStream(prompt, 600, { feature: "pricing" }), {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }
