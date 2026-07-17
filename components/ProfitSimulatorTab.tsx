@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
+import { T5_MULTIPLIERS, T5_SHIPPING, T5_ZEROCOST, CROSS_LOGISTICS } from "@/lib/settlement-rules";
 
 const PINK = { main: "#D4537E", mid: "#E89CB8", light: "#FBEAF0", text: "#993556" };
 const CARD: React.CSSProperties = {
@@ -80,14 +81,13 @@ const IZ_PRESET: SimPreset = {
   dropBlockText: () => "73개를 한 번에 빼지 않습니다. 드롭하면 롱테일 매출이 20~40% 빠질 수 있습니다 (Grok 경고).",
   demoDrop: IZ_DROP,
   demoStar: IZ_STAR,
-  // 채널명은 규칙서 원문 표기로 완전일치 (2026-07-15 이다슬 확정 — 정규화·부분일치 없음)
-  // ※ 이 배율은 "공급가(N)가 비어 있을 때만" M×배율로 N을 생성하는 폴백용.
-  //    이다슬 프로 실제집계 파일의 N에는 이미 배율이 적용돼 있어 그대로 사용한다(195건 전수대조 확정).
-  settlementMultipliers: { "띵샵(신)": 0.88, "원룸만들기": 0.85, "현대홈쇼핑(3)": 1.1, "(통합)블루베리": 0.85, "이모야킨지로": 0.08 },
+  // 채널 규칙은 lib/settlement-rules.ts 단일 맵에서 파생 (2026-07-17 이전 — 값·결과 불변, 195건 재대조 확인).
+  //   정규화·부분일치 없이 원문 표기 완전일치. N에 값 있으면 그대로, 없을 때만 M×배율 폴백.
+  settlementMultipliers: T5_MULTIPLIERS,
   settlementRules: {
-    shippingMultipliers: { "스마트스토어": 0.96, "이모야킨지로": 0 },
-    crossLogistics: ["오포물류", "유비엘"],
-    zeroCostChannels: ["이모야킨지로"],   // 위탁 운영수수료 채널 — 원가 미발생
+    shippingMultipliers: T5_SHIPPING,
+    crossLogistics: [...CROSS_LOGISTICS],
+    zeroCostChannels: T5_ZEROCOST,
   },
   settlementNote: "이다슬 실제집계 파일(0628-0630) 195건 전수대조 일치 (2026-07-16) — 공급가 N 그대로 사용(배율 기적용 값, 비었을 때만 M×배율 폴백) · O=N/1.1 · 배송비 G=F/1.1(스마트스토어×0.96·이모야킨지로 0) · AA=G+O · 원가측 R=P×Q/1.1(이모야킨지로 R=0)·S·T(2%)·U(20%, V 미포함 표시만) · 물류처 예외(오포물류·유비엘 외 S·T·U=0) · AB=V · 매출이익=AA−AB. 채널명 현 표기 완전일치(사방넷·채널 업데이트 시 이다슬 프로 재공유 예정) · Phase2: 사방넷 API 연동 시 업로드 제거, 로직 재사용",
 };
