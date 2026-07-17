@@ -58,7 +58,7 @@ export function createGeminiStream(prompt: string, maxTokens = 2000, meta?: LlmL
       } finally {
         controller.close();
         // fail-safe: 로깅은 응답 종료 후, 실패해도 무시
-        void logLlmUsage({ ...meta, model: GEMINI_MODEL, input_tokens: usage.input, output_tokens: usage.output, success: ok });
+        await logLlmUsage({ ...meta, model: GEMINI_MODEL, input_tokens: usage.input, output_tokens: usage.output, success: ok });
       }
     },
   });
@@ -78,12 +78,12 @@ export async function callGemini(prompt: string, maxTokens = 500, meta?: LlmLogM
     }),
   });
   if (!res.ok) {
-    void logLlmUsage({ ...meta, model: GEMINI_MODEL, input_tokens: 0, output_tokens: 0, success: false });
+    await logLlmUsage({ ...meta, model: GEMINI_MODEL, input_tokens: 0, output_tokens: 0, success: false });
     throw new Error(`Gemini ${res.status}`);
   }
   const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   const t = geminiTokens(data);
-  void logLlmUsage({ ...meta, model: GEMINI_MODEL, input_tokens: t.input, output_tokens: t.output, success: true });
+  await logLlmUsage({ ...meta, model: GEMINI_MODEL, input_tokens: t.input, output_tokens: t.output, success: true });
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
@@ -97,11 +97,11 @@ export async function callClaude(prompt: string, maxTokens = 2000, meta?: LlmLog
       messages: [{ role: "user", content: prompt }],
     });
     const t = claudeTokens(msg);
-    void logLlmUsage({ ...meta, model: CLAUDE_MODEL, input_tokens: t.input, output_tokens: t.output, success: true });
+    await logLlmUsage({ ...meta, model: CLAUDE_MODEL, input_tokens: t.input, output_tokens: t.output, success: true });
     const block = msg.content.find((b) => b.type === "text");
     return block && block.type === "text" ? block.text : "";
   } catch (e) {
-    void logLlmUsage({ ...meta, model: CLAUDE_MODEL, input_tokens: 0, output_tokens: 0, success: false });
+    await logLlmUsage({ ...meta, model: CLAUDE_MODEL, input_tokens: 0, output_tokens: 0, success: false });
     throw e;
   }
 }

@@ -21,12 +21,12 @@ async function callGemini(prompt: string): Promise<string> {
     }),
   });
   if (!res.ok) {
-    void logLlmUsage({ feature: "compare-products", model: "gemini-2.5-flash", input_tokens: 0, output_tokens: 0, success: false });
+    await logLlmUsage({ feature: "compare-products", model: "gemini-2.5-flash", input_tokens: 0, output_tokens: 0, success: false });
     throw new Error(`Gemini ${res.status}`);
   }
   const data = await res.json();
   const t = geminiTokens(data);
-  void logLlmUsage({ feature: "compare-products", model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
+  await logLlmUsage({ feature: "compare-products", model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 

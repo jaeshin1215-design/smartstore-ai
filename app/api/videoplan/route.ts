@@ -97,7 +97,7 @@ Veo 3.1 설정:
 
   const data = await res.json();
   const t = geminiTokens(data);
-  void logLlmUsage({ feature: "videoplan", model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
+  await logLlmUsage({ feature: "videoplan", model: "gemini-2.5-flash", input_tokens: t.input, output_tokens: t.output, success: true });
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
   try {
