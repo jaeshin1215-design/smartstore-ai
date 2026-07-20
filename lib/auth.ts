@@ -45,6 +45,8 @@ export interface SessionInfo {
   impersonatedStoreId: string | null;
   /** 읽기 전용 세션 여부 (임퍼소네이션 기본값) */
   readonly: boolean;
+  /** 임퍼소네이션 만료 시각(ms). 아니면 null */
+  impersonatedUntil: number | null;
 }
 
 /** 쿠키 → 서명·만료·DB 검증 → 세션 정보. 실패 시 null */
@@ -63,7 +65,7 @@ export async function getSession(req: NextRequest): Promise<SessionInfo | null> 
 
   // active_store_id 가 걸려 있으면 그 스토어의 멤버십(m.store_id)을 같은 쿼리에서 확인 — 라운드트립 1회 유지
   const r = await db.execute({
-    sql: `SELECT s.id AS sid, s.active_store_id, s.impersonated_store_id, s.readonly,
+    sql: `SELECT s.id AS sid, s.active_store_id, s.impersonated_store_id, s.readonly, s.impersonated_until,
                  u.id AS uid, u.email, u.store_id, u.role,
                  m.store_id AS member_of
           FROM sellfit_sessions s
@@ -79,7 +81,10 @@ export async function getSession(req: NextRequest): Promise<SessionInfo | null> 
   const defaultStoreId = String(row.store_id ?? "");
   const role = String(row.role ?? "member");
   const active = row.active_store_id ? String(row.active_store_id) : null;
-  const impersonated = row.impersonated_store_id ? String(row.impersonated_store_id) : null;
+  // 임퍼소네이션 만료(2시간) 강제 — 지나면 없던 것으로 취급(기본 스토어로 복귀)
+  const impUntil = row.impersonated_until != null ? Number(row.impersonated_until) : null;
+  const impExpired = impUntil != null && impUntil < Date.now();
+  const impersonated = !impExpired && row.impersonated_store_id ? String(row.impersonated_store_id) : null;
 
   // 유효 스토어 판정 — 셋 중 하나만 통과. 실패하면 기본 스토어로 안전 폴백(열림보다 닫힘).
   //   ① active_store_id 가 없음        → 기본 스토어 (현행 동작과 동일)
@@ -100,8 +105,30 @@ export async function getSession(req: NextRequest): Promise<SessionInfo | null> 
     role,
     defaultStoreId,
     impersonatedStoreId: impersonated,
-    readonly: Number(row.readonly ?? 0) === 1,
+    // 임퍼소네이션이 만료됐으면 읽기전용 플래그도 해제(기본 세션으로 복귀)
+    readonly: !impExpired && Number(row.readonly ?? 0) === 1,
+    impersonatedUntil: impExpired ? null : impUntil,
   };
+}
+
+/** 임퍼소네이션 감사로그 1행 기록 (실패해도 요청을 막지 않는다) */
+export async function auditLog(
+  actor: { userId: string; email?: string },
+  action: string,
+  opts: { storeId?: string | null; target?: string | null; meta?: unknown } = {}
+): Promise<void> {
+  try {
+    await db.execute({
+      sql: `INSERT INTO sellfit_audit_log (id, actor_user_id, actor_email, action, store_id, target, meta)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        `aud_${Date.now()}_${randomBytes(4).toString("hex")}`,
+        actor.userId, actor.email ?? null, action,
+        opts.storeId ?? null, opts.target ?? null,
+        opts.meta != null ? JSON.stringify(opts.meta) : null,
+      ],
+    });
+  } catch { /* 감사 실패가 기능을 막지 않음 */ }
 }
 
 /**
@@ -113,7 +140,12 @@ export async function getSession(req: NextRequest): Promise<SessionInfo | null> 
  */
 export async function resolveStoreId(req: NextRequest, fallbackParam?: string | null): Promise<string | null> {
   const session = await getSession(req);
-  if (session) return session.storeId;
+  if (session) {
+    // 읽기전용 세션(임퍼소네이션)은 쓰기 메서드를 차단 — 호출부 수정 없이 중앙에서 fail-closed.
+    //   운영자가 "쓰기 모드"를 명시적으로 켜면 readonly=0 이 되어 통과한다.
+    if (session.readonly && !["GET", "HEAD", "OPTIONS"].includes(req.method)) return null;
+    return session.storeId;
+  }
   if (req.headers.get("x-extension-token") === process.env.EXTENSION_TOKEN && process.env.EXTENSION_TOKEN) {
     return fallbackParam ?? null;
   }

@@ -13,6 +13,7 @@ import SellFitFooter from "@/components/SellFitFooter";
 import CalendarTab from "@/components/CalendarTab";
 import ProfitSimulatorTab from "@/components/ProfitSimulatorTab";
 import ContentTab from "@/components/ContentTab";
+import ImpersonationBar from "@/components/ImpersonationBar";
 
 const TABS = [
   { id: "setup",     icon: "ti ti-settings",       label: "Setup"     },
@@ -52,6 +53,8 @@ export default function Home() {
       className="min-h-screen pb-14"
       style={{ background: "#f9f9fb" }}
     >
+      {/* 운영자 임퍼소네이션 바 — operator 아니면 렌더 없음 */}
+      <ImpersonationBar />
       <header
         className="sticky top-0 z-20"
         style={{
