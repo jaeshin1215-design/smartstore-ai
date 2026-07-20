@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
   if (format === "json") {
     return NextResponse.json({
       row_count: result.outRows.length,
+      input_row_count: rawRows.length,        // 원본 행수 (제외 전)
+      excluded: result.excluded,              // 물류처 제외 규칙(스타배송)으로 빠진 행
       error_count: result.errors.length,
       errors: result.errors.slice(0, 20),
       unresolved_channels: result.unresolvedChannels,
@@ -63,6 +65,7 @@ export async function POST(req: NextRequest) {
       "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "X-Row-Count": String(result.outRows.length),
       "X-Error-Count": String(result.errors.length),
+      "X-Excluded-Count": String(result.excluded.count),
     },
   });
 }

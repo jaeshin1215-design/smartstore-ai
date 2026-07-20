@@ -12,6 +12,8 @@ interface Summary {
   row_count: number; error_count: number;
   errors: { rowIndex: number; channel: string; field: string; raw: unknown }[];
   unresolved_channels: string[];
+  input_row_count?: number;
+  excluded?: { count: number; byChannel: Record<string, number>; rowIndexes: number[] };
   channels: ChannelRow[];
   totals: { count: number; AA: number; AB: number; U: number; margin: number; marginPct: number };
 }
@@ -91,6 +93,14 @@ export default function SettlementSection() {
               ⚠ 규칙 미등록 채널 {sum.unresolved_channels.length}개: {sum.unresolved_channels.join(", ")} — 공급가 0·배율 미적용으로 처리됨. 규칙 추가 필요.
             </div>
           )}
+          {sum.excluded && sum.excluded.count > 0 && (
+            <div style={{ padding: "9px 14px", background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, color: "#4b5563", marginBottom: 10 }}>
+              스타배송 제외 {sum.excluded.count}건 (
+              {Object.entries(sum.excluded.byChannel).map(([k, v]) => `${k} ${v}건`).join(", ")}
+              ) — 별도 관리 주문이라 정제 대상에서 제외됨
+              {sum.input_row_count != null && ` · 원본 ${sum.input_row_count}건 → 정제 ${sum.row_count}건`}
+            </div>
+          )}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
@@ -131,7 +141,7 @@ export default function SettlementSection() {
             </table>
           </div>
           <p style={{ fontSize: 10, color: "#c0c4cc", marginTop: 10, lineHeight: 1.6 }}>
-            매출이익=AA−AB (최종이익 아님, 광고비·배송비 제외 전) · 물류처 예외: 오포물류·유비엘 외 부자재·로스·물류비 제외 · T deal 0.85·보고류 0.9는 박혜미 회신 대기(보류) · 행 삭제 규칙 미적용(전 행 처리)
+            매출이익=AA−AB (최종이익 아님, 광고비·배송비 제외 전) · 물류처 예외: 오포물류·유비엘 외 부자재·로스·물류비 제외 · T deal 0.85 확정(2026-07-20 박혜미 확인) · 스타배송(지마켓·옥션 물류처) 주문은 별도 관리로 정제 제외 — 확정 규칙 · 보고류 0.9(옵션 실판매가)·배송비 수동보정은 회신 대기(보류)
           </p>
         </div>
       )}

@@ -16,6 +16,17 @@ export interface ChannelRule {
 
 // 물류처 화이트리스트: 이 두 문자열과 "완전 일치"가 아니면 S·T·U 빈칸 + V=R (패턴 매칭 금지)
 export const CROSS_LOGISTICS = ["오포물류", "유비엘"] as const;
+
+// 스타배송 제외(확정 규칙): 지마켓/옥션 물류처 배송 주문은 일반 주문과 별도 관리 →
+//   정산매출 정제에서 제외 (2026-07-20 박혜미 프로 확인, 정식 규칙으로 격상).
+//
+//   ⚠️ 판정 필드 주의 — 실측 결과(0628-0630 파일, 전수 대조):
+//      · 물류처(Y) 열은 스타배송 건도 "오포물류"로 찍힘 → 물류처로는 판정 불가
+//      · 실제 식별자는 상품명 끝의 "/스타배송" 태그뿐 → 상품명 부분일치로 판정
+//      · 이 규칙으로 정제전 101행 → 92행 (박혜미 정제후 파일과 행수 일치) 재현됨
+//   ※ 상품명 표기가 바뀌면 깨지는 규칙이므로, 장기적으로는 전용 플래그 열 권장.
+//   ※ 제외 건수는 조용히 버리지 않고 SettleResult.excluded 로 집계·노출한다.
+export const EXCLUDED_PRODUCT_MARKERS = ["스타배송"] as const;
 const ONEDAY_SHIP = 1 - 0.0333; // 오늘의집 배송비 계수 0.9667 (박혜미 STEP2 예외)
 
 export const CHANNEL_RULES: Record<string, ChannelRule> = {
@@ -40,7 +51,7 @@ export const CHANNEL_RULES: Record<string, ChannelRule> = {
   "레안어스":       { supplyMode: "auto", group: "T6" },
 
   // ── T6 (박혜미) manual 채널 — 공급가 없음, N=M×배율 생성 후 O=N/1.1 ──
-  "T deal":        { supplyMode: "manual", multiplier: 0.85, group: "T6" }, // ⚠️ 박혜미 원문 0.87, 파일 실계산 0.85 — 회신 대기(보류 슬롯)
+  "T deal":        { supplyMode: "manual", multiplier: 0.85, group: "T6" }, // 0.85 확정 (2026-07-20 박혜미 프로 파일 대조 확인. 안내문 원문 0.87은 오기로 확인됨)
   "해피마켓":       { supplyMode: "manual", multiplier: 0.85, group: "T6" },
   "카카오톡스토어":   { supplyMode: "manual", multiplier: 0.83, group: "T6" },
   "Grip":          { supplyMode: "manual", multiplier: 0.89, group: "T6" },
@@ -69,6 +80,12 @@ export function resolveChannelRule(name: string): { key: string; rule: ChannelRu
 /** 물류처 완전일치 판정 */
 export function isCrossLogistics(y: string): boolean {
   return (CROSS_LOGISTICS as readonly string[]).includes(String(y ?? "").trim());
+}
+
+/** 스타배송 제외 판정 — 상품명에 제외 마커가 포함되면 true (실측 근거: 상단 주석) */
+export function isExcludedOrder(productName: string): boolean {
+  const n = String(productName ?? "");
+  return (EXCLUDED_PRODUCT_MARKERS as readonly string[]).some(m => n.includes(m));
 }
 
 // ── ProfitSimulatorTab(T5) 하위호환 파생 맵 — 정본(CHANNEL_RULES)에서 생성. 값 이전만, 로직·결과 불변 ──
