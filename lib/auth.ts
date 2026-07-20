@@ -162,7 +162,11 @@ export async function requireIntegrationStore(req: NextRequest): Promise<boolean
   const allowed = process.env.INTEGRATION_STORE_ID;
   if (!allowed) return false;
   const session = await getSession(req);
-  return session?.storeId === allowed;
+  if (session?.storeId !== allowed) return false;
+  // 읽기전용 세션(임퍼소네이션)은 쓰기 메서드 차단 — resolveStoreId 를 거치지 않는 연동 라우트의
+  // readonly 우회 갭 방지 (2026-07-20 Phase 3). 운영자가 쓰기 모드를 켜면 통과한다.
+  if (session.readonly && !["GET", "HEAD", "OPTIONS"].includes(req.method)) return false;
+  return true;
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

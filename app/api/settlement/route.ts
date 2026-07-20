@@ -2,7 +2,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { getSession } from "@/lib/auth";
+import { getSession, requireIntegrationStore } from "@/lib/auth";
 import { processSettlement, SETTLEMENT_HEADERS } from "@/lib/settlement-process";
 
 // T6 정산매출 정제 (박혜미) — 사방넷 정산매출 원본 엑셀 업로드 → 손익 계산 정제 파일 생성.
@@ -10,6 +10,10 @@ import { processSettlement, SETTLEMENT_HEADERS } from "@/lib/settlement-process"
 export async function POST(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  // IZ 전용 — 주석과 코드 일치 (2026-07-20 Phase 3). 임퍼소네이션 읽기전용도 여기서 차단됨.
+  if (!(await requireIntegrationStore(req))) {
+    return NextResponse.json({ error: "이 기능은 해당 스토어에서만 사용할 수 있습니다." }, { status: 403 });
+  }
 
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx";
   let rawRows: Record<string, unknown>[];
