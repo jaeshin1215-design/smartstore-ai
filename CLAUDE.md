@@ -68,7 +68,24 @@ return NextResponse.json({ error: "결과 파싱 실패" }, { status: 500 });
   - baseline 점 3겹 구조 (광채 링 r+6 opacity0.15 + 본체 r5/8, 불투명도 1.0)
   - main pb-16 추가 (fixed notice bar 겹침 해소)
 
+### 2026-07-20 완료 (정산매출 확정 2건 + 권한 분리 Phase 0~3)
+- **정산매출** (커밋 `513694a`): T deal 배율 0.85 확정(코드값은 원래 0.85, 주석·안내문만 정정) / 스타배송 제외 정식 규칙화
+  - ⚠️ **스타배송 판정은 물류처가 아니라 상품명의 `/스타배송` 태그** (물류처는 전부 "오포물류"). 상품명 표기 바뀌면 깨짐 — 전용 열 여부 박혜미 프로 확인 예정
+  - 검증: 원본 101행 → 정제 92행(제외 9), 박혜미 정제후 파일과 행수 일치
+- **권한 분리 Phase 0~3** (커밋 `60958ad` → `e3bde57` → `f86b9b5`)
+  - `users.role`(operator/member) + `sellfit_store_members`(다대다, owner/staff) + `sellfit_audit_log` + `stores.status`
+  - 운영자는 고객 테넌트에 **소속되지 않음** → 임퍼소네이션만 (읽기전용 기본·2시간 만료·감사로그). `/api/authz/*` 4종 + `ImpersonationBar`
+  - Jae 계정: 이지스토리 멤버십 제거 + `users.store_id=''`(NOT NULL 제약 때문에 NULL 대신 빈값 sentinel)
+  - `/api/settlement` requireIntegrationStore 적용, 연동 라우트 readonly 우회 갭 차단, 중복 스토어 2개 archived(데이터 보존)
+
+### 2026-07-24 완료 (정산 통합)
+- **정산/매출집계 입구 단일화** (커밋 `4e402a2`, push+배포됨): ProfitSimulatorTab의 T5 자체 업로드(BLOCK 4, 6채널 한정 결함) 전면 제거 → SettlementSection(processSettlement·전체 26채널·EA 고정·고정헤더) 단일 입구. 시뮬레이터·목표마진·드롭분석·매트릭스·광고집계는 유지.
+  - 근거(전량 실측): 두 파일 헤더 32개 완전 일치 / Q=EA 확정(이다슬 105/105·박혜미 25/25 원가(-VAT)·총원가 역산) / 이다슬 195건 재대조 AA·AB 불일치 0(1원 불변)
+  - ⚠️ 미결(별건): CHANNEL_RULES 미등록 채널 3(쿠팡·신세계몰(신)·홈&쇼핑(신)) — 공급가 N 빈 행 대비 규칙 추가 검토
+  - 사방넷 CS API 프로브 5회 결론: `/v3/sb/cs`의 `answerContent`는 고객응대 답변이라 심유나 재출고 지시(★…검수) 아님 → 교환 발주서는 엑셀 업로드로 확정(별건 대기)
+
 ### 다음 자리
+- **#0 (Phase 4, 권한분리 잔여)**: `users.store_id` 컬럼 제거 + 빈값 sentinel 소멸. **반드시 같이 처리**: `auth/demo-request`가 `store_members`를 안 만듦(현재는 store_id 폴백으로 동작) / 기능 플래그화(env INTEGRATION_STORE_ID → 스토어별)는 **2호 계약 시점**
 - **#1 (D-60 활성화)**: POST /api/db/migrate-discover-v1 실행 → 테이블 생성 → POST /api/cron/discover-engine 수동 테스트
 - **#2 (Prophet 실제 연동)**: modal.com 계정 생성 → `modal deploy scripts/prophet_app.py` → MODAL_PROPHET_URL 환경변수 등록
 - **#3 (실제 XGBoost)**: Sabangnet 개통 후 바스켓 500건+ 누적 → XGBoost 모델 (Sabangnet 승인 선행)
