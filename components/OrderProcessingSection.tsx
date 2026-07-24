@@ -5,7 +5,7 @@
 // 수도꼭지 2: 오포물류/오포_카노위탁 교차 송장 매칭 → 사방넷 업로드용 3컬럼 파일
 // 디자인: 텍스트 흑/회색·흰 배경·카드 1px 보더 + 0 2px 8px rgba(0,0,0,0.04)·버튼만 핑크
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const FF = "'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
@@ -53,6 +53,34 @@ export default function OrderProcessingSection() {
   const [matchMsg, setMatchMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [summary, setSummary] = useState<MatchSummary | null>(null);
   const [downloadingMatch, setDownloadingMatch] = useState(false);
+  // 수도꼭지 3: 교환 출고 발주서 (CS메모관리 업로드 → 답변내용 있는 건만 12컬럼 발주서, 2026-07-24)
+  const [exchangeFile, setExchangeFile] = useState<File | null>(null);
+  const [exchangeLoading, setExchangeLoading] = useState(false);
+  const [exchangeMsg, setExchangeMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const exchangeRef = useRef<HTMLInputElement>(null);
+
+  async function handleExchangeOrder() {
+    if (!exchangeFile) return;
+    setExchangeLoading(true); setExchangeMsg(null);
+    try {
+      const fd = new FormData(); fd.append("file", exchangeFile);
+      const res = await fetch("/api/sabangnet/exchange-order?format=xlsx", { method: "POST", body: fd });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || `HTTP ${res.status}`); }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const m = cd.match(/filename\*=UTF-8''(.+)/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = m ? decodeURIComponent(m[1]) : "교환출고발주서.xlsx";
+      a.click(); URL.revokeObjectURL(a.href);
+      const oc = res.headers.get("X-Order-Count") ?? "?", ic = res.headers.get("X-Input-Count") ?? "?";
+      setExchangeMsg({ ok: true, text: `발주서 생성 완료 — 전체 ${ic}건 중 답변내용 있는 ${oc}건 (수량은 관리자 수기 입력)` });
+    } catch (e) {
+      setExchangeMsg({ ok: false, text: `오류: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setExchangeLoading(false);
+    }
+  }
 
   const cStart = startDate.replace(/-/g, "");
   const cEnd = endDate.replace(/-/g, "");
@@ -339,6 +367,31 @@ export default function OrderProcessingSection() {
           </div>
         )}
         {matchMsg && <Msg msg={matchMsg} />}
+      </div>
+
+      {/* ── 수도꼭지 3: 교환 출고 발주서 (CS메모관리 업로드 → 12컬럼 발주서) ── */}
+      <div style={CARD}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>
+          교환 출고 발주서 <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>수도꼭지 3</span>
+        </div>
+        <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
+          사방넷 C/S메모관리 <b>전체 다운로드 엑셀</b>을 업로드하면, <b>답변내용이 입력된 건만</b> 골라 1·2차 발주서와 동일한 12컬럼 양식으로 변환합니다.<br />
+          <span style={{ color: "#9ca3af" }}>상품명 = 답변내용 그대로 · 수량은 관리자가 직접 기재(빈칸 출력) · 주문상태 무관</span>
+        </p>
+        <input ref={exchangeRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }}
+          onChange={(e) => { setExchangeFile(e.target.files?.[0] ?? null); setExchangeMsg(null); }} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={() => exchangeRef.current?.click()}
+            style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid #e8eaed", background: "#fff", fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: FF }}>
+            엑셀 파일 선택
+          </button>
+          {exchangeFile && <span style={{ fontSize: 12, color: "#6b7280" }}>{exchangeFile.name}</span>}
+          <button onClick={handleExchangeOrder} disabled={!exchangeFile || exchangeLoading}
+            style={{ padding: "9px 18px", borderRadius: 8, border: "none", background: !exchangeFile || exchangeLoading ? "#c4c8cc" : "#ef567c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: !exchangeFile || exchangeLoading ? "default" : "pointer", fontFamily: FF }}>
+            {exchangeLoading ? "생성 중..." : "발주서 생성 ↓"}
+          </button>
+        </div>
+        {exchangeMsg && <Msg msg={exchangeMsg} />}
       </div>
     </div>
   );
