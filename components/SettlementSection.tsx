@@ -63,7 +63,7 @@ export default function SettlementSection() {
 
   return (
     <div style={CARD}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>정산매출 자동화 <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>(박혜미 프로 채널)</span></div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>정산/매출집계 자동화 <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>전 채널 통합</span></div>
       <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
         사방넷 정산매출 원본 엑셀을 업로드하면 손익 계산(배송비·매출·원가·부대비용·물류처 예외)이 자동 적용된 정제 파일을 생성합니다.
       </div>
