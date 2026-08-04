@@ -16,8 +16,17 @@ const has = (v: string | null | undefined) => v != null && String(v).trim() !== 
 
 // 교차 매칭 대상 물류처 — 정확히 이 두 문자열만 (패턴/접두사 금지, 2026-07-14 심유나 프로 확정)
 const CROSS_MATCH_LOGISTICS = new Set(["오포물류", "오포_카노위탁"]);
+
+// 세트분리 매칭 대상 주문상태 화이트리스트 (2026-07-27 심유나 프로 정의).
+//   ORDER_CONFIRM = 주문확인(발주 완료·송장 없음 → 매칭 타깃)
+//   DELIVERY_WAITING = 출고대기(운송장 등록됨 → 매칭 소스)
+//   화이트리스트 방식 — 출고완료·교환접수·반품접수 등은 코드값을 몰라도 자동 제외됨.
+//   ※ 심유나 프로 회신에 따라 NEW_ORDER 추가 가능(버튼2 시점에 신규주문이 섞여 보이면).
+//     그 경우 이 상수 한 줄만 고치면 됨.
+const ALLOWED_MATCH_STATUS = new Set(["ORDER_CONFIRM", "DELIVERY_WAITING"]);
 // 주문번호 몸통 — 분리 suffix(-1, _2 등) 제거. 없으면 원본 그대로.
-const orderBody = (shopOrdNo: string | null | undefined) => String(shopOrdNo ?? "").replace(/[-_]\d+$/, "").trim();
+// export: (b) 재검증 프로브가 라우트와 동일 정규식을 쓰도록 (재구현 금지, 2026-07-27).
+export const orderBody = (shopOrdNo: string | null | undefined) => String(shopOrdNo ?? "").replace(/[-_]\d+$/, "").trim();
 
 interface FilledRow {
   sbOrdNo: string;
@@ -26,13 +35,24 @@ interface FilledRow {
   productAbbr: string;
   logisticsNm: string; // 물류처명 — 업로드 전 업체별 확인용 (2026-07-14 심유나 프로)
   matched: true;       // 합배송 추정 자동매칭 결과 — UI 배경색 표시(눈으로 최종 확인)
+  viaBody: boolean;    // true=주문번호 몸통 동일(정상 세트분리) / false=주소+수취인+배송희망일(합배송 추정)
+  targetStatus: string; // 타깃 행 ORDER_STATUS (검증·추적 메타 — 다운로드 2컬럼엔 미사용, 무해)
+  srcStatus: string;    // 소스(송장 보유) 행 ORDER_STATUS
 }
 
 // 매칭 규칙(T1+T4): 물류처 ∈ {오포물류, 오포_카노위탁}인 건만 대상(교차 매칭 허용).
-// [주문번호 몸통 동일] OR [주소+수취인 동일] 이면 같은 그룹 → 송장있는 행 값을 없는 행에 복사.
+// [주문번호 몸통 동일] OR [주소+수취인+배송희망일 동일] 이면 같은 그룹 → 송장있는 행 값을 없는 행에 복사.
 // 그 외 물류처는 현행대로 직접 입력 유지(매칭 제외).
-function matchWaybills(orders: SabangnetOrder[]) {
-  const pool = orders.filter((o) => CROSS_MATCH_LOGISTICS.has(String(o.LOGISTICS_NM ?? "")));
+// export: (b) 재검증 프로브가 이 함수를 직접 호출하도록 (시뮬 재구현 금지, 2026-07-27).
+export function matchWaybills(orders: SabangnetOrder[]) {
+  // pool 진입 조건 2가지 (AND):
+  //   1) 물류처 ∈ 교차매칭 대상  2) 주문상태 ∈ 화이트리스트(주문확인·출고대기)
+  // 상태 필터가 과거 출고완료건·교환/반품건을 그룹에서 제외 → 과거 송장 오매칭 차단(2026-07-27).
+  const pool = orders.filter(
+    (o) =>
+      CROSS_MATCH_LOGISTICS.has(String(o.LOGISTICS_NM ?? "")) &&
+      ALLOWED_MATCH_STATUS.has(String(o.ORDER_STATUS ?? ""))
+  );
 
   // Union-Find로 두 키(주문번호 몸통 / 주소+수취인)를 OR 병합
   const parent = pool.map((_, i) => i);
@@ -44,9 +64,13 @@ function matchWaybills(orders: SabangnetOrder[]) {
   pool.forEach((o, i) => {
     const ob = orderBody(o.SHOP_ORD_NO);
     if (ob) { const prev = byOrder.get(ob); if (prev != null) union(i, prev); else byOrder.set(ob, i); }
+    // 주소+수취인 경로: 배송희망일(8자리)까지 같을 때만 union (2026-07-27 심유나 확정).
+    //   합배송(주문일 다름·배송희망일 같음)은 살리고, 다른 배송희망일의 재주문은 분리 → 과거 송장 오매칭 차단.
+    //   fallback 없음 — 배송희망일 빈 값은 이 경로에서 제외(실측 존재율 100%, Jae 방침).
     const addr = String(o.RECEIVER_ADDR ?? "").trim();
     const nm = String(o.RECEIVER_NM ?? "").trim();
-    if (addr && nm) { const ak = `${addr}|${nm}`; const prev = byAddr.get(ak); if (prev != null) union(i, prev); else byAddr.set(ak, i); }
+    const hope = String(o.HOPE_DELIVERY_DT ?? "").slice(0, 8); // 시각 버리고 날짜 8자리만
+    if (addr && nm && hope) { const ak = `${addr}|${nm}|${hope}`; const prev = byAddr.get(ak); if (prev != null) union(i, prev); else byAddr.set(ak, i); }
   });
 
   const groups = new Map<number, SabangnetOrder[]>();
@@ -61,6 +85,8 @@ function matchWaybills(orders: SabangnetOrder[]) {
     if (!withWaybill || missing.length === 0) continue;
     fillableGroups += 1;
     for (const m of missing) {
+      // 매칭 근거: 타깃이 소스와 주문번호 몸통 동일이면 정상 세트분리, 아니면 주소+수취인+배송희망일(합배송)
+      const viaBody = orderBody(m.SHOP_ORD_NO) !== "" && orderBody(m.SHOP_ORD_NO) === orderBody(withWaybill.SHOP_ORD_NO);
       filled.push({
         sbOrdNo: m.SB_ORD_NO ?? "",
         waybillNo: withWaybill.WAYBILL_NO!,
@@ -68,6 +94,9 @@ function matchWaybills(orders: SabangnetOrder[]) {
         productAbbr: m.PRD_ABBR ?? "",
         logisticsNm: m.LOGISTICS_NM ?? "",
         matched: true,
+        viaBody,
+        targetStatus: String(m.ORDER_STATUS ?? ""),
+        srcStatus: String(withWaybill.ORDER_STATUS ?? ""),
       });
     }
   }

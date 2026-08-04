@@ -13,6 +13,8 @@ export const ORDER_FIELDS = [
   "RECEIVER_NM", "RECEIVER_TEL", "RECEIVER_CEL", "RECEIVER_ADDR", "RECEIVER_ZIPCODE",
   "DELIVERY_MSG", "WAYBILL_NO", "SHOP_NM", "LOGISTICS_NM",
   "ORDER_DT", "REG_DATE", "SET_DIV_CD",
+  // 배송희망일 (2026-07-27 세트분리 주소+수취인 경로 날짜 조건용). 값=YYYYMMDD 8자리, 오포 pool 존재율 100% 실측.
+  "HOPE_DELIVERY_DT",
 ] as const;
 
 export type SabangnetOrder = Record<(typeof ORDER_FIELDS)[number], string | null>;
