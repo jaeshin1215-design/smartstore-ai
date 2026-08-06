@@ -26,7 +26,7 @@ function getWithBody(urlStr: string, headers: Record<string, string>, body: stri
       {
         hostname: u.hostname,
         path: u.pathname + u.search,
-        method: "GET",
+        method: "POST", // 2026-08-06: 사방넷 GET+body 지원종료(공지 8/5, 9/2) 대응 → POST. body·헤더·경로·프록시 동일(프로브 200 확인).
         headers: { ...headers, "content-length": Buffer.byteLength(body) },
       },
       (res) => {
