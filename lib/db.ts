@@ -53,6 +53,18 @@ export async function initDB() {
       status TEXT DEFAULT 'pending',
       created_at INTEGER DEFAULT (unixepoch())
     );
+
+    -- 실출고 배송비 대응표 (2026-08-06 박혜미) — 사방넷품번코드 → 물류 출고비(VAT 포함 원값).
+    --   store_id 스코핑(2호 격리). shipping_cost는 VAT 포함(예 2700); ÷1.1은 계산식(settlement-process)에서.
+    CREATE TABLE IF NOT EXISTS sellfit_shipping_rates (
+      store_id TEXT NOT NULL,
+      product_code TEXT NOT NULL,
+      shipping_cost REAL,
+      product_name TEXT,
+      logistics_nm TEXT,
+      updated_at INTEGER,
+      PRIMARY KEY (store_id, product_code)
+    );
   `);
 
   // 컬럼 추가 마이그레이션 — 이미 있으면 무시

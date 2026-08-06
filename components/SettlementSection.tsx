@@ -12,6 +12,7 @@ interface Summary {
   row_count: number; error_count: number;
   errors: { rowIndex: number; channel: string; field: string; raw: unknown }[];
   unresolved_channels: string[];
+  unresolved_product_codes?: string[];
   input_row_count?: number;
   excluded?: { count: number; byChannel: Record<string, number>; rowIndexes: number[] };
   channels: ChannelRow[];
@@ -91,6 +92,11 @@ export default function SettlementSection() {
           {sum.unresolved_channels.length > 0 && (
             <div style={{ padding: "9px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, fontSize: 12, color: "#c2410c", marginBottom: 10 }}>
               ⚠ 규칙 미등록 채널 {sum.unresolved_channels.length}개: {sum.unresolved_channels.join(", ")} — 공급가 0·배율 미적용으로 처리됨. 규칙 추가 필요.
+            </div>
+          )}
+          {sum.unresolved_product_codes && sum.unresolved_product_codes.length > 0 && (
+            <div style={{ padding: "9px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, fontSize: 12, color: "#c2410c", marginBottom: 10 }}>
+              ⚠ 배송비 미등록 품번 {sum.unresolved_product_codes.length}개: {sum.unresolved_product_codes.slice(0, 20).join(", ")}{sum.unresolved_product_codes.length > 20 ? " 외" : ""} — 실출고배송비 <b>빈칸</b> 처리(0 아님). 기준표 등록 필요.
             </div>
           )}
           {sum.excluded && sum.excluded.count > 0 && (

@@ -13,6 +13,7 @@ export const SETTLEMENT_HEADERS = [
   "수집일", "사방넷품번코드", "물류처", "쇼핑몰명",
   "상품매출(배송비+매출)", "상품총원가", // ★AA AB
   "상품약어",
+  "실출고배송비", // ★신규(2026-08-06 박혜미): 품번별 물류 출고비. ÷1.1 표기. AA·AB·U·마진에 미반영(참고열).
 ] as const;
 
 export interface SettleRowError { rowIndex: number; channel: string; field: string; raw: unknown; }
@@ -25,6 +26,7 @@ export interface SettleResult {
   channels: ChannelAgg[];
   totals: { count: number; AA: number; AB: number; U: number };
   unresolvedChannels: string[];          // 규칙 맵에 없는 채널
+  unresolvedProductCodes: string[];      // 배송비 기준표에 없는 사방넷품번코드 (실출고배송비 빈칸 처리, 0 아님)
   excluded: SettleExcluded;              // 물류처 제외 규칙으로 빠진 행 (스타배송 등)
 }
 
@@ -38,13 +40,18 @@ function parseNum(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const IN = { ch: "쇼핑몰", M: "판매가", N: "공급가", P: "원가", Q: "EA", F: "배송비(수집)", Y: "물류처", name: "상품명" };
+const IN = { ch: "쇼핑몰", M: "판매가", N: "공급가", P: "원가", Q: "EA", F: "배송비(수집)", Y: "물류처", name: "상품명", code: "사방넷품번코드" };
 
-export function processSettlement(rawRows: Record<string, unknown>[]): SettleResult {
+// 실출고배송비 출력 계수 — 박혜미 프로 확인 대기(2026-08-06). 기본 ÷1.1 (계산열 G·O·R과 동일 VAT 제거).
+//   테이블엔 VAT 포함 원값(예 2700) 저장. VAT 포함값 그대로 표기를 원하면 이 값만 1로 바꾸면 됨(한 줄).
+const SHIPPING_OUT_DIVISOR = 1.1;
+
+export function processSettlement(rawRows: Record<string, unknown>[], ratesMap?: Map<string, number>): SettleResult {
   const outRows: Record<string, unknown>[] = [];
   const errors: SettleRowError[] = [];
   const aggMap: Record<string, ChannelAgg> = {};
   const unresolved = new Set<string>();
+  const unresolvedCodes = new Set<string>();
   const excluded: SettleExcluded = { count: 0, byChannel: {}, rowIndexes: [] };
 
   rawRows.forEach((row, i) => {
@@ -104,6 +111,19 @@ export function processSettlement(rawRows: Record<string, unknown>[]): SettleRes
     out["총원가"] = V;
     out["상품매출(배송비+매출)"] = AA;
     out["상품총원가"] = AB;
+
+    // 실출고배송비 — 사방넷품번코드로 대응표 조회 (ratesMap 없으면 미적용 = 기존 동작 바이트 불변).
+    //   ÷1.1 표기(SHIPPING_OUT_DIVISOR). 미등록 품번은 0 아닌 빈칸 유지 + 목록 노출(조용히 0 금지).
+    //   ★ AA·AB·U·마진 계산에는 넣지 않는다 (박혜미 2026-08-06: 참고열, 마진 구조 무수정).
+    if (ratesMap) {
+      const code = String(row[IN.code] ?? "").trim();
+      if (code) {
+        const rate = ratesMap.get(code);
+        if (rate != null && Number.isFinite(rate)) out["실출고배송비"] = rate / SHIPPING_OUT_DIVISOR;
+        else unresolvedCodes.add(code); // out["실출고배송비"]는 초기 루프에서 이미 "" — 빈칸 유지
+      }
+    }
+
     if (hasErr) out["_error"] = true;
     outRows.push(out);
 
@@ -114,5 +134,5 @@ export function processSettlement(rawRows: Record<string, unknown>[]): SettleRes
 
   const channels = Object.values(aggMap).sort((x, y) => y.AA - x.AA);
   const totals = channels.reduce((t, c) => ({ count: t.count + c.count, AA: t.AA + c.AA, AB: t.AB + c.AB, U: t.U + c.U }), { count: 0, AA: 0, AB: 0, U: 0 });
-  return { outRows, errors, channels, totals, unresolvedChannels: [...unresolved], excluded };
+  return { outRows, errors, channels, totals, unresolvedChannels: [...unresolved], unresolvedProductCodes: [...unresolvedCodes], excluded };
 }

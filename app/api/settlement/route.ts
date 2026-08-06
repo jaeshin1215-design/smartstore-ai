@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { getSession, requireIntegrationStore } from "@/lib/auth";
 import { processSettlement, SETTLEMENT_HEADERS } from "@/lib/settlement-process";
+import { db } from "@/lib/db";
 
 // T6 정산매출 정제 (박혜미) — 사방넷 정산매출 원본 엑셀 업로드 → 손익 계산 정제 파일 생성.
 //   IZ 전용(세션 필요). format=json → 요약 / 그 외 → 정제후 32열 엑셀 다운로드.
@@ -30,7 +31,21 @@ export async function POST(req: NextRequest) {
   }
   if (rawRows.length === 0) return NextResponse.json({ error: "데이터 행이 없습니다." }, { status: 400 });
 
-  const result = processSettlement(rawRows);
+  // 실출고배송비 대응표 로드 (store 스코핑). 테이블 미생성/미등록이면 빈 맵 → 기존 동작 그대로.
+  const ratesMap = new Map<string, number>();
+  try {
+    const rr = await db.execute({
+      sql: "SELECT product_code, shipping_cost FROM sellfit_shipping_rates WHERE store_id = ?",
+      args: [session.storeId],
+    });
+    for (const r of rr.rows) {
+      const c = String(r.product_code ?? "").trim();
+      const v = Number(r.shipping_cost);
+      if (c && Number.isFinite(v)) ratesMap.set(c, v);
+    }
+  } catch { /* 테이블 미생성 → 빈 맵 (배포 전) */ }
+
+  const result = processSettlement(rawRows, ratesMap);
 
   if (format === "json") {
     return NextResponse.json({
@@ -40,6 +55,7 @@ export async function POST(req: NextRequest) {
       error_count: result.errors.length,
       errors: result.errors.slice(0, 20),
       unresolved_channels: result.unresolvedChannels,
+      unresolved_product_codes: result.unresolvedProductCodes, // 배송비 미등록 품번 (빈칸 처리, 0 아님)
       channels: result.channels.map((c) => ({
         channel: c.channel, count: c.count, AA: Math.round(c.AA), AB: Math.round(c.AB), U: Math.round(c.U),
         margin: Math.round(c.AA - c.AB), marginPct: c.AA > 0 ? +(((c.AA - c.AB) / c.AA) * 100).toFixed(1) : 0,
