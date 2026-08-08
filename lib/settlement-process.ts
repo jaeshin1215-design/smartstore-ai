@@ -84,7 +84,16 @@ export function processSettlement(rawRows: Record<string, unknown>[], ratesMap?:
 
     // 매출측: manual → N 있으면 파일값 우선, 없으면 M×배율 / auto → N 그대로 (재계산 금지)
     const mult = rule?.supplyMode === "manual" ? (rule.multiplier ?? null) : null;
-    const Ncalc = Nraw > 0 ? Nraw : (mult != null ? M * mult : 0);
+    // [supplyColIsPrice] 공급가(N) 칸에 실제 판매가 → M이 0/빈값일 때만 N을 M으로 이동 후 N=M×배율 강제(원 N 무시).
+    //   M에 유효값 있으면 건드리지 않음. (원룸만들기, 2026-08-08 이다슬)
+    const priceInN = rule?.supplyColIsPrice === true && M === 0 && Nraw > 0;
+    const Meff = priceInN ? Nraw : M;
+    let Ncalc = priceInN
+      ? (mult != null ? Meff * mult : 0)
+      : (Nraw > 0 ? Nraw : (mult != null ? Meff * mult : 0));
+    // [supplyVatAddBack] 공급가=VAT제외 순액 → O=N 되도록 ×1.1 보정 후 표준 ÷1.1.
+    //   ★ 원본 입력 기준. 이미 보정된 파일 재입력 시 이중적용 주의. (현대홈쇼핑(3), 2026-08-08 이다슬)
+    if (rule?.supplyVatAddBack === true) Ncalc = Ncalc * 1.1;
     const O = Ncalc / 1.1;
     let G = F / 1.1;
     if (rule?.shippingFactor != null) G *= rule.shippingFactor;
@@ -104,6 +113,7 @@ export function processSettlement(rawRows: Record<string, unknown>[], ratesMap?:
     out["배송비(매출)"] = G;
     out["공급가"] = Ncalc;
     out["매출(-VAT)"] = O;
+    if (priceInN) out["판매가"] = Meff; // 이동된 판매가 반영(원본 M=0 → 판매가)
     out["원가(-VAT)"] = R;
     out["부자재(2%)"] = S;
     out["로스(2%)"] = T;

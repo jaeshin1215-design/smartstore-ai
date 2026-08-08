@@ -12,6 +12,8 @@ export interface ChannelRule {
   zeroCost?: boolean;       // 원가 R=0 강제 (이모야킨지로 — 위탁 운영수수료 채널)
   aliases?: string[];       // 동일 채널 별칭 (완전일치 대상에 함께 포함)
   group?: "T5" | "T6";      // 소속(파생 맵 생성·검증용)
+  supplyColIsPrice?: boolean; // 공급가(N) 칸에 실제 판매가가 들어오는 채널 → M이 0/빈값이면 N을 M으로 이동 후 N=M×multiplier (예: 원룸만들기)
+  supplyVatAddBack?: boolean;  // 공급가가 VAT 제외 순액 → O=N 되도록 N을 ×1.1 보정 후 표준 ÷1.1 (예: 현대홈쇼핑(3))
 }
 
 // 물류처 화이트리스트: 이 세 문자열과 "완전 일치"가 아니면 S·T·U 빈칸 + V=R (패턴 매칭 금지)
@@ -35,8 +37,8 @@ const ONEDAY_SHIP = 1 - 0.0333; // 오늘의집 배송비 계수 0.9667 (박혜�
 export const CHANNEL_RULES: Record<string, ChannelRule> = {
   // ── T5 (이다슬) — 195건 전수대조 확정. 값 1원도 불변 ──
   "띵샵(신)":       { supplyMode: "manual", multiplier: 0.88, group: "T5" },
-  "원룸만들기":      { supplyMode: "manual", multiplier: 0.85, group: "T5" },
-  "현대홈쇼핑(3)":   { supplyMode: "manual", multiplier: 1.1, group: "T5" },
+  "원룸만들기":      { supplyMode: "manual", multiplier: 0.85, supplyColIsPrice: true, group: "T5" }, // 원본 N칸=실제 판매가·M=0 (2026-08-08 이다슬)
+  "현대홈쇼핑(3)":   { supplyMode: "manual", multiplier: 1.1, supplyVatAddBack: true, group: "T5" },   // 공급가=VAT제외 순액 → O=N (2026-08-08 이다슬)
   "(통합)블루베리":  { supplyMode: "manual", multiplier: 0.85, group: "T5" },
   "이모야킨지로":    { supplyMode: "manual", multiplier: 0.08, shippingFactor: 0, zeroCost: true, group: "T5" },
   "스마트스토어":    { supplyMode: "auto", shippingFactor: 0.96, group: "T5" }, // 배율 없음(N 직접), 배송비만 ×0.96
