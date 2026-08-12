@@ -2,6 +2,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
+import { unzipSync } from "fflate";
 import { getSession } from "@/lib/auth";
 import { parseOrderBuffer, buildCenterSheets, buildAllSheet, summarize } from "@/lib/coupang-po";
 
@@ -9,32 +10,16 @@ import { parseOrderBuffer, buildCenterSheets, buildAllSheet, summarize } from "@
 //   2단계: 물류센터별 시트 + 3단계: 전체 취합 시트 = 한 워크북 다운로드. format=json → 요약.
 //   정산·배송비 파이프라인과 코드 공유 없음. store 하드코딩 없음(로그인만 요구, 2·3호 재사용).
 
-// yauzl(기존 transitive dep) 런타임 require — zip 내 .xlsx 엔트리를 버퍼로 추출.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const yauzl = require("yauzl");
-
-function unzipXlsx(buf: Buffer): Promise<{ name: string; buffer: Buffer }[]> {
-  return new Promise((resolve, reject) => {
-    yauzl.fromBuffer(buf, { lazyEntries: true }, (err: Error | null, zip: { on: (e: string, cb: (...a: unknown[]) => void) => void; openReadStream: (entry: unknown, cb: (e: Error | null, rs: NodeJS.ReadableStream) => void) => void; readEntry: () => void }) => {
-      if (err || !zip) return reject(err ?? new Error("zip 열기 실패"));
-      const out: { name: string; buffer: Buffer }[] = [];
-      zip.on("entry", (entry: unknown) => {
-        const name = String((entry as { fileName: string }).fileName);
-        if (/\.xlsx$/i.test(name) && !name.endsWith("/") && !name.startsWith("__MACOSX")) {
-          zip.openReadStream(entry, (e: Error | null, rs: NodeJS.ReadableStream) => {
-            if (e) return reject(e);
-            const chunks: Buffer[] = [];
-            rs.on("data", (c: Buffer) => chunks.push(c));
-            rs.on("end", () => { out.push({ name: name.split("/").pop() || name, buffer: Buffer.concat(chunks) }); zip.readEntry(); });
-            rs.on("error", reject);
-          });
-        } else zip.readEntry();
-      });
-      zip.on("end", () => resolve(out));
-      zip.on("error", reject);
-      zip.readEntry();
-    });
-  });
+// zip 내 .xlsx 엔트리를 버퍼로 추출 (fflate unzipSync, zero-dep·동기).
+function unzipXlsx(buf: Buffer): { name: string; buffer: Buffer }[] {
+  const entries = unzipSync(new Uint8Array(buf));
+  const out: { name: string; buffer: Buffer }[] = [];
+  for (const [path, data] of Object.entries(entries)) {
+    if (/\.xlsx$/i.test(path) && !path.endsWith("/") && !path.startsWith("__MACOSX")) {
+      out.push({ name: path.split("/").pop() || path, buffer: Buffer.from(data) });
+    }
+  }
+  return out;
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +35,7 @@ export async function POST(req: NextRequest) {
       if (typeof f === "string") continue;
       const name = (f as File).name;
       const buf = Buffer.from(await (f as File).arrayBuffer());
-      if (/\.zip$/i.test(name)) inputs.push(...(await unzipXlsx(buf)));
+      if (/\.zip$/i.test(name)) inputs.push(...unzipXlsx(buf));
       else if (/\.xlsx$/i.test(name)) inputs.push({ name, buffer: buf });
     }
   } catch (e) {
