@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { T5_MULTIPLIERS, T5_SHIPPING, T5_ZEROCOST, CROSS_LOGISTICS } from "@/lib/settlement-rules";
 import SettlementSection from "@/components/SettlementSection";
+import CoupangPoSection from "@/components/CoupangPoSection";
 
 const PINK = { main: "#D4537E", mid: "#E89CB8", light: "#FBEAF0", text: "#993556" };
 const CARD: React.CSSProperties = {
@@ -534,6 +535,8 @@ export default function ProfitSimulatorTab() {
 
         {/* ══ BLOCK 4.5: 정산매출 자동화 (박혜미 T6) — IZ 전용 ══ */}
         {preset === IZ_PRESET && <SettlementSection />}
+        {/* 쿠팡 발주서 취합 — 정산과 별개 기능. IZ 잠금 없음(2·3호 재사용). */}
+        <CoupangPoSection />
 
         {/* ══ BLOCK 5: 채널별 광고 집계 ══ */}
         <div style={{ ...CARD }}>
