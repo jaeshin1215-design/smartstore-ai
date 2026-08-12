@@ -2,7 +2,13 @@
 //   규칙: lib/settlement-rules.ts. 계산 로직은 T5(이다슬)와 동일 프레임 + 채널 supplyMode.
 import { resolveChannelRule, isCrossLogistics, isExcludedOrder } from "./settlement-rules";
 
-// 정제후 32열 양식 헤더 순서 (박혜미 정제후 파일 기준). 계산열 = ★
+// AG/AH/AI 열명 — 박혜미 파일과 동일. AH·AI는 셀 내 줄바꿈(Alt+Enter) 포함. SETTLEMENT_HEADERS·out 키 동시 참조(불일치 방지).
+const H_AG = "배송비(비용)";
+const H_AH = "위탁배송비\n(원가)";
+const H_AI = "원가\n+위탁배송비";
+
+// 정제후 35열 양식 헤더 순서 (박혜미 정제후 파일 기준). 계산열 = ★
+//   2026-08-11 재편: 분류1/2/3(AD·AE·AF) + 실출고배송비 AG/AH 송장 dedup + AI(마진 원가기준).
 export const SETTLEMENT_HEADERS = [
   "주문일자", "쇼핑몰주문번호", "주문번호(사방넷)", "수취인", "송장번호", "배송비(수집)",
   "배송비(매출)", // ★G
@@ -13,18 +19,21 @@ export const SETTLEMENT_HEADERS = [
   "수집일", "사방넷품번코드", "물류처", "쇼핑몰명",
   "상품매출(배송비+매출)", "상품총원가", // ★AA AB
   "상품약어",
-  "실출고배송비", // ★신규(2026-08-06 박혜미): 품번별 물류 출고비. ÷1.1 표기. AA·AB·U·마진에 미반영(참고열).
+  "분류1(소싱)", "분류2(대분류)", "분류3(상품명)", // AD·AE·AF 분류열(값 비움 · 박혜미 수기 입력용)
+  H_AG, // ★AG 실출고배송비 中 당사물류(오포물류·오포_카노위탁·유비엘) — 참고비용, 원가 미산입. 송장 dedup.
+  H_AH, // ★AH 실출고배송비 中 위탁(나머지 6곳) — 원가(AI)에 산입. 송장 dedup.
+  H_AI, // ★AI = AB + AH(dedup 후). 마진율 원가 기준(박혜미 메일 원문 표기, 2026-08-11: AB→AI 전환)
 ] as const;
 
 export interface SettleRowError { rowIndex: number; channel: string; field: string; raw: unknown; }
 /** 정제 제외된 행 (스타배송 제외 규칙). 조용히 버리지 않고 집계·노출한다. */
 export interface SettleExcluded { count: number; byChannel: Record<string, number>; rowIndexes: number[]; }
-export interface ChannelAgg { channel: string; count: number; AA: number; AB: number; U: number; mode: string; multiplier: number | null; resolved: boolean; }
+export interface ChannelAgg { channel: string; count: number; AA: number; AB: number; AH: number; U: number; mode: string; multiplier: number | null; resolved: boolean; }
 export interface SettleResult {
   outRows: Record<string, unknown>[];   // 정제후 32열 순서 객체
   errors: SettleRowError[];
   channels: ChannelAgg[];
-  totals: { count: number; AA: number; AB: number; U: number };
+  totals: { count: number; AA: number; AB: number; AH: number; U: number };
   unresolvedChannels: string[];          // 규칙 맵에 없는 채널
   unresolvedProductCodes: string[];      // 배송비 기준표에 없는 사방넷품번코드 (실출고배송비 빈칸 처리, 0 아님)
   excluded: SettleExcluded;              // 물류처 제외 규칙으로 빠진 행 (스타배송 등)
@@ -40,7 +49,7 @@ function parseNum(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const IN = { ch: "쇼핑몰", M: "판매가", N: "공급가", P: "원가", Q: "EA", F: "배송비(수집)", Y: "물류처", name: "상품명", code: "사방넷품번코드" };
+const IN = { ch: "쇼핑몰", M: "판매가", N: "공급가", P: "원가", Q: "EA", F: "배송비(수집)", Y: "물류처", name: "상품명", code: "사방넷품번코드", invoice: "송장번호" };
 
 // 실출고배송비 출력 계수 — 박혜미 프로 확인 대기(2026-08-06). 기본 ÷1.1 (계산열 G·O·R과 동일 VAT 제거).
 //   테이블엔 VAT 포함 원값(예 2700) 저장. VAT 포함값 그대로 표기를 원하면 이 값만 1로 바꾸면 됨(한 줄).
@@ -53,6 +62,8 @@ export function processSettlement(rawRows: Record<string, unknown>[], ratesMap?:
   const unresolved = new Set<string>();
   const unresolvedCodes = new Set<string>();
   const excluded: SettleExcluded = { count: 0, byChannel: {}, rowIndexes: [] };
+  // 송장 dedup용 수집 — 출력행 인덱스(oi)·채널·송장·물류처(cross)·실출고배송비원값(shipRaw)·AB
+  const ship: { oi: number; ch: string; invoice: string; cross: boolean; shipRaw: number; AB: number }[] = [];
 
   rawRows.forEach((row, i) => {
     // 제외 규칙(확정): 스타배송 주문은 별도 관리 → 정제 대상에서 뺀다.
@@ -122,27 +133,60 @@ export function processSettlement(rawRows: Record<string, unknown>[], ratesMap?:
     out["상품매출(배송비+매출)"] = AA;
     out["상품총원가"] = AB;
 
-    // 실출고배송비 — 사방넷품번코드로 대응표 조회 (ratesMap 없으면 미적용 = 기존 동작 바이트 불변).
-    //   ÷1.1 표기(SHIPPING_OUT_DIVISOR). 미등록 품번은 0 아닌 빈칸 유지 + 목록 노출(조용히 0 금지).
-    //   ★ AA·AB·U·마진 계산에는 넣지 않는다 (박혜미 2026-08-06: 참고열, 마진 구조 무수정).
+    // 분류열 3개(AD·AE·AF) — 값 비움(박혜미 수기 입력용, 2026-08-11). 입력에 값 있어도 강제 공란.
+    out["분류1(소싱)"] = "";
+    out["분류2(대분류)"] = "";
+    out["분류3(상품명)"] = "";
+
+    // 실출고배송비 원값(rate÷1.1) 수집 — AG/AH 배치·AI·AH집계는 송장 dedup 후 2패스에서 확정.
+    //   ÷1.1 표기(SHIPPING_OUT_DIVISOR). 미등록 품번은 shipRaw=0 + 목록 노출(조용히 0 금지).
+    //   AG(배송비(비용))=당사물류(cross)·참고비용(원가 미산입) / AH(위탁배송비(원가))=위탁·원가 산입.
+    //   ★ 2026-08-11 박혜미: AH를 원가에 포함해 AI로 마진 산정 + 송장 dedup(부자재·로스는 cross에만·AH는 위탁에만 → 배타).
+    let shipRaw = 0;
     if (ratesMap) {
       const code = String(row[IN.code] ?? "").trim();
       if (code) {
         const rate = ratesMap.get(code);
-        if (rate != null && Number.isFinite(rate)) out["실출고배송비"] = rate / SHIPPING_OUT_DIVISOR;
-        else unresolvedCodes.add(code); // out["실출고배송비"]는 초기 루프에서 이미 "" — 빈칸 유지
+        if (rate != null && Number.isFinite(rate)) shipRaw = rate / SHIPPING_OUT_DIVISOR;
+        else unresolvedCodes.add(code);
       }
     }
+    // AG/AH/AI 기본 공란·AB (dedup 패스에서 승자 위탁행만 AH·AI 상향, 승자 당사행만 AG). 초기 복사값 덮어씀.
+    out[H_AG] = ""; out[H_AH] = ""; out[H_AI] = AB;
 
     if (hasErr) out["_error"] = true;
-    outRows.push(out);
+    const oi = outRows.push(out) - 1;
+    ship.push({ oi, ch, invoice: String(row[IN.invoice] ?? "").trim(), cross, shipRaw, AB });
 
-    // 채널 집계
-    const a = aggMap[ch] ?? (aggMap[ch] = { channel: ch, count: 0, AA: 0, AB: 0, U: 0, mode: rule?.supplyMode ?? "unknown", multiplier: rule?.multiplier ?? null, resolved: !!resolved });
+    // 채널 집계 — AA/AB/U는 dedup 무관(여기서 가산). AH는 dedup 후 2패스에서 가산.
+    const a = aggMap[ch] ?? (aggMap[ch] = { channel: ch, count: 0, AA: 0, AB: 0, AH: 0, U: 0, mode: rule?.supplyMode ?? "unknown", multiplier: rule?.multiplier ?? null, resolved: !!resolved });
     a.count++; a.AA += AA; a.AB += AB; a.U += typeof U === "number" ? U : 0;
   });
 
+  // ── 송장 dedup (2026-08-11 박혜미 A안): 동일 송장 내 실출고배송비 = 최대값 1회.
+  //   최대값을 낸 상품 행에 유지(동률=먼저 나온 행), 나머지 행 공란. 당사물류 AG·위탁 AH 전체 적용.
+  //   물류처는 송장 단위 단일(데이터 검증) → AG/AH 충돌 없음. store 하드코딩 없음(2·3호 재사용).
+  const byInvoice: Record<string, number[]> = {};
+  ship.forEach((s, idx) => {
+    const key = s.invoice !== "" ? s.invoice : `__row${idx}`; // 송장 없으면 각 행 독립(격리, dedup 미적용)
+    (byInvoice[key] ??= []).push(idx);
+  });
+  for (const idxs of Object.values(byInvoice)) {
+    let win = -1, max = 0;
+    for (const idx of idxs) if (ship[idx].shipRaw > max) { max = ship[idx].shipRaw; win = idx; } // 동률=먼저 나온 행(> 이므로 후행 갱신 안 함)
+    for (const idx of idxs) {
+      const s = ship[idx];
+      const keep = idx === win && max > 0;
+      const val: number | "" = keep ? s.shipRaw : "";
+      if (s.cross) outRows[s.oi][H_AG] = val;        // AG: 당사물류 참고비용
+      else outRows[s.oi][H_AH] = val;                // AH: 위탁 원가
+      const ahNum = (!s.cross && keep) ? s.shipRaw : 0;
+      outRows[s.oi][H_AI] = s.AB + ahNum;            // AI = AB + dedup 후 AH
+      const a = aggMap[s.ch]; if (a) a.AH += ahNum;  // 채널 AH 집계(dedup 반영)
+    }
+  }
+
   const channels = Object.values(aggMap).sort((x, y) => y.AA - x.AA);
-  const totals = channels.reduce((t, c) => ({ count: t.count + c.count, AA: t.AA + c.AA, AB: t.AB + c.AB, U: t.U + c.U }), { count: 0, AA: 0, AB: 0, U: 0 });
+  const totals = channels.reduce((t, c) => ({ count: t.count + c.count, AA: t.AA + c.AA, AB: t.AB + c.AB, AH: t.AH + c.AH, U: t.U + c.U }), { count: 0, AA: 0, AB: 0, AH: 0, U: 0 });
   return { outRows, errors, channels, totals, unresolvedChannels: [...unresolved], unresolvedProductCodes: [...unresolvedCodes], excluded };
 }

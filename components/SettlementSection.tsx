@@ -5,7 +5,7 @@
 import { useRef, useState } from "react";
 
 interface ChannelRow {
-  channel: string; count: number; AA: number; AB: number; U: number; margin: number; marginPct: number;
+  channel: string; count: number; AA: number; AB: number; AH: number; AI: number; U: number; margin: number; marginPct: number;
   mode: string; multiplier: number | null; resolved: boolean;
 }
 interface Summary {
@@ -16,7 +16,7 @@ interface Summary {
   input_row_count?: number;
   excluded?: { count: number; byChannel: Record<string, number>; rowIndexes: number[] };
   channels: ChannelRow[];
-  totals: { count: number; AA: number; AB: number; U: number; margin: number; marginPct: number };
+  totals: { count: number; AA: number; AB: number; AH: number; AI: number; U: number; margin: number; marginPct: number };
 }
 
 const won = (n: number) => Math.round(n).toLocaleString() + "원";
@@ -111,7 +111,7 @@ export default function SettlementSection() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-                  {["채널", "건수", "AA 상품매출", "AB 상품총원가", "U 물류비", "매출이익", "매출이익률"].map((h) => (
+                  {["채널", "건수", "AA 상품매출", "AB 상품총원가", "AI 원가+위탁배송", "U 물류비", "매출이익", "매출이익률"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: 10, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -127,6 +127,7 @@ export default function SettlementSection() {
                     <td style={{ padding: "9px 10px", color: "#6b7280" }}>{c.count}</td>
                     <td style={{ padding: "9px 10px", color: "#374151" }}>{won(c.AA)}</td>
                     <td style={{ padding: "9px 10px", color: "#374151" }}>{won(c.AB)}</td>
+                    <td style={{ padding: "9px 10px", color: c.AI !== c.AB ? "#b45309" : "#9ca3af" }}>{won(c.AI)}</td>
                     <td style={{ padding: "9px 10px", color: "#6b7280" }}>{won(c.U)}</td>
                     <td style={{ padding: "9px 10px", color: c.margin >= 0 ? "#374151" : "#dc2626" }}>{won(c.margin)}</td>
                     <td style={{ padding: "9px 10px", fontWeight: 700, color: c.marginPct >= 20 ? "#15803d" : c.marginPct >= 10 ? "#d97706" : "#dc2626" }}>{c.marginPct}%</td>
@@ -139,6 +140,7 @@ export default function SettlementSection() {
                   <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{sum.totals.count}</td>
                   <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{won(sum.totals.AA)}</td>
                   <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{won(sum.totals.AB)}</td>
+                  <td style={{ padding: "9px 10px", fontWeight: 700, color: "#b45309" }}>{won(sum.totals.AI)}</td>
                   <td style={{ padding: "9px 10px", fontWeight: 700, color: "#6b7280" }}>{won(sum.totals.U)}</td>
                   <td style={{ padding: "9px 10px", fontWeight: 700, color: "#374151" }}>{won(sum.totals.margin)}</td>
                   <td style={{ padding: "9px 10px", fontWeight: 700, color: "#15803d" }}>{sum.totals.marginPct}%</td>
@@ -147,7 +149,7 @@ export default function SettlementSection() {
             </table>
           </div>
           <p style={{ fontSize: 10, color: "#c0c4cc", marginTop: 10, lineHeight: 1.6 }}>
-            매출이익=AA−AB (최종이익 아님, 광고비·배송비 제외 전) · 물류처 예외: 오포물류·유비엘 외 부자재·로스·물류비 제외 · T deal 0.85 확정(2026-07-20 박혜미 확인) · 스타배송(지마켓·옥션 물류처) 주문은 별도 관리로 정제 제외 — 확정 규칙 · 보고류 0.9(옵션 실판매가)·배송비 수동보정은 회신 대기(보류)
+            매출이익=AA−AI (AI=상품총원가 AB+위탁배송비 AH · 2026-08-11 박혜미 확정 — 당사물류는 AH=0이라 AI=AB·마진 불변, 위탁만 하락. 최종이익 아님) · 물류처 예외: 오포물류·유비엘·오포_카노위탁(당사물류) 외 부자재·로스·물류비 제외 · T deal 0.85 확정(2026-07-20 박혜미 확인) · 스타배송(지마켓·옥션 물류처) 주문은 별도 관리로 정제 제외 — 확정 규칙 · 보고류 0.9(옵션 실판매가)·배송비 수동보정은 회신 대기(보류)
           </p>
         </div>
       )}

@@ -56,16 +56,24 @@ export async function POST(req: NextRequest) {
       errors: result.errors.slice(0, 20),
       unresolved_channels: result.unresolvedChannels,
       unresolved_product_codes: result.unresolvedProductCodes, // 배송비 미등록 품번 (빈칸 처리, 0 아님)
-      channels: result.channels.map((c) => ({
-        channel: c.channel, count: c.count, AA: Math.round(c.AA), AB: Math.round(c.AB), U: Math.round(c.U),
-        margin: Math.round(c.AA - c.AB), marginPct: c.AA > 0 ? +(((c.AA - c.AB) / c.AA) * 100).toFixed(1) : 0,
-        mode: c.mode, multiplier: c.multiplier, resolved: c.resolved,
-      })),
-      totals: {
-        count: result.totals.count, AA: Math.round(result.totals.AA), AB: Math.round(result.totals.AB), U: Math.round(result.totals.U),
-        margin: Math.round(result.totals.AA - result.totals.AB),
-        marginPct: result.totals.AA > 0 ? +(((result.totals.AA - result.totals.AB) / result.totals.AA) * 100).toFixed(1) : 0,
-      },
+      channels: result.channels.map((c) => {
+        const AI = c.AB + c.AH; // ★ 마진 원가 기준(AB+위탁배송비). 당사물류는 AH=0 → AI=AB
+        return {
+          channel: c.channel, count: c.count, AA: Math.round(c.AA), AB: Math.round(c.AB), U: Math.round(c.U),
+          AH: Math.round(c.AH), AI: Math.round(AI),
+          margin: Math.round(c.AA - AI), marginPct: c.AA > 0 ? +(((c.AA - AI) / c.AA) * 100).toFixed(1) : 0,
+          mode: c.mode, multiplier: c.multiplier, resolved: c.resolved,
+        };
+      }),
+      totals: (() => {
+        const AI = result.totals.AB + result.totals.AH;
+        return {
+          count: result.totals.count, AA: Math.round(result.totals.AA), AB: Math.round(result.totals.AB), U: Math.round(result.totals.U),
+          AH: Math.round(result.totals.AH), AI: Math.round(AI),
+          margin: Math.round(result.totals.AA - AI),
+          marginPct: result.totals.AA > 0 ? +(((result.totals.AA - AI) / result.totals.AA) * 100).toFixed(1) : 0,
+        };
+      })(),
     });
   }
 
