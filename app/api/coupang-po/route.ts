@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { unzipSync } from "fflate";
 import { getSession } from "@/lib/auth";
-import { parseOrderBuffer, buildCenterSheets, buildAllSheet, summarize } from "@/lib/coupang-po";
+import { parseOrderBuffer, buildCenterSheets, buildTemplateBook, summarize } from "@/lib/coupang-po";
 
 // 쿠팡 로켓배송 발주서 취합 (박혜미) — 개별 발주서(다중 파일 또는 zip) 업로드 →
-//   2단계: 물류센터별 시트 + 3단계: 전체 취합 시트 = 한 워크북 다운로드. format=json → 요약.
-//   정산·배송비 파이프라인과 코드 공유 없음. store 하드코딩 없음(로그인만 요구, 2·3호 재사용).
+//   template(기본양식.xlsx) 첨부 시 3단계: 수식·외부링크·서식·병합 보존한 "전체" 파일(raw XML 주입).
+//   template 없으면 2단계: 물류센터별 17시트. format=json → 요약. 정산·배송비와 코드 공유 없음, 로그인만(2·3호 재사용).
 
 // zip 내 .xlsx 엔트리를 버퍼로 추출 (fflate unzipSync, zero-dep·동기).
 function unzipXlsx(buf: Buffer): { name: string; buffer: Buffer }[] {
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
 
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx";
   const inputs: { name: string; buffer: Buffer }[] = [];
+  let templateBuf: Uint8Array | null = null;
   try {
     const form = await req.formData();
     const files = [...form.getAll("files"), ...form.getAll("file")]; // 다중 파일 + 단수 호환
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
       if (/\.zip$/i.test(name)) inputs.push(...unzipXlsx(buf));
       else if (/\.xlsx$/i.test(name)) inputs.push({ name, buffer: buf });
     }
+    const tf = form.get("template"); // 3단계 수식본용 기본양식(선택)
+    if (tf && typeof tf !== "string" && /\.xlsx$/i.test((tf as File).name)) templateBuf = new Uint8Array(await (tf as File).arrayBuffer());
   } catch (e) {
     return NextResponse.json({ error: "업로드 처리 실패: " + (e as Error).message }, { status: 400 });
   }
@@ -54,17 +57,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 한 워크북 = 전체(3단계) 시트 + 물류센터별(2단계) 시트들
-  const wb = XLSX.utils.book_new();
-  const all = buildAllSheet(pos);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(all.aoa), all.sheetName);
-  for (const s of buildCenterSheets(pos)) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.aoa), s.sheetName);
-  const outBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  const filename = `쿠팡발주서_취합_${new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10)}.xlsx`;
+  // 다운로드: template(기본양식) 첨부 시 3단계(수식·외부링크 보존 전체), 없으면 2단계(물류센터별 17시트)
+  const dateStr = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  let outBuf: Buffer, filename: string, mode: string;
+  if (templateBuf) {
+    outBuf = Buffer.from(buildTemplateBook(pos, templateBuf)); // 3단계 — 템플릿 raw XML 주입
+    filename = `쿠팡발주서_전체_${dateStr}.xlsx`; mode = "template";
+  } else {
+    const wb = XLSX.utils.book_new(); // 2단계 — 물류센터별 17시트
+    for (const s of buildCenterSheets(pos)) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.aoa), s.sheetName);
+    outBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    filename = `쿠팡발주서_물류센터별_${dateStr}.xlsx`; mode = "centers";
+  }
   return new NextResponse(new Uint8Array(outBuf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      "X-Mode": mode,
       "X-Center-Count": String(sum.centerCount),
       "X-Item-Count": String(sum.itemCount),
       "X-Fail-Count": String(sum.failCount),

@@ -2,6 +2,7 @@
 //   2026-08-12 신설. 정산·배송비 파이프라인과 코드 공유 없음(별개 기능). store 하드코딩 없음(파일에서 물류센터 읽음).
 //   구조 근거: 개별 발주서 3섹션(거래처/발주정보/상품) + 상품당 2행(본행+BARCODE행). 라벨 앵커 파싱.
 import * as XLSX from "xlsx";
+import { unzipSync, strFromU8, strToU8, zipSync } from "fflate";
 
 export interface PoItem {
   no: number; code: string; name: string; barcode: string;
@@ -135,4 +136,76 @@ export function summarize(pos: ParsedPo[]): PoSummary {
     failed: pos.filter((p) => !p.ok).map((p) => ({ file: p.file, reason: p.reason ?? "" })),
     centers: Object.entries(byC).map(([center, b]) => ({ center, poCount: b.po.size, itemCount: b.items })).sort((a, b) => a.center.localeCompare(b.center, "ko")),
   };
+}
+
+// ── 3단계 (템플릿 raw XML 주입) — 기본양식.xlsx에 데이터행만 채워 수식·외부링크·서식·병합·Sheet1 보존 ──
+//   ★ 새 워크북 생성 아님. SheetJS는 왕복 시 externalLinks를 잃어 불가(실증). 그래서 템플릿 XML을 직접 편집.
+//   손대는 것만: 데이터시트(sheet1.xml) 데이터행 + 시트명 + M1 날짜 + calcChain 제거 + fullCalcOnLoad. 나머지 전부 원본 유지.
+//   ⚠️ 전제: 템플릿의 데이터시트=첫 시트=xl/worksheets/sheet1.xml, 원가표=Sheet1, 열/스타일/병합 패턴이 이지스토리 기본양식과 동일.
+const TPL_MERGE_COLS = ["A", "B", "C", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"];
+const TPL_EXT = "'[1]1파레트 적재수량'";
+const xesc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const mdParts = (a: string) => { const m = String(a).match(/(\d{4})[/.-](\d{2})[/.-](\d{2})/); return m ? { md: `${+m[2]}/${+m[3]}`, mmdd: m[2] + m[3] } : { md: "", mmdd: "0000" }; };
+
+export function buildTemplateBook(pos: ParsedPo[], templateBytes: Uint8Array): Uint8Array {
+  const items = pos.filter((p) => p.ok).flatMap((p) => p.items)
+    .sort((a, b) => a.center.localeCompare(b.center, "ko") || String(a.poNo).localeCompare(String(b.poNo)) || a.no - b.no);
+  const arrival = pos.find((p) => p.ok && p.arrival)?.arrival ?? "";
+  const { md, mmdd } = mdParts(arrival);
+  const z = unzipSync(templateBytes);
+  const sheet = strFromU8(z["xl/worksheets/sheet1.xml"]);
+
+  const cNum = (col: string, r: number, s: number, v: number | string) => `<c r="${col}${r}" s="${s}"><v>${v}</v></c>`;
+  const cStr = (col: string, r: number, s: number, t: string) => `<c r="${col}${r}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xesc(t)}</t></is></c>`;
+  const cF = (col: string, r: number, s: number, f: string) => `<c r="${col}${r}" s="${s}"><f>${xesc(f)}</f></c>`;
+  const cE = (col: string, r: number, s: number) => `<c r="${col}${r}" s="${s}"/>`;
+  const codeCell = (col: string, r: number, s: number, v: string) => (/^\d+$/.test(String(v).trim()) ? cNum(col, r, s, v) : cStr(col, r, s, v));
+
+  // 헤더행 1~9 보존 + M1 날짜 교체
+  let hm: RegExpExecArray | null, headerRows = "";
+  const rowRe = /<row r="(\d+)"[^>]*>[\s\S]*?<\/row>/g;
+  while ((hm = rowRe.exec(sheet))) {
+    if (+hm[1] > 9) continue;
+    let rx = hm[0];
+    if (+hm[1] === 1) rx = rx.replace(/<c r="M1"[^>]*>[\s\S]*?<\/c>/, `<c r="M1" s="64" t="inlineStr"><is><t xml:space="preserve">${xesc(md)}일 쿠팡 납품 (부가세별도)</t></is></c>`);
+    headerRows += rx;
+  }
+  // 데이터행(상품당 2행: 본행+BARCODE행) + 병합
+  let dataRows = "", merges = "";
+  items.forEach((it, i) => {
+    const no = i + 1, r = 10 + i * 2, r2 = r + 1;
+    dataRows += `<row r="${r}" spans="1:19">`
+      + cNum("A", r, 50, no) + codeCell("B", r, 51, it.poNo) + codeCell("C", r, 43, it.code) + cStr("D", r, 27, it.name)
+      + cF("E", r, 2, `VLOOKUP(C${r},${TPL_EXT}!$B:$F,5,0)`) + cE("F", r, 4) + cStr("G", r, 43, it.center)
+      + cNum("H", r, 49, it.orderQty) + cNum("I", r, 49, it.supplyableQty) + cNum("J", r, 49, it.purAmt) + cNum("K", r, 49, it.supAmt) + cNum("L", r, 49, it.vatAmt)
+      + cF("M", r, 42, `VLOOKUP(C${r},${TPL_EXT}!$B:$D,3,0)`) + cF("N", r, 42, `I${r}/M${r}`) + cF("O", r, 36, `VLOOKUP(C${r},Sheet1!A:C,3,0)`)
+      + cF("P", r, 37, `O${r}*I${r}`) + cF("Q", r, 39, `P${r}*0.04`) + cF("R", r, 40, `P${r}*0.2`) + cF("S", r, 41, `K${r}-(P${r}+Q${r}+R${r})`)
+      + `</row>`;
+    dataRows += `<row r="${r2}" spans="1:19">`
+      + cE("A", r2, 50) + cE("B", r2, 52) + cE("C", r2, 43) + cStr("D", r2, 27, it.barcode)
+      + cE("E", r2, 2) + cE("F", r2, 4) + cE("G", r2, 43) + cE("H", r2, 43) + cE("I", r2, 43) + cE("J", r2, 43) + cE("K", r2, 43) + cE("L", r2, 43)
+      + cE("M", r2, 43) + cE("N", r2, 43) + cE("O", r2, 36) + cE("P", r2, 38) + cE("Q", r2, 38) + cE("R", r2, 38) + cE("S", r2, 41)
+      + `</row>`;
+    for (const c of TPL_MERGE_COLS) merges += `<mergeCell ref="${c}${r}:${c}${r2}"/>`;
+  });
+  const lastRow = 9 + items.length * 2;
+  // 헤더 병합(1~9) 보존
+  let mg: RegExpExecArray | null, headerMerges = "";
+  const mgRe = /<mergeCell ref="([A-S])(\d+):([A-S])(\d+)"\/>/g;
+  while ((mg = mgRe.exec(sheet))) if (+mg[2] <= 9 && +mg[4] <= 9) headerMerges += mg[0];
+  const totalMerges = (headerMerges.match(/<mergeCell/g) || []).length + items.length * TPL_MERGE_COLS.length;
+  // 조립 (dimension 갱신)
+  const head = sheet.slice(0, sheet.indexOf("<sheetData>")).replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:S${lastRow}"/>`);
+  const tail = sheet.slice(sheet.indexOf("</mergeCells>") + "</mergeCells>".length);
+  z["xl/worksheets/sheet1.xml"] = strToU8(head + "<sheetData>" + headerRows + dataRows + "</sheetData>"
+    + `<mergeCells count="${totalMerges}">` + headerMerges + merges + "</mergeCells>" + tail);
+  // 첫 시트명 → MMDD + fullCalcOnLoad(캐시값 없는 수식 재계산 강제)
+  let wbxml = strFromU8(z["xl/workbook.xml"]).replace(/(<sheet name=")[^"]*("[^>]*\/>)/, `$1${mmdd}$2`);
+  if (!/<calcPr[^>]*fullCalcOnLoad/.test(wbxml)) wbxml = wbxml.replace(/<calcPr([^/>]*)\/>/, '<calcPr$1 fullCalcOnLoad="1"/>');
+  z["xl/workbook.xml"] = strToU8(wbxml);
+  // calcChain 완전 제거(파일+Content_Types+rels 관계 — 잔재 시 Excel repair)
+  delete z["xl/calcChain.xml"];
+  z["[Content_Types].xml"] = strToU8(strFromU8(z["[Content_Types].xml"]).replace(/<Override PartName="\/xl\/calcChain\.xml"[^>]*\/>/, ""));
+  z["xl/_rels/workbook.xml.rels"] = strToU8(strFromU8(z["xl/_rels/workbook.xml.rels"]).replace(/<Relationship [^>]*Target="calcChain\.xml"[^>]*\/>/, ""));
+  return zipSync(z);
 }

@@ -14,12 +14,14 @@ const won = (n: number) => Math.round(n).toLocaleString() + "원";
 
 export default function CoupangPoSection() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const tmplRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [template, setTemplate] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [sum, setSum] = useState<Summary | null>(null);
 
-  const build = (fd: FormData) => { for (const f of files) fd.append("files", f); return fd; };
+  const build = (fd: FormData) => { for (const f of files) fd.append("files", f); if (template) fd.append("template", template); return fd; };
 
   async function preview() {
     if (!files.length) { setMsg({ ok: false, text: "발주서 파일(.xlsx 여러 개) 또는 zip을 선택해주세요." }); return; }
@@ -55,15 +57,18 @@ export default function CoupangPoSection() {
     <div style={CARD}>
       <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>쿠팡 발주서 취합 <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>물류센터별 · 전체</span></div>
       <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16, lineHeight: 1.6 }}>
-        Supplier Hub에서 받은 <b>개별 발주서(.xlsx 여러 개)</b> 또는 <b>.zip</b>을 올리면, 물류센터별 시트로 분리·누적하고 전체 취합 시트를 더해 한 파일로 내려받습니다. (사방넷 교환발주서·정산과 별개)
+        Supplier Hub 개별 발주서(<b>.xlsx 여러 개</b> 또는 <b>.zip</b>)를 올립니다. <b>기본양식</b>도 함께 올리면 수식·외부링크·서식·병합을 보존한 <b>전체 취합 파일</b>(발주수량 수정 시 이익 자동 재계산)로, 없으면 <b>물류센터별 시트</b>로 내려받습니다. (사방넷 교환발주서·정산과 별개)
       </div>
       <input ref={fileRef} type="file" accept=".xlsx,.zip" multiple style={{ display: "none" }}
         onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); setSum(null); setMsg(null); }} />
+      <input ref={tmplRef} type="file" accept=".xlsx" style={{ display: "none" }}
+        onChange={(e) => { setTemplate(e.target.files?.[0] ?? null); }} />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <button style={{ ...BTN, background: "#f3f4f6", color: "#374151" }} onClick={() => fileRef.current?.click()}>파일 선택</button>
+        <button style={{ ...BTN, background: "#f3f4f6", color: "#374151" }} onClick={() => fileRef.current?.click()}>발주서 선택</button>
+        <button style={{ ...BTN, background: "#f3f4f6", color: "#374151" }} onClick={() => tmplRef.current?.click()}>기본양식 선택</button>
         <button style={{ ...BTN, background: loading ? "#c7d2fe" : "#eef2ff", color: "#4338ca" }} disabled={loading} onClick={preview}>{loading ? "처리 중..." : "요약 보기"}</button>
-        <button style={{ ...BTN, background: loading ? "#a7f3d0" : "#059669", color: "#fff" }} disabled={loading} onClick={download}>취합 다운로드 ↓</button>
-        <span style={{ fontSize: 12, color: "#9ca3af" }}>{files.length ? `${files.length}개 선택됨` : "선택된 파일 없음"}</span>
+        <button style={{ ...BTN, background: loading ? "#a7f3d0" : "#059669", color: "#fff" }} disabled={loading} onClick={download}>{template ? "전체 취합(수식 유지) ↓" : "물류센터별 ↓"}</button>
+        <span style={{ fontSize: 12, color: "#9ca3af" }}>{files.length ? `발주서 ${files.length}개` : "발주서 없음"}{template ? " · 기본양식 ✓" : ""}</span>
       </div>
       {msg && (
         <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, fontSize: 13, background: msg.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${msg.ok ? "#86efac" : "#fecaca"}`, color: msg.ok ? "#15803d" : "#dc2626" }}>{msg.text}</div>
