@@ -2,9 +2,9 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { unzipSync } from "fflate";
+import { unzipSync, zipSync } from "fflate";
 import { getSession } from "@/lib/auth";
-import { parseOrderBuffer, buildCenterSheets, buildTemplateBook, summarize } from "@/lib/coupang-po";
+import { parseOrderBuffer, buildCenterSheets, buildTemplateBook, summarize, arrivalParts, type ParsedPo } from "@/lib/coupang-po";
 
 // 쿠팡 로켓배송 발주서 취합 (박혜미) — 개별 발주서(다중 파일 또는 zip) 업로드 →
 //   template(기본양식.xlsx) 첨부 시 3단계: 수식·외부링크·서식·병합 보존한 "전체" 파일(raw XML 주입).
@@ -60,9 +60,24 @@ export async function POST(req: NextRequest) {
   // 다운로드: template(기본양식) 첨부 시 3단계(수식·외부링크 보존 전체), 없으면 2단계(물류센터별 17시트)
   const dateStr = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   let outBuf: Buffer, filename: string, mode: string;
+  let contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   if (templateBuf) {
-    outBuf = Buffer.from(buildTemplateBook(pos, templateBuf)); // 3단계 — 템플릿 raw XML 주입
-    filename = `쿠팡발주서_전체_${dateStr}.xlsx`; mode = "template";
+    // 3단계 — 입고예정일별로 파일 분리(발주번호 1건=입고일 1개=센터 1개, 예외 0). 단일 날짜=xlsx, 복수=zip.
+    const okPos = pos.filter((p) => p.ok);
+    const byDate = new Map<string, ParsedPo[]>();
+    for (const p of okPos) { const k = p.arrival || ""; const g = byDate.get(k) ?? []; g.push(p); byDate.set(k, g); }
+    const poName = (arr: string) => `쿠팡 발주서리스트 전체(${arrivalParts(arr).yymmdd} 입고건)_전체.xlsx`;
+    if (byDate.size <= 1) {
+      const [arr, group] = [...byDate.entries()][0] ?? ["", okPos];
+      outBuf = Buffer.from(buildTemplateBook(group, templateBuf));
+      filename = poName(arr); mode = "template";
+    } else {
+      const entries: Record<string, Uint8Array> = {};
+      for (const [arr, group] of byDate) entries[poName(arr)] = buildTemplateBook(group, templateBuf);
+      outBuf = Buffer.from(zipSync(entries));
+      filename = `쿠팡 발주서리스트_입고일별_${byDate.size}건_${dateStr}.zip`;
+      contentType = "application/zip"; mode = "template-multi";
+    }
   } else {
     const wb = XLSX.utils.book_new(); // 2단계 — 물류센터별 17시트
     for (const s of buildCenterSheets(pos)) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.aoa), s.sheetName);
@@ -71,7 +86,7 @@ export async function POST(req: NextRequest) {
   }
   return new NextResponse(new Uint8Array(outBuf), {
     headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Type": contentType,
       "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "X-Mode": mode,
       "X-Center-Count": String(sum.centerCount),

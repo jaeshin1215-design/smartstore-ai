@@ -46,7 +46,8 @@ export default function CoupangPoSection() {
       const m = cd.match(/filename\*=UTF-8''([^;]+)/);
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = m ? decodeURIComponent(m[1]) : "쿠팡발주서_취합.xlsx"; a.click(); URL.revokeObjectURL(a.href);
-      setMsg({ ok: true, text: "취합 파일 다운로드 완료 (전체 시트 + 물류센터별 시트)." });
+      const mode = res.headers.get("X-Mode");
+      setMsg({ ok: true, text: mode === "template-multi" ? "입고예정일별 파일(zip) 다운로드 완료." : mode === "template" ? "전체 취합 파일 다운로드 완료 (수식·서식 유지)." : "물류센터별 취합 파일 다운로드 완료." });
     } catch (e) { setMsg({ ok: false, text: "다운로드 오류: " + (e as Error).message }); } finally { setLoading(false); }
   }
 
@@ -77,7 +78,7 @@ export default function CoupangPoSection() {
         <div style={{ marginTop: 16 }}>
           {sum.arrivals.length > 1 && (
             <div style={{ padding: "9px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, fontSize: 12, color: "#c2410c", marginBottom: 10 }}>
-              ⚠ 입고예정일이 {sum.arrivals.length}종({sum.arrivals.join(", ")}) 섞여 있습니다 — 전체 시트명은 "전체"로 나갑니다(단일 날짜면 MMDD).
+              ⚠ 입고예정일이 {sum.arrivals.length}종({sum.arrivals.join(", ")}) 섞여 있습니다 — {template ? `입고예정일별로 ${sum.arrivals.length}개 파일이 zip으로 내려갑니다(파일당 시트명 MMDD).` : `물류센터별 다운로드는 한 파일에 담깁니다.`}
             </div>
           )}
           {sum.failed.length > 0 && (
