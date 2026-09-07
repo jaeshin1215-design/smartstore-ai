@@ -189,7 +189,7 @@ export default function Home() {
         {activeTab === "optimize" && (
           <div style={{ fontFamily: "'Pretendard', -apple-system, sans-serif" }}>
             <ProfitSimulatorTab />
-            <div style={{ borderTop: "1px solid #dededi", paddingTop: "3.5rem", marginTop: "4rem", display: "flex", flexDirection: "column", gap: "32px" }}>
+            <div style={{ borderTop: "1px solid #e8eaed", paddingTop: "3.5rem", marginTop: "4rem", display: "flex", flexDirection: "column", gap: "32px" }}>
               <PricingTab />
               <BiddingTab />
             </div>
@@ -212,7 +212,7 @@ export default function Home() {
           background: "rgba(255,255,255,0.88)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
-          borderTop: "1px solid #dededi",
+          borderTop: "1px solid #e8eaed",
         }}
       >
         <div className="max-w-[1600px] mx-auto px-12 py-2 flex items-center justify-center gap-2">

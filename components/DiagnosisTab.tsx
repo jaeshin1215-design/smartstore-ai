@@ -26,7 +26,7 @@ interface OfferDraft {
   needs_evidence: boolean;
 }
 
-const inputCls = "w-full text-xs rounded border border-[#dededi] px-3 py-2 outline-none transition-all placeholder:text-slate-300 text-slate-700 focus:border-[#ef567c] focus:ring-1 focus:ring-[#ef567c]/20 resize-none bg-white";
+const inputCls = "w-full text-xs rounded border border-[#e8eaed] px-3 py-2 outline-none transition-all placeholder:text-slate-300 text-slate-700 focus:border-[#ef567c] focus:ring-1 focus:ring-[#ef567c]/20 resize-none bg-white";
 const labelCls = "block text-[11px] font-semibold text-[#64676b] uppercase tracking-wider mb-1.5";
 
 interface Product {
@@ -75,6 +75,15 @@ export default function DiagnosisTab({
   // 이상탐지
   const [anomalyIds,    setAnomalyIds]    = useState<string[]>([]);
   const [contamination, setContamination] = useState(0.05);
+
+  // 운영자 판별 — 데모 리셋 등 운영자 전용 컨트롤 노출용 (ImpersonationBar와 동일 기준)
+  const [isOperator, setIsOperator] = useState(false);
+  useEffect(() => {
+    fetch("/api/authz/session")
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => setIsOperator(j?.role === "operator"))
+      .catch(() => setIsOperator(false));
+  }, []);
 
   // Matrix Option States (⚙️ Settings Dropdown)
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -595,14 +604,6 @@ export default function DiagnosisTab({
           }}>
             {mode === "mezzanine" ? `Brands (${allProducts.length})` : `Ideas (${products.length})`}
           </span>
-          <span style={{
-            fontSize: "11px",
-            color: "#8f9399",
-            cursor: "pointer",
-            fontWeight: 500
-          }}>
-            Highest priority <i className="ti ti-chevron-down" style={{ fontSize: "10px", marginLeft: "2px" }}></i>
-          </span>
         </div>
 
         {/* Scrollable list */}
@@ -730,7 +731,7 @@ export default function DiagnosisTab({
           display: "flex",
           flexDirection: "column",
           background: "#ffffff",
-          border: "1px solid #dededi",
+          border: "1px solid #e8eaed",
           borderRadius: "5px",
           boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
           position: "relative",
@@ -743,7 +744,7 @@ export default function DiagnosisTab({
           justifyContent: "space-between",
           alignItems: "center",
           padding: "14px 20px",
-          borderBottom: "1px solid #dededi",
+          borderBottom: "1px solid #e8eaed",
           background: "#ffffff",
           zIndex: 10
         }}>
@@ -764,7 +765,7 @@ export default function DiagnosisTab({
                 width: "28px",
                 height: "28px",
                 borderRadius: "5px",
-                border: "1px solid #dededi",
+                border: "1px solid #e8eaed",
                 background: settingsOpen ? "#eeeef1" : "#ffffff",
                 cursor: "pointer",
                 transition: "all 0.15s ease"
@@ -780,7 +781,7 @@ export default function DiagnosisTab({
                 top: "30px",
                 left: "0",
                 background: "#ffffff",
-                border: "1px solid #dededi",
+                border: "1px solid #e8eaed",
                 borderRadius: "5px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "6px 0",
@@ -952,7 +953,7 @@ export default function DiagnosisTab({
                 onClick={() => setDrawerOpen(false)}
                 style={{
                   background: "#ffffff",
-                  border: "1px solid #dededi",
+                  border: "1px solid #e8eaed",
                   borderRadius: "5px",
                   padding: "5px 10px",
                   fontSize: "11px",
@@ -1030,7 +1031,7 @@ export default function DiagnosisTab({
                 onClick={() => setSalesPanelOpen(v => !v)}
                 style={{
                   background: salesPanelOpen ? "#f0fdf4" : "#ffffff",
-                  border: `1px solid ${salesPanelOpen ? "#86efac" : "#dededi"}`,
+                  border: `1px solid ${salesPanelOpen ? "#86efac" : "#e8eaed"}`,
                   borderRadius: "5px", padding: "5px 10px",
                   fontSize: "11px", color: salesPanelOpen ? "#166534" : "#64676b",
                   fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
@@ -1049,7 +1050,7 @@ export default function DiagnosisTab({
                 disabled={savingSnapshot}
                 style={{
                   background: snapshotDone ? "#f0fdf4" : "#ffffff",
-                  border: `1px solid ${snapshotDone ? "#86efac" : "#dededi"}`,
+                  border: `1px solid ${snapshotDone ? "#86efac" : "#e8eaed"}`,
                   borderRadius: "5px", padding: "5px 10px",
                   fontSize: "11px", color: snapshotDone ? "#166534" : "#64676b",
                   fontWeight: 500, cursor: savingSnapshot ? "not-allowed" : "pointer",
@@ -1061,7 +1062,7 @@ export default function DiagnosisTab({
               </button>
             )}
 
-            {mode === "sellfit" && storeId && (
+            {mode === "sellfit" && storeId && isOperator && (
               <button
                 onClick={async (e) => {
                   if (!window.confirm("정말 초기화하시겠습니까?")) return;
@@ -1077,7 +1078,7 @@ export default function DiagnosisTab({
                   }
                 }}
                 style={{
-                  background: "#ffffff", border: "1px solid #dededi",
+                  background: "#ffffff", border: "1px solid #e8eaed",
                   borderRadius: "5px", padding: "5px 10px",
                   fontSize: "11px", color: "#64676b", fontWeight: 500,
                   cursor: "pointer", fontFamily: "inherit",
@@ -1086,33 +1087,6 @@ export default function DiagnosisTab({
                 데모 리셋
               </button>
             )}
-            <button style={{
-              background: "#ffffff",
-              border: "1px solid #dededi",
-              borderRadius: "5px",
-              padding: "5px 10px",
-              fontSize: "11px",
-              color: "#64676b",
-              fontWeight: 500,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px"
-            }}>
-              <i className="ti ti-filter" style={{ fontSize: "11px" }}></i> Filter
-            </button>
-            <button style={{
-              background: "#ffffff",
-              border: "1px solid #dededi",
-              borderRadius: "5px",
-              padding: "5px 10px",
-              fontSize: "11px",
-              color: "#64676b",
-              fontWeight: 500,
-              cursor: "pointer"
-            }}>
-              Shortlist
-            </button>
           </div>
         </div>
 
@@ -1241,7 +1215,7 @@ export default function DiagnosisTab({
               <div style={{
                 width: "220px",
                 background: "#fbfbfb",
-                borderRight: "1px solid #dededi",
+                borderRight: "1px solid #e8eaed",
                 padding: "24px 20px",
                 display: "flex",
                 flexDirection: "column",
