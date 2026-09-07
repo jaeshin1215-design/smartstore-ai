@@ -14,6 +14,7 @@ export async function POST() {
   await runSafe("ALTER TABLE sellfit_daily_reports ADD COLUMN consecutive_days INTEGER DEFAULT 1");
 
   // v2 — products: 상품 데이터 마스터 (판매가+매입가+배송비 세트) / 5-14 미팅 1순위
+  await runSafe("ALTER TABLE sellfit_users ADD COLUMN disabled_at TEXT");
   await runSafe("ALTER TABLE sellfit_products ADD COLUMN purchase_price INTEGER");
   await runSafe("ALTER TABLE sellfit_products ADD COLUMN shipping_cost INTEGER");
   await runSafe("ALTER TABLE sellfit_products ADD COLUMN is_price_confirmed INTEGER DEFAULT 0");

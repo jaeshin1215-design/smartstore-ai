@@ -66,7 +66,7 @@ export async function getSession(req: NextRequest): Promise<SessionInfo | null> 
   // active_store_id 가 걸려 있으면 그 스토어의 멤버십(m.store_id)을 같은 쿼리에서 확인 — 라운드트립 1회 유지
   const r = await db.execute({
     sql: `SELECT s.id AS sid, s.active_store_id, s.impersonated_store_id, s.readonly, s.impersonated_until,
-                 u.id AS uid, u.email, u.store_id, u.role,
+                 u.id AS uid, u.email, u.store_id, u.role, u.disabled_at,
                  m.store_id AS member_of
           FROM sellfit_sessions s
           JOIN sellfit_users u ON u.id = s.user_id
@@ -77,6 +77,9 @@ export async function getSession(req: NextRequest): Promise<SessionInfo | null> 
   });
   const row = r.rows[0];
   if (!row) return null;
+  // 비활성 계정(퇴사 등)은 유효 쿠키가 있어도 세션을 성립시키지 않는다.
+  // 되돌리기: UPDATE sellfit_users SET disabled_at = NULL WHERE email = ?
+  if (row.disabled_at) return null;
 
   const defaultStoreId = String(row.store_id ?? "");
   const role = String(row.role ?? "member");

@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return SAME_RESPONSE;
 
-  const user = await db.execute({ sql: "SELECT id FROM sellfit_users WHERE email = ?", args: [email] });
+  const user = await db.execute({ sql: "SELECT id, disabled_at FROM sellfit_users WHERE email = ?", args: [email] });
   if (user.rows.length === 0) return SAME_RESPONSE; // 미등록 — 동일 응답, 발송 없음
+  if (user.rows[0].disabled_at) return SAME_RESPONSE; // 비활성 계정 — 미등록과 동일 응답(존재 노출 방지)
 
   const token = randomBytes(32).toString("hex");
   await db.execute({

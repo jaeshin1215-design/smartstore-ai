@@ -436,11 +436,12 @@ export default function MatrixBox({
                   onMouseLeave={() => setHoverProductId?.(null)}
                   onMouseDown={e => handleMouseDown(e, p.id, mx, my)}
                 >
-                  {/* 이상 신호 링 */}
+                  {/* 특이 조합 링 — Isolation Forest 결과. 경고 아님(보라 점선) */}
                   {isAnomaly && (
                     <>
-                      <circle cx={cx} cy={cy} r={r + 7} fill="none" stroke="#ef4444" strokeWidth={1.8} strokeDasharray="3 2" />
-                      <text x={cx} y={cy - r - 10} textAnchor="middle" style={{ fontSize: "8px", fill: "#ef4444", fontWeight: 700, pointerEvents: "none" }}>이상 신호</text>
+                      <title>특이 조합 — 마진·판매량 조합이 다른 상품과 다릅니다. 좋다/나쁘다 판정이 아닙니다.</title>
+                      <circle cx={cx} cy={cy} r={r + 7} fill="none" stroke="#8b5cf6" strokeWidth={1.8} strokeDasharray="3 2" />
+                      <text x={cx} y={cy - r - 10} textAnchor="middle" style={{ fontSize: "8px", fill: "#8b5cf6", fontWeight: 700, pointerEvents: "none" }}>특이 조합</text>
                     </>
                   )}
 

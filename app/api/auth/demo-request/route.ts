@@ -67,7 +67,11 @@ export async function POST(req: NextRequest) {
 
   // 데모 유저 upsert — 기존 계정이 있으면 스토어를 절대 건드리지 않는다
   // (직원 이메일로 신청해도 직원 계정의 store_id가 demo로 바뀌는 사고 방지)
-  const user = await db.execute({ sql: "SELECT id FROM sellfit_users WHERE email = ?", args: [email] });
+  const user = await db.execute({ sql: "SELECT id, disabled_at FROM sellfit_users WHERE email = ?", args: [email] });
+  // 비활성 계정은 이 경로로도 링크를 받지 못한다 (auth/request 차단 우회 방지)
+  if (user.rows[0]?.disabled_at) {
+    return NextResponse.json({ ok: true, message: "요청이 접수되었습니다. 메일함을 확인하세요." });
+  }
   if (!user.rows[0]) {
     await db.execute({
       sql: "INSERT INTO sellfit_users (id, email, store_id) VALUES (?, ?, ?)",
