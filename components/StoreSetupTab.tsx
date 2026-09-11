@@ -645,7 +645,7 @@ export default function StoreSetupTab() {
           {activeSection === "매출 입력" && (
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0ede9", padding: "24px" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1e", marginBottom: 4 }}>오늘 매출 입력</div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 5분 · 30일 누적 = PoC 결과 보고서</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>매일 5분 · 광고비 낭비(재고 0 + 광고 집행) 자동 감지에 사용됩니다</div>
               {yesterdaySales && (
                 <div style={{ background: "#f9fafb", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#6b7280" }}>
                   어제: 매출 {yesterdaySales.revenue ? Number(yesterdaySales.revenue).toLocaleString() + "원" : "—"}
