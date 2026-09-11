@@ -59,9 +59,13 @@ export default function ImageEditTab() {
       ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
       const textWidth = ctx.measureText(text).width;
       const padding = fontSize * 0.5;
+      // 서브 문구는 본문 기준선 아래(ty + fontSize*0.8)에 그려진다. 하단 배치에서 본문을
+      //   그만큼 올려주지 않으면 서브 문구가 캔버스 밖으로 나가 잘린다.
+      //   (2026-09-11 수정 — 16~72px · 500/1000/1200px 전 조합에서 재현되던 문제)
+      const subDrop = subText ? fontSize * 0.8 : 0;
       let ty = textPosition === "top" ? fontSize + padding * 2
         : textPosition === "middle" ? size / 2
-        : size - padding * 2;
+        : size - padding * 2 - subDrop;
       const tx = size / 2;
 
       if (textBg) {

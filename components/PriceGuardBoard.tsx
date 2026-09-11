@@ -332,11 +332,13 @@ export default function PriceGuardBoard({ storeId }: { storeId: string }) {
                           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 12px", borderRadius: 10, background: s!.bg, color: s!.color, border: `1px solid ${s!.border}` }}>
                             {r.level}
                           </span>
-                        ) : r.supply_price == null ? (
-                          // 공급가 자체가 없을 때만 "공급가 미입력"
-                          <span style={{ fontSize: 11, color: "#c0c4cc" }}>공급가 미입력</span>
+                        ) : r.supply_price == null || r.supply_price === 0 ? (
+                          // 매입가(공급가) 없음 — 안내문(279행)과 같은 기준. 0도 "없음"으로 본다.
+                          //   0은 NULL이 아니라 이 분기를 빠져나가 "수집 전"으로 잘못 표시됐다 (2026-09-11 수정).
+                          //   수집은 됐고 마진율만 계산 불가인 상태 — "수집 전"과 구분한다.
+                          <span style={{ fontSize: 11, color: "#c0c4cc" }}>매입가 미입력</span>
                         ) : (
-                          // 공급가는 있는데 아직 판매가 수집 전 (2026-07-10 오표기 수정)
+                          // 매입가는 있는데 아직 판매가 캡처가 한 건도 없음 (2026-07-10 오표기 수정)
                           <span style={{ fontSize: 11, color: "#9ca3af" }}>수집 전</span>
                         )}
                       </td>
