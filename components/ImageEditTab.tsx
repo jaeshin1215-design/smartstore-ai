@@ -56,9 +56,32 @@ export default function ImageEditTab() {
 
     if (text) {
       const fontSize = Math.round(size * textSize / 500);
-      ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
-      const textWidth = ctx.measureText(text).width;
       const padding = fontSize * 0.5;
+      const maxW = size * 0.9;
+
+      // 넘치는 문구는 "그리기 전에" 폰트 크기를 확정한다. 그린 뒤 축소해 다시 그리면
+      //   앞서 그린 큰 글씨가 지워지지 않아 두 겹으로 겹쳤다 (2026-09-11 수정 ①).
+      //   서브 문구도 같은 기준으로 보정한다 — 기존엔 메인만 재서 서브가 좌우로 잘려 나갔다 (수정 ②).
+      //   ※ 세로 배치(ty·배경 높이)는 축소 전 fontSize 기준을 유지한다. 축소는 글자를 줄일 뿐이라
+      //     세로로는 더 안쪽에 들어오고, 배경 띠 높이도 기존과 같게 남는다.
+      const fitFont = (s: string, base: number, bold: boolean) => {
+        const setFont = (px: number) => { ctx.font = `${bold ? "bold " : ""}${px}px Pretendard, sans-serif`; };
+        setFont(base);
+        const w = ctx.measureText(s).width;
+        if (w <= maxW) return base;
+        // 글자폭은 폰트 크기에 정확히 비례하지 않는다(힌팅·반올림). 비례식으로 한 번 줄인 뒤
+        //   실제로 재서 남은 초과분을 1px씩 마저 줄인다 — 목표선을 넘긴 채 끝나지 않도록.
+        let px = Math.max(1, Math.floor(base * maxW / w));
+        for (let i = 0; i < 20 && px > 1; i++) {
+          setFont(px);
+          if (ctx.measureText(s).width <= maxW) break;
+          px--;
+        }
+        return px;
+      };
+      const mainFontSize = fitFont(text, fontSize, true);
+      const subFontSize = subText ? fitFont(subText, Math.round(fontSize * 0.6), false)
+        : Math.round(fontSize * 0.6);
       // 서브 문구는 본문 기준선 아래(ty + fontSize*0.8)에 그려진다. 하단 배치에서 본문을
       //   그만큼 올려주지 않으면 서브 문구가 캔버스 밖으로 나가 잘린다.
       //   (2026-09-11 수정 — 16~72px · 500/1000/1200px 전 조합에서 재현되던 문제)
@@ -80,19 +103,13 @@ export default function ImageEditTab() {
       ctx.fillStyle = textColor;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      ctx.font = `bold ${mainFontSize}px Pretendard, sans-serif`;
       ctx.fillText(text, tx, ty);
 
       if (subText) {
-        const subFontSize = Math.round(fontSize * 0.6);
         ctx.font = `${subFontSize}px Pretendard, sans-serif`;
         ctx.fillStyle = textColor + "cc";
         ctx.fillText(subText, tx, ty + fontSize * 0.8);
-      }
-
-      const maxW = size * 0.9;
-      if (textWidth > maxW) {
-        ctx.font = `bold ${Math.round(fontSize * maxW / textWidth)}px Pretendard, sans-serif`;
-        ctx.fillText(text, tx, ty);
       }
     }
   }, [image, brightness, contrast, saturation, sharpness, text, textSize, textColor, textBg, textPosition, subText, outputSize]);
